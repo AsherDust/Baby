@@ -1,0 +1,115 @@
+(function () {
+  'use strict';
+  const Baby = globalThis.Baby || (globalThis.Baby = {});
+
+  const INK = '#6B4A2E';
+  const svg = (viewBox, inner) =>
+    `<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">${inner}</svg>`;
+
+  const HONEY_POT = `
+    <path d="M19 23C10.5 27.5 7 36 8.8 44.5 10.8 53.5 19.8 58 32 58s21.2-4.5 23.2-13.5C57 36 53.5 27.5 45 23z" fill="#EBAA3F" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="M20 23.5H44V26C44 27.6 43.1 28.5 42 28.5S40 27.6 40 26V25.5C40 29.5 38.6 32 37 32S34 29.5 34 25.5C34 27.5 33 28.6 31.8 28.6S29.6 27.5 29.6 25.5V25C29.6 30.5 28 33.5 26 33.5S22.4 30.5 22.4 25C22.4 26.6 21.4 27.4 20 27.4Z" fill="#F7CD6B"/>
+    <ellipse cx="25.2" cy="30" rx="0.8" ry="1.4" fill="#FFF3D0"/>
+    <path d="M14.5 36c-1.3 4.6-.6 9.4 2.4 12.8" fill="none" stroke="#FFF1CC" stroke-width="3" stroke-linecap="round" opacity=".75"/>
+    <rect x="14.5" y="14.5" width="35" height="9.5" rx="4.75" fill="#F4C565" stroke="${INK}" stroke-width="2.2"/>
+    <g transform="rotate(-5 32 44)">
+      <rect x="23" y="38" width="18" height="12" rx="2.5" fill="#FFF8E7" stroke="${INK}" stroke-width="1.6"/>
+      <path d="M32 47.2l-3.3-3.2a2 2 0 0 1 3.3-2.2 2 2 0 0 1 3.3 2.2z" fill="#C0563F"/>
+    </g>`;
+
+  const BEE = `
+    <ellipse cx="16" cy="9" rx="6" ry="4.2" transform="rotate(-25 16 9)" fill="#FFFFFF" fill-opacity=".92" stroke="${INK}" stroke-width="1.4"/>
+    <ellipse cx="23.5" cy="8.5" rx="5.4" ry="3.8" transform="rotate(20 23.5 8.5)" fill="#FFFFFF" fill-opacity=".92" stroke="${INK}" stroke-width="1.4"/>
+    <ellipse cx="20" cy="18.5" rx="11" ry="8" fill="#F4C24F" stroke="${INK}" stroke-width="1.6"/>
+    <path d="M15.5 11.3c-1.4 4.4-1.4 10 0 14.4M21.3 10.6c-1.4 4.6-1.4 11.2 0 15.8" fill="none" stroke="${INK}" stroke-width="2.6"/>
+    <circle cx="27.4" cy="16.6" r="1.25" fill="${INK}"/>
+    <ellipse cx="28.4" cy="20.2" rx="1.6" ry="1" fill="#E98B6D" opacity=".55"/>
+    <path d="M9.2 17.6L6 18.5l3.2 1" fill="${INK}" stroke="${INK}" stroke-width="1" stroke-linejoin="round"/>
+    <path d="M27 12.9c1-2.6 2.8-4 5-4.3" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round"/>`;
+
+  const BALLOON_BODY = `
+    <path d="M15 2.5C8.1 2.5 3 7.9 3 14.6c0 7.6 6.3 14.2 12 15.6 5.7-1.4 12-8 12-15.6C27 7.9 21.9 2.5 15 2.5z" fill="#93B6CC" stroke="${INK}" stroke-width="1.5"/>
+    <path d="M9.2 9.6c-1.6 2-2.2 4.4-1.8 6.6" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>
+    <path d="M13.4 30.6h3.2L15 33.2z" fill="#93B6CC" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"/>`;
+  const BALLOON_STRING = `<path d="M15 33.2c-2.4 3.6 2.4 6 0 9.6s2 5 0 8.4" fill="none" stroke="${INK}" stroke-width="1.1" stroke-linecap="round"/>`;
+
+  function hexPath(cx, cy, r) {
+    const pts = [];
+    for (let i = 0; i < 6; i += 1) {
+      const a = (Math.PI / 180) * (60 * i - 90);
+      pts.push(`${(cx + r * Math.cos(a)).toFixed(1)} ${(cy + r * Math.sin(a)).toFixed(1)}`);
+    }
+    return `M${pts.join('L')}Z`;
+  }
+
+  const COMB_CELLS = [
+    [30, 16], [54.5, 16, 1], [79, 16], [103.5, 16],
+    [42.3, 37.2], [66.8, 37.2], [91.3, 37.2, 1], [115.8, 37.2],
+    [54.5, 58.4], [79, 58.4, 1], [103.5, 58.4],
+    [91.3, 79.6], [115.8, 79.6],
+  ];
+  const HONEYCOMB = COMB_CELLS.map(([x, y, filled]) =>
+    `<path d="${hexPath(x, y, 12.5)}" fill="${filled ? '#F6D58E' : 'none'}" fill-opacity=".55" stroke="#E2B867" stroke-width="1.3" stroke-opacity=".7"/>`
+  ).join('');
+
+  const SCENE = `
+    <circle cx="74" cy="56" r="22" fill="#FBE3A6" opacity=".55"/>
+    <path d="M0 158C52 128 118 124 178 138S296 158 360 134V210H0z" fill="#EEF2E1"/>
+    <path d="M0 182C72 160 152 158 222 170S322 186 360 176V210H0z" fill="#E0E9D0"/>
+    <path d="M258 178c3-24 2-46-7-68" fill="none" stroke="#8C6A47" stroke-width="10" stroke-linecap="round"/>
+    <path d="M255 136c11-7 22-9 33-9" fill="none" stroke="#8C6A47" stroke-width="5.5" stroke-linecap="round"/>
+    <circle cx="234" cy="88" r="31" fill="#A9C193"/>
+    <circle cx="272" cy="80" r="35" fill="#93AF7E"/>
+    <circle cx="250" cy="57" r="27" fill="#B6CCA1"/>
+    <path d="M226 72c4-3 9-4 13-3M263 60c5-2 10-2 14 0" fill="none" stroke="#D4E2C4" stroke-width="3" stroke-linecap="round"/>
+    <path d="M288 127c6-14-6-22 4-34s8-14 20-24" fill="none" stroke="${INK}" stroke-width="1.1" stroke-linecap="round"/>
+    <g transform="translate(297 36)">${BALLOON_BODY}</g>
+    <g fill="none" stroke="#A9C193" stroke-width="1.6" stroke-linecap="round">
+      <path d="M96 176c1-5 2-7 2-10M101 176c0-4 2-6 4-8M320 182c1-4 2-6 2-9M325 182c0-3 2-5 3-7"/>
+    </g>
+    <g fill="#F1C3AE"><circle cx="64" cy="180" r="3"/><circle cx="132" cy="172" r="2.4"/><circle cx="306" cy="184" r="2.6"/></g>
+    <g fill="#F4C565"><circle cx="76" cy="186" r="2.2"/><circle cx="216" cy="182" r="2.6"/></g>
+    <g>
+      <circle cx="171" cy="111" r="7.5" fill="#E3A548" stroke="${INK}" stroke-width="2"/>
+      <circle cx="171" cy="111" r="3.5" fill="#F6D29A"/>
+      <circle cx="199" cy="111" r="7.5" fill="#E3A548" stroke="${INK}" stroke-width="2"/>
+      <circle cx="199" cy="111" r="3.5" fill="#F6D29A"/>
+      <circle cx="185" cy="126" r="19" fill="#E8AE55" stroke="${INK}" stroke-width="2"/>
+      <circle cx="178.5" cy="122.5" r="2" fill="${INK}"/>
+      <circle cx="191.5" cy="122.5" r="2" fill="${INK}"/>
+      <ellipse cx="185" cy="131" rx="6.5" ry="4.5" fill="#F6D9A6"/>
+      <ellipse cx="185" cy="129" rx="2.4" ry="1.7" fill="${INK}"/>
+    </g>
+    <g transform="translate(153 118)">${HONEY_POT}</g>
+    <path d="M44 104c24-30 62-32 84-12s52 16 68-8" fill="none" stroke="#D6A24A" stroke-width="1.6" stroke-dasharray="1 7" stroke-linecap="round"/>
+    <g transform="translate(192 66)">${BEE}</g>
+    <g transform="translate(112 22) scale(.62)">${BEE}</g>`;
+
+  const icon = (d, width = 1.8) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`;
+
+  const icons = {
+    scale: icon('<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M8.2 10a4.6 4.6 0 0 1 7.6 0"/><path d="M12 10.2l1.6-2.1"/>'),
+    calendarHeart: icon('<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 9.8h17M8 3v4M16 3v4"/><path d="M12 18l-2.6-2.5a1.6 1.6 0 0 1 2.6-1.9 1.6 1.6 0 0 1 2.6 1.9z"/>'),
+    calendarPlus: icon('<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 9.8h17M8 3v4M16 3v4M12 12.5v5M9.5 15h5"/>'),
+    leaf: icon('<path d="M5 19.5C5 11 10.5 5 19.5 4.5 19.5 13.5 13.5 19 5 19.5z"/><path d="M5 19.5l8-8"/>'),
+    sliders: icon('<path d="M4 7h9.5M18.5 7H20M4 17h3.5M12.5 17H20"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/>'),
+    bell: icon('<path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+    plus: icon('<path d="M12 5.5v13M5.5 12h13"/>'),
+    check: icon('<path d="M5 12.5l4.5 4.5L19 7.5"/>', 2.6),
+    x: icon('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'),
+    download: icon('<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>'),
+    bag: icon('<path d="M5 8.5h14l-1 11.5H6z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/>'),
+    suitcase: icon('<rect x="3.5" y="7.5" width="17" height="12.5" rx="3.2"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5"/><path d="M12 16.8l-2.3-2.2a1.4 1.4 0 0 1 2.3-1.7 1.4 1.4 0 0 1 2.3 1.7z"/>'),
+    clock: icon('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  };
+
+  Baby.art = {
+    honeyPot: svg('0 0 64 64', HONEY_POT),
+    bee: svg('0 0 40 30', BEE),
+    balloon: svg('0 0 30 52', BALLOON_BODY + BALLOON_STRING),
+    honeycomb: svg('0 0 130 100', HONEYCOMB),
+    scene: svg('0 0 360 210', SCENE),
+    icon: icons,
+  };
+})();
