@@ -142,18 +142,21 @@ svg { display: block; }
 .field-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 input::placeholder, textarea::placeholder { color: #C4B49B; }
 
-/* iPhone Safari 的日期、时间框自带最小宽度，不收掉会撑出格子盖住旁边的输入框 */
+/* iPhone Safari 的日期、时间框自带最小宽度，不收掉会撑出格子盖住旁边的输入框；
+   它本来靠 flex 让文字上下居中，这里保留 flex，再左右也居中 */
 @supports (-webkit-touch-callout: none) {
   input[type="date"],
   input[type="time"] {
     -webkit-appearance: none;
     appearance: none;
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     min-width: 0;
     max-width: 100%;
   }
   input[type="date"]::-webkit-date-and-time-value,
-  input[type="time"]::-webkit-date-and-time-value { margin: 0; text-align: left; }
+  input[type="time"]::-webkit-date-and-time-value { margin: 0; text-align: center; }
 }
 
 .hint { margin: 0; font-size: 12.5px; color: var(--ink-3); }
