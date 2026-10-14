@@ -8,9 +8,49 @@
   const KG_MIN = 25;
   const KG_MAX = 250;
   const BAG_NAME_MAX = 30;
+  const MED_NAME_MAX = 30;
+
+  // 用药回顾按这几个阶段看；from/to 是孕龄天数，左闭右开
+  const MED_STAGES = [
+    { id: 'pre', name: '孕前', from: -Infinity, to: 0 },
+    { id: 't1', name: D.TRIMESTER_NAMES[1], from: 0, to: 98 },
+    { id: 't2', name: D.TRIMESTER_NAMES[2], from: 98, to: 196 },
+    { id: 't3', name: D.TRIMESTER_NAMES[3], from: 196, to: Infinity },
+  ];
+
+  // 数胎动：一次数 1 小时，5 分钟内连续的胎动算 1 次
+  const KICK_WINDOW = 60 * 60000;
+  const KICK_MERGE = 5 * 60000;
+  const KICK_NORMAL = 3;
+  const KICK_KEEP = 120;
+  // 宫缩计时只留最近 7 天；单次超过 5 分钟多半是忘了点结束，不算进统计
+  const CONTRACTION_KEEP = 7 * 86400000;
+  const CONTRACTION_LONG = 5 * 60000;
+
+  // 血压：孕期 ≥140/90 算高，≥160/110 算严重
+  const BP_RANGE = { sys: [60, 250], dia: [30, 150], pulse: [30, 220] };
+  // 血糖（mmol/L）：低于 3.3 偏低；餐后按 1 小时还是 2 小时测，目标不一样
+  const GLUCOSE_RANGE = [1, 33.3];
+  const GLUCOSE_LOW = 3.3;
 
   const round2 = (n) => Math.round(n * 100) / 100;
+  const isClock = (t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
   const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const isTime = (v) => Number.isFinite(v) && v > 0;
+  const newId = (prefix) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const byStart = (a, b) => a.start - b.start;
+  const byDateTime = (a, b) => byDate(a, b) || (a.time < b.time ? -1 : a.time > b.time ? 1 : 0);
+  const slotIndex = (slot) => C.GLUCOSE_SLOTS.findIndex((s) => s.id === slot);
+  const byDateSlot = (a, b) => byDate(a, b) || slotIndex(a.slot) - slotIndex(b.slot);
+  const toNumber = (v) => (typeof v === 'number' ? v : Number(String(v ?? '').trim().replace(/[,，]/, '.')));
+  const isBlank = (v) => v == null || String(v).trim() === '';
+
+  function intIn(v, [lo, hi]) {
+    if (isBlank(v)) return null;
+    const n = toNumber(v);
+    return Number.isInteger(n) && n >= lo && n <= hi ? n : null;
+  }
+  const mean = (list) => list.reduce((s, n) => s + n, 0) / list.length;
   const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
   const bagGroupId = (g) => (C.BAG_GROUPS.some((x) => x.id === g) ? g : 'misc');
 
@@ -55,9 +95,16 @@
         preWeight: profile.preWeight ?? null,
         nickname: text(profile.nickname, 12),
       },
+      prefs: { glucoseAfter: 2 },
       weights: [],
       checkups: C.defaultCheckups(),
       bag: C.defaultBag(),
+      meds: [],
+      kicks: [],
+      contractions: [],
+      bp: [],
+      glucose: [],
+      ultrasounds: [],
       notified: {},
     };
   }
@@ -99,6 +146,96 @@
     };
   }
 
+  /** 用药记录里允许保存的字段，顺便截掉过长的文字 */
+  function medFields(f) {
+    return {
+      name: text(f.name, MED_NAME_MAX),
+      kind: f.kind === 'medicine' ? 'medicine' : 'supplement',
+      dose: text(f.dose, 40),
+      start: f.start,
+      end: f.end || null,
+      note: text(f.note, 120),
+    };
+  }
+
+  function normalizeMed(m) {
+    if (!m || typeof m !== 'object' || typeof m.id !== 'string' || !m.id) return null;
+    const fields = medFields(m);
+    if (!fields.name || !D.isISODate(fields.start)) return null;
+    if (!D.isISODate(fields.end) || fields.end < fields.start) fields.end = null;
+    return { id: m.id.slice(0, 40), ...fields };
+  }
+
+  function normalizeKick(k) {
+    if (!k || typeof k !== 'object' || typeof k.id !== 'string' || !k.id || !isTime(k.start)) return null;
+    const limit = k.start + KICK_WINDOW;
+    const end = isTime(k.end) && k.end >= k.start ? Math.min(k.end, limit) : null;
+    const taps = (Array.isArray(k.taps) ? k.taps : [])
+      .filter((t) => isTime(t) && t >= k.start && t <= (end ?? limit))
+      .sort((a, b) => a - b)
+      .slice(0, 500);
+    return { id: k.id.slice(0, 40), start: k.start, end, taps };
+  }
+
+  function normalizeContraction(c) {
+    if (!c || typeof c !== 'object' || typeof c.id !== 'string' || !c.id || !isTime(c.start)) return null;
+    return { id: c.id.slice(0, 40), start: c.start, end: isTime(c.end) && c.end >= c.start ? c.end : null };
+  }
+
+  function bpFields(f) {
+    return {
+      date: f.date,
+      time: isClock(f.time) ? f.time : '',
+      sys: intIn(f.sys, BP_RANGE.sys),
+      dia: intIn(f.dia, BP_RANGE.dia),
+      pulse: intIn(f.pulse, BP_RANGE.pulse),
+      note: text(f.note, 60),
+    };
+  }
+
+  function normalizeBp(b) {
+    if (!b || typeof b !== 'object' || typeof b.id !== 'string' || !b.id) return null;
+    const fields = bpFields(b);
+    if (!D.isISODate(fields.date) || fields.sys == null || fields.dia == null || fields.sys <= fields.dia) return null;
+    return { id: b.id.slice(0, 40), ...fields };
+  }
+
+  function parseGlucose(v) {
+    const s = String(v ?? '').trim().replace(/[,，]/, '.');
+    if (!/^\d{1,2}(\.\d{1,2})?$/.test(s)) return null;
+    const n = Math.round(Number(s) * 10) / 10;
+    return n >= GLUCOSE_RANGE[0] && n <= GLUCOSE_RANGE[1] ? n : null;
+  }
+
+  function normalizeGlucose(g) {
+    if (!g || typeof g !== 'object' || !D.isISODate(g.date) || slotIndex(g.slot) < 0) return null;
+    const value = parseGlucose(g.value);
+    return value == null ? null : { date: g.date, slot: g.slot, value };
+  }
+
+  /** B 超数值：空的跳过，超出范围的丢掉，按各项精度取整 */
+  function usValues(raw) {
+    const values = {};
+    for (const f of C.US_FIELDS) {
+      const v = raw ? raw[f.id] : null;
+      if (isBlank(v)) continue;
+      const n = toNumber(v);
+      if (Number.isFinite(n) && n >= f.min && n <= f.max) values[f.id] = f.step >= 1 ? Math.round(n) : Math.round(n * 10) / 10;
+    }
+    return values;
+  }
+
+  function usFields(f) {
+    return { date: f.date, values: usValues(f.values), placenta: text(f.placenta, 40), note: text(f.note, 200) };
+  }
+
+  function normalizeUltrasound(u) {
+    if (!u || typeof u !== 'object' || typeof u.id !== 'string' || !u.id) return null;
+    const fields = usFields(u);
+    if (!D.isISODate(fields.date) || (!Object.keys(fields.values).length && !fields.placenta && !fields.note)) return null;
+    return { id: u.id.slice(0, 40), ...fields };
+  }
+
   /** 逐条校验，丢掉坏的和 id 重复的 */
   function normalizeList(list, normalizeOne) {
     const out = [];
@@ -128,6 +265,17 @@
     // 老数据没有这两个字段时补上默认的；空数组说明是自己删光的，原样保留
     const checkups = normalizeList(Array.isArray(raw.checkups) ? raw.checkups : C.defaultCheckups(), normalizeCheckup);
     const bag = normalizeList(Array.isArray(raw.bag) ? raw.bag : C.defaultBag(), normalizeBagItem);
+    const meds = normalizeList(Array.isArray(raw.meds) ? raw.meds : [], normalizeMed);
+    const kicks = normalizeList(Array.isArray(raw.kicks) ? raw.kicks : [], normalizeKick).sort(byStart).slice(-KICK_KEEP);
+    const contractions = normalizeList(Array.isArray(raw.contractions) ? raw.contractions : [], normalizeContraction).sort(byStart);
+    const bp = normalizeList(Array.isArray(raw.bp) ? raw.bp : [], normalizeBp).sort(byDateTime);
+    const ultrasounds = normalizeList(Array.isArray(raw.ultrasounds) ? raw.ultrasounds : [], normalizeUltrasound).sort(byDate);
+    const glucose = new Map();
+    for (const g of Array.isArray(raw.glucose) ? raw.glucose : []) {
+      const item = normalizeGlucose(g);
+      if (item) glucose.set(`${item.date}/${item.slot}`, item);
+    }
+    const prefs = raw.prefs && typeof raw.prefs === 'object' ? raw.prefs : {};
 
     const notified = {};
     if (raw.notified && typeof raw.notified === 'object') {
@@ -141,9 +289,16 @@
         preWeight: p.preWeight == null ? null : parseKg(p.preWeight),
         nickname: text(p.nickname, 12),
       },
+      prefs: { glucoseAfter: prefs.glucoseAfter === 1 ? 1 : 2 },
       weights: [...weights.values()].sort(byDate),
       checkups,
       bag,
+      meds,
+      kicks,
+      contractions,
+      bp,
+      glucose: [...glucose.values()].sort(byDateSlot),
+      ultrasounds,
       notified,
     };
   }
@@ -337,6 +492,385 @@
     state.bag = C.defaultBag().concat(state.bag.filter((b) => b.custom));
   }
 
+  // ---- 用药与补剂 ----
+
+  /** 表单内容有问题时返回提示，没问题返回 null */
+  function medError(f, today) {
+    if (!text(f.name, MED_NAME_MAX)) return '写一下药或补剂的名字';
+    if (!D.isISODate(f.start)) return '选一下开始日期';
+    if (f.start > today) return '开始日期不能晚于今天';
+    if (f.end && !D.isISODate(f.end)) return '结束日期格式不对，重新选一下';
+    if (f.end && f.end < f.start) return '结束日期不能早于开始日期';
+    return null;
+  }
+
+  function addMed(state, f) {
+    const med = { id: `m-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, ...medFields(f) };
+    state.meds.push(med);
+    return med;
+  }
+
+  function updateMed(state, id, f) {
+    const med = state.meds.find((m) => m.id === id);
+    if (med) Object.assign(med, medFields(f));
+    return med || null;
+  }
+
+  function removeMed(state, id) {
+    const index = state.meds.findIndex((m) => m.id === id);
+    if (index < 0) return null;
+    const [med] = state.meds.splice(index, 1);
+    return { med, index };
+  }
+
+  /** 记为今天停了；返回原来的结束日期，方便撤销 */
+  function stopMed(state, id, today) {
+    const med = state.meds.find((m) => m.id === id);
+    if (!med) return null;
+    const previous = med.end;
+    med.end = today < med.start ? med.start : today;
+    return { med, previous };
+  }
+
+  /**
+   * 用药记录按开始日期排好，附上孕龄范围（天数）和吃过的阶段。
+   * untilGA 是实际吃到的那天：还在吃的算到今天，计划以后才停的也只算到今天。
+   */
+  function medRows(state, today) {
+    const lmp = D.lmpFromDue(state.profile.dueDate);
+    return state.meds
+      .map((med) => {
+        const ongoing = !med.end || med.end > today;
+        let until = ongoing ? today : med.end;
+        if (until < med.start) until = med.start;
+        const startGA = D.diffDays(lmp, med.start);
+        const untilGA = D.diffDays(lmp, until);
+        return {
+          med,
+          ongoing,
+          startGA,
+          untilGA,
+          endGA: med.end ? D.diffDays(lmp, med.end) : null,
+          days: D.diffDays(med.start, until) + 1,
+          stages: MED_STAGES.filter((s) => startGA < s.to && untilGA >= s.from).map((s) => s.id),
+        };
+      })
+      .sort((a, b) => a.startGA - b.startGA);
+  }
+
+  /** 时间轴范围（孕龄天数）：往前最多画到孕前 16 周，往后至少画到 40 周、最多 44 周 */
+  function medTimeline(rows, todayGA) {
+    return {
+      from: Math.max(-16 * 7, Math.min(0, ...rows.map((r) => r.startGA))),
+      to: Math.min(44 * 7, Math.max(D.PREGNANCY_DAYS, todayGA, ...rows.map((r) => r.endGA ?? r.untilGA))),
+    };
+  }
+
+  // ---- 数胎动 ----
+
+  /** 算进去的那几下：从一下算起，之后 5 分钟内再点都并进这一次 */
+  function countedKicks(taps) {
+    const out = [];
+    for (const t of taps) if (!out.length || t - out[out.length - 1] >= KICK_MERGE) out.push(t);
+    return out;
+  }
+
+  function activeKicks(state, now) {
+    const k = state.kicks[state.kicks.length - 1];
+    return k && k.end == null && now < k.start + KICK_WINDOW ? k : null;
+  }
+
+  /** 满 1 小时还没点结束的补上结束时间，返回补上的那次 */
+  function settleKicks(state, now) {
+    const k = state.kicks[state.kicks.length - 1];
+    if (!k || k.end != null || now < k.start + KICK_WINDOW) return null;
+    k.end = k.start + KICK_WINDOW;
+    return k;
+  }
+
+  function startKicks(state, now) {
+    settleKicks(state, now);
+    const running = activeKicks(state, now);
+    if (running) return running;
+    const k = { id: newId('k'), start: now, end: null, taps: [] };
+    state.kicks.push(k);
+    if (state.kicks.length > KICK_KEEP) state.kicks.splice(0, state.kicks.length - KICK_KEEP);
+    return k;
+  }
+
+  /** 点一下「动了」；counted 表示这下算成了新的一次 */
+  function tapKick(state, now) {
+    const k = activeKicks(state, now);
+    if (!k) return null;
+    const before = countedKicks(k.taps).length;
+    k.taps.push(now);
+    return { session: k, counted: countedKicks(k.taps).length > before };
+  }
+
+  function endKicks(state, now) {
+    const k = activeKicks(state, now);
+    if (k) k.end = now;
+    return k;
+  }
+
+  function removeKicks(state, id) {
+    const index = state.kicks.findIndex((k) => k.id === id);
+    if (index < 0) return null;
+    const [session] = state.kicks.splice(index, 1);
+    return { session, index };
+  }
+
+  /**
+   * 每次数胎动的结果，新的在前。verdict：ok 正常 / low 数满 1 小时不到 3 次 /
+   * drop 比最近几次的平均少了一半以上 / short 没数满且不到 3 次；还在数的是 null
+   */
+  function kickReview(state, now) {
+    const fullCounts = [];
+    const rows = state.kicks.map((k) => {
+      const end = k.end ?? Math.min(now, k.start + KICK_WINDOW);
+      const count = countedKicks(k.taps).length;
+      const running = k.end == null && now < k.start + KICK_WINDOW;
+      const full = end - k.start >= KICK_WINDOW - 60000;
+      const recent = fullCounts.slice(-7);
+      const baseline = recent.length >= 3 ? Math.round(mean(recent) * 10) / 10 : null;
+      let verdict = null;
+      if (!running) {
+        if (full && count < KICK_NORMAL) verdict = 'low';
+        else if (full && baseline != null && count < baseline / 2) verdict = 'drop';
+        else if (count >= KICK_NORMAL) verdict = 'ok';
+        else verdict = 'short';
+        if (full) fullCounts.push(count);
+      }
+      return {
+        session: k,
+        date: D.localISO(new Date(k.start)),
+        running,
+        count,
+        taps: k.taps.length,
+        minutes: Math.floor((end - k.start) / 60000),
+        full,
+        baseline,
+        verdict,
+      };
+    });
+    return rows.reverse();
+  }
+
+  // ---- 宫缩计时 ----
+
+  function activeContraction(state) {
+    const c = state.contractions[state.contractions.length - 1];
+    return c && c.end == null ? c : null;
+  }
+
+  /** 宫缩开始点一下、结束再点一下；开始新的一次时顺手清掉 7 天前的记录 */
+  function toggleContraction(state, now) {
+    const running = activeContraction(state);
+    if (running) {
+      running.end = Math.max(now, running.start);
+      return { contraction: running, started: false };
+    }
+    state.contractions = state.contractions.filter((c) => c.start >= now - CONTRACTION_KEEP);
+    const c = { id: newId('q'), start: now, end: null };
+    state.contractions.push(c);
+    return { contraction: c, started: true };
+  }
+
+  function removeContraction(state, id) {
+    const index = state.contractions.findIndex((c) => c.id === id);
+    if (index < 0) return null;
+    const [contraction] = state.contractions.splice(index, 1);
+    return { contraction, index };
+  }
+
+  /** 最近 since 毫秒内的宫缩，新的在前；interval 是和上一次开始隔了多久 */
+  function contractionRows(state, now, since = 12 * 3600000) {
+    const list = state.contractions;
+    return list
+      .map((c, i) => ({ contraction: c, duration: c.end == null ? null : c.end - c.start, interval: i ? c.start - list[i - 1].start : null }))
+      .filter((r) => r.contraction.start >= now - since)
+      .reverse();
+  }
+
+  /**
+   * 看最近 1 小时的规律。level：go 接近 5-1-1（约 5 分钟一次、每次约 1 分钟、持续了快 1 小时）/
+   * watch 比较规律（10 分钟以内一次）/ early 还不规律 / none 次数太少
+   */
+  function contractionStats(state, now) {
+    const recent = state.contractions.filter((c) => c.end != null && c.start >= now - 60 * 60000 && c.end - c.start <= CONTRACTION_LONG);
+    const stats = { count: recent.length, avgDuration: null, avgInterval: null, level: 'none' };
+    if (recent.length < 2) return stats;
+    const span = recent[recent.length - 1].start - recent[0].start;
+    stats.avgDuration = Math.round(mean(recent.map((c) => c.end - c.start)) / 1000);
+    stats.avgInterval = Math.round(mean(recent.slice(1).map((c, i) => c.start - recent[i].start)) / 6000) / 10;
+    if (span >= 45 * 60000 && stats.avgInterval <= 5.5 && stats.avgDuration >= 45) stats.level = 'go';
+    else if (recent.length >= 3 && stats.avgInterval <= 10) stats.level = 'watch';
+    else stats.level = 'early';
+    return stats;
+  }
+
+  // ---- 血压 ----
+
+  function bpError(f, today) {
+    if (!D.isISODate(f.date)) return '选一下日期';
+    if (f.date > today) return '日期不能晚于今天';
+    if (intIn(f.sys, BP_RANGE.sys) == null) return '高压（收缩压）填 60–250 之间的整数';
+    if (intIn(f.dia, BP_RANGE.dia) == null) return '低压（舒张压）填 30–150 之间的整数';
+    if (toNumber(f.sys) <= toNumber(f.dia)) return '高压要比低压大，是不是填反了？';
+    if (!isBlank(f.pulse) && intIn(f.pulse, BP_RANGE.pulse) == null) return '心率填 30–220 之间的整数，不知道可以空着';
+    return null;
+  }
+
+  function addBp(state, f) {
+    const record = { id: newId('p'), ...bpFields(f) };
+    state.bp.push(record);
+    state.bp.sort(byDateTime);
+    return record;
+  }
+
+  function removeBp(state, id) {
+    const index = state.bp.findIndex((r) => r.id === id);
+    if (index < 0) return null;
+    const [record] = state.bp.splice(index, 1);
+    return { record, index };
+  }
+
+  /** severe ≥160/110 / high ≥140/90 / low <90/60 / ok */
+  function bpLevel(r) {
+    if (r.sys >= 160 || r.dia >= 110) return 'severe';
+    if (r.sys >= 140 || r.dia >= 90) return 'high';
+    if (r.sys < 90 || r.dia < 60) return 'low';
+    return 'ok';
+  }
+
+  /** 最近 7 天（含今天）的情况 */
+  function bpSummary(state, today) {
+    const since = D.addDays(today, -6);
+    const recent = state.bp.filter((r) => r.date >= since && r.date <= today);
+    const latest = state.bp.filter((r) => r.date <= today).pop() || null;
+    return {
+      latest,
+      count: recent.length,
+      high: recent.filter((r) => ['high', 'severe'].includes(bpLevel(r))).length,
+      todayCount: recent.filter((r) => r.date === today).length,
+    };
+  }
+
+  // ---- 血糖 ----
+
+  function glucoseTarget(slot, after) {
+    if (slot === 'fasting') return 5.3;
+    if (slot === 'night') return 6.7;
+    return after === 1 ? 7.8 : 6.7;
+  }
+
+  /** low 低于 3.3 / high 高于目标 / ok */
+  function glucoseLevel(value, slot, after) {
+    if (value < GLUCOSE_LOW) return 'low';
+    return value > glucoseTarget(slot, after) ? 'high' : 'ok';
+  }
+
+  function glucoseError(f, today) {
+    if (!D.isISODate(f.date)) return '选一下日期';
+    if (f.date > today) return '日期不能晚于今天';
+    if (slotIndex(f.slot) < 0) return '选一下是什么时候测的';
+    if (parseGlucose(f.value) == null) return '血糖填 1–33.3 之间的数，单位是 mmol/L，例如 5.2';
+    return null;
+  }
+
+  /** 同一天同一时间点只留一条，返回被替换掉的那条（没有就是 null） */
+  function setGlucose(state, f) {
+    const previous = removeGlucose(state, f.date, f.slot);
+    state.glucose.push({ date: f.date, slot: f.slot, value: parseGlucose(f.value) });
+    state.glucose.sort(byDateSlot);
+    return previous;
+  }
+
+  function removeGlucose(state, date, slot) {
+    const index = state.glucose.findIndex((g) => g.date === date && g.slot === slot);
+    return index < 0 ? null : state.glucose.splice(index, 1)[0];
+  }
+
+  /** 按天排好，新的在前：[{ date, values: { fasting: 5.1, ... } }] */
+  function glucoseDays(state) {
+    const days = new Map();
+    for (const g of state.glucose) {
+      if (!days.has(g.date)) days.set(g.date, { date: g.date, values: {} });
+      days.get(g.date).values[g.slot] = g.value;
+    }
+    return [...days.values()].reverse();
+  }
+
+  function glucoseSummary(state, today) {
+    const after = state.prefs.glucoseAfter;
+    const since = D.addDays(today, -6);
+    const recent = state.glucose.filter((g) => g.date >= since && g.date <= today);
+    const levels = recent.map((g) => glucoseLevel(g.value, g.slot, after));
+    return {
+      count: recent.length,
+      high: levels.filter((l) => l === 'high').length,
+      low: levels.filter((l) => l === 'low').length,
+      today: state.glucose.filter((g) => g.date === today),
+    };
+  }
+
+  // ---- B 超 ----
+
+  function usError(f, today) {
+    if (!D.isISODate(f.date)) return '选一下检查日期';
+    if (f.date > today) return '日期不能晚于今天';
+    for (const field of C.US_FIELDS) {
+      const v = f.values ? f.values[field.id] : null;
+      if (isBlank(v)) continue;
+      const n = toNumber(v);
+      if (!Number.isFinite(n) || n < field.min || n > field.max) {
+        return `${field.name}填 ${field.min}–${field.max} ${field.unit} 之间的数，看看单位对不对`;
+      }
+    }
+    const fields = usFields(f);
+    if (!Object.keys(fields.values).length && !fields.placenta && !fields.note) return '至少填一项数值';
+    return null;
+  }
+
+  function addUltrasound(state, f) {
+    const record = { id: newId('u'), ...usFields(f) };
+    state.ultrasounds.push(record);
+    state.ultrasounds.sort(byDate);
+    return record;
+  }
+
+  function updateUltrasound(state, id, f) {
+    const record = state.ultrasounds.find((u) => u.id === id);
+    if (!record) return null;
+    Object.assign(record, usFields(f));
+    state.ultrasounds.sort(byDate);
+    return record;
+  }
+
+  function removeUltrasound(state, id) {
+    const index = state.ultrasounds.findIndex((u) => u.id === id);
+    if (index < 0) return null;
+    const [record] = state.ultrasounds.splice(index, 1);
+    return { record, index };
+  }
+
+  /** 超出一般范围时返回 low / high；只判断有公认范围的几项 */
+  function usFlag(id, value) {
+    if (id === 'fhr') return value < 110 ? 'low' : value > 160 ? 'high' : null;
+    if (id === 'afi') return value < 5 ? 'low' : value >= 25 ? 'high' : null;
+    if (id === 'dvp') return value < 2 ? 'low' : value >= 8 ? 'high' : null;
+    return null;
+  }
+
+  /** 新的在前，附上孕龄和上一次（更早一次）的记录，方便看长了多少 */
+  function ultrasoundRows(state) {
+    const due = state.profile.dueDate;
+    const list = state.ultrasounds;
+    return list
+      .map((record, i) => ({ record, ga: D.gestation(due, record.date).days, prev: i ? list[i - 1] : null }))
+      .reverse();
+  }
+
   Baby.model = {
     round2,
     parseKg,
@@ -366,5 +900,51 @@
     addBagItem,
     removeBagItem,
     resetBag,
+    MED_NAME_MAX,
+    MED_STAGES,
+    medError,
+    addMed,
+    updateMed,
+    removeMed,
+    stopMed,
+    medRows,
+    medTimeline,
+    KICK_WINDOW,
+    KICK_MERGE,
+    KICK_NORMAL,
+    CONTRACTION_LONG,
+    countedKicks,
+    activeKicks,
+    settleKicks,
+    startKicks,
+    tapKick,
+    endKicks,
+    removeKicks,
+    kickReview,
+    activeContraction,
+    toggleContraction,
+    removeContraction,
+    contractionRows,
+    contractionStats,
+    bpError,
+    addBp,
+    removeBp,
+    bpLevel,
+    bpSummary,
+    GLUCOSE_LOW,
+    parseGlucose,
+    glucoseTarget,
+    glucoseLevel,
+    glucoseError,
+    setGlucose,
+    removeGlucose,
+    glucoseDays,
+    glucoseSummary,
+    usError,
+    addUltrasound,
+    updateUltrasound,
+    removeUltrasound,
+    usFlag,
+    ultrasoundRows,
   };
 })();

@@ -102,6 +102,21 @@
     bag: icon('<path d="M5 8.5h14l-1 11.5H6z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/>'),
     suitcase: icon('<rect x="3.5" y="7.5" width="17" height="12.5" rx="3.2"/><path d="M9 7.5V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5"/><path d="M12 16.8l-2.3-2.2a1.4 1.4 0 0 1 2.3-1.7 1.4 1.4 0 0 1 2.3 1.7z"/>'),
     clock: icon('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+    pill: icon('<g transform="rotate(-35 12 12)"><rect x="3" y="8.5" width="18" height="7" rx="3.5"/><path d="M12 8.5v7"/></g>'),
+    feet: icon('<ellipse cx="8" cy="16.6" rx="2.6" ry="3.9" transform="rotate(-8 8 16.6)"/><path d="M5.7 10.8h0M7.4 10.1h0M9.1 10.2h0M10.5 11.1h0"/><ellipse cx="16" cy="9.4" rx="2.6" ry="3.9" transform="rotate(8 16 9.4)"/><path d="M13.6 3.9h0M15.2 3.1h0M16.9 3.2h0M18.4 4h0"/>'),
+    timer: icon('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.6M10 2.8h4M12 2.8V6M18.4 6.6l1.4-1.4"/>'),
+    bowl: icon('<path d="M3.5 11.5h17a8.5 7 0 0 1-17 0z"/><path d="M9 20.5h6M9.2 8.2c0-1.6 1.6-1.6 1.6-3.2M13.4 8.2c0-1.6 1.6-1.6 1.6-3.2"/>'),
+    alert: icon('<path d="M12 4.2l9 15.6H3z"/><path d="M12 10v4.4M12 17.2h0"/>'),
+    home: icon('<path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.6v9.9h12V9.6"/><path d="M12 17.2l-2-1.9a1.25 1.25 0 0 1 2-1.5 1.25 1.25 0 0 1 2 1.5z"/>'),
+    notes: icon('<rect x="5" y="3.5" width="14" height="17" rx="3"/><path d="M8.8 8.5h6.4M8.8 12h6.4M8.8 15.5h3.6"/>'),
+    grid: icon('<rect x="4" y="4" width="6.6" height="6.6" rx="2"/><rect x="13.4" y="4" width="6.6" height="6.6" rx="2"/><rect x="4" y="13.4" width="6.6" height="6.6" rx="2"/><circle cx="16.7" cy="16.7" r="3.3"/>'),
+    chevronLeft: icon('<path d="M14.5 5.5L8 12l6.5 6.5"/>', 2.2),
+    chevronRight: icon('<path d="M9.5 5.5L16 12l-6.5 6.5"/>', 2.2),
+    heart: icon('<path d="M12 19.5l-6.6-6.3a4.1 4.1 0 0 1 6.6-4.8 4.1 4.1 0 0 1 6.6 4.8z"/>'),
+    heartPulse: icon('<path d="M12 19.5l-6.6-6.3a4.1 4.1 0 0 1 6.6-4.8 4.1 4.1 0 0 1 6.6 4.8z"/><path d="M3.5 12.5h4l1.5-2.5 2.5 5 1.5-2.5h7.5"/>'),
+    drop: icon('<path d="M12 3.8c3.4 4.3 5.8 7.6 5.8 10.6a5.8 5.8 0 0 1-11.6 0c0-3 2.4-6.3 5.8-10.6z"/><path d="M9.4 14.6a2.7 2.7 0 0 0 2.4 2.6"/>'),
+    scan: icon('<path d="M4 8.5V6a2 2 0 0 1 2-2h2.5M15.5 4H18a2 2 0 0 1 2 2v2.5M20 15.5V18a2 2 0 0 1-2 2h-2.5M8.5 20H6a2 2 0 0 1-2-2v-2.5"/><path d="M14.6 9.6a3.6 3.6 0 1 0-1 4.4c.6 1 1.6 1.6 2.6 1.4"/>'),
+    book: icon('<path d="M12 6.5C10 5 7.5 4.5 4 4.8v13.4c3.5-.3 6 .2 8 1.8 2-1.6 4.5-2.1 8-1.8V4.8c-3.5-.3-6 .2-8 1.7z"/><path d="M12 6.5V20"/>'),
   };
 
   Baby.art = {
