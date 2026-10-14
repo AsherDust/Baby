@@ -1372,6 +1372,16 @@
     sheetDialog.innerHTML = `
       <form class="dialog-body" data-form="ultrasound" data-id="${r ? esc(r.id) : ''}" novalidate>
         ${dialogHead(r ? '编辑 B 超' : '记一次 B 超', '照着 B 超单填，没有的空着就行')}
+        <details class="us-paste"${r ? '' : ' open'}>
+          <summary>${A.icon.scan}粘贴 B 超单上的文字，自动填好</summary>
+          <ol class="us-paste-steps">
+            <li>在相册里打开 B 超单照片，长按上面的字</li>
+            <li>点「全选」，再点「拷贝」</li>
+            <li>回到这里，粘贴到下面的框里</li>
+          </ol>
+          <textarea id="us-paste" rows="3" placeholder="长按这里，选「粘贴」" aria-label="B 超单上的文字"></textarea>
+          <p class="us-paste-result" id="us-paste-result" aria-live="polite"></p>
+        </details>
         <label class="field">
           <span>检查日期</span>
           <input type="date" name="date" max="${ui.today}" value="${r ? r.date : ui.today}">
@@ -1394,6 +1404,38 @@
         </div>
       </form>`;
     showDialog(sheetDialog);
+  }
+
+  /** 把粘贴进来的 B 超单文字认一遍，认出来的填进表单并标亮，等人核对 */
+  function fillFromReport(textarea) {
+    const form = textarea.form;
+    const result = form.querySelector('#us-paste-result');
+    if (!textarea.value.trim()) {
+      result.textContent = '';
+      return;
+    }
+    const found = M.parseUltrasoundText(textarea.value, ui.today);
+    const filled = [];
+    const mark = (input, value) => {
+      input.value = value;
+      input.classList.add('is-filled');
+    };
+    for (const f of C.US_FIELDS) {
+      if (found.values[f.id] == null) continue;
+      mark(form.elements[`v-${f.id}`], usText(found.values[f.id]));
+      filled.push(f.name);
+    }
+    if (found.date) mark(form.elements.date, found.date);
+    if (found.placenta) mark(form.elements.placenta, found.placenta);
+    if (found.note && !form.elements.note.value.trim()) mark(form.elements.note, found.note);
+    const extras = [found.date && '检查日期', found.placenta && '胎盘'].filter(Boolean);
+    if (!filled.length && !extras.length) {
+      result.className = 'us-paste-result is-empty';
+      result.textContent = '没认出数值。可以只拷贝写着测量结果的那几行再试，或者直接在下面填。';
+      return;
+    }
+    result.className = 'us-paste-result is-ok';
+    result.textContent = `认出了 ${[...filled, ...extras].join('、')}，已经填好并标黄。照片上的字偶尔会认错，对着单子核对一下再保存。`;
   }
 
   function openSettings() {
@@ -2165,6 +2207,12 @@
   });
 
   document.addEventListener('input', (e) => {
+    if (e.target.id === 'us-paste') {
+      fillFromReport(e.target);
+      return;
+    }
+    // 自己改过的就不再标成「自动填的」
+    if (e.target.classList.contains('is-filled')) e.target.classList.remove('is-filled');
     if (e.target.id !== 'food-q') return;
     ui.foodQuery = e.target.value;
     document.getElementById('food-results').innerHTML = viewFoodResults();

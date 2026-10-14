@@ -747,6 +747,79 @@ test('日历：有时间的产检，前一晚 8 点和提前 1 小时提醒，�
   ok(late.includes('DTEND:20270101T003000'), late);
 });
 
+// ---------- B 超单文字识别 ----------
+
+test('B 超识别：叙述式报告，厘米换成毫米，胎盘和胎位也认出来', () => {
+  const text = `超声所见：宫内可见一胎儿，胎心搏动可见，胎心率约142次/分。
+双顶径约6.2cm，头围约22.6cm，腹围约20.3cm，股骨长约4.5cm。
+胎盘位于子宫后壁，成熟度0级。羊水最大深度约5.1cm，羊水指数12.3cm。
+估测胎儿体重约640g±94g。胎儿头位，脐带绕颈一周。
+检查日期：2026-10-09`;
+  const r = M.parseUltrasoundText(text, '2026-10-12');
+  eq(r.values, { bpd: 62, hc: 226, ac: 203, fl: 45, fhr: 142, afi: 12.3, dvp: 5.1, efw: 640 });
+  eq(r.date, '2026-10-09');
+  eq(r.placenta, '后壁 0 级');
+  eq(r.note, '头位，脐带绕颈一周');
+});
+
+test('B 超识别：医院常见格式，不把肱骨长、胎盘厚度、S/D、打印时间认进来', () => {
+  const text = `检查部位：产科（中晚孕） 检查日期：2026-10-09
+打印时间：2026-10-10 08:12
+胎心搏动可见，胎心率：148次/分，心律齐。
+双顶径：62mm，头围：226mm，腹围：203mm，股骨长：45mm，肱骨长：40mm。
+胎盘：位于子宫前壁，厚约25mm，成熟度Ⅰ级，下缘距宫颈内口>70mm。
+羊水：最大深度约52mm，羊水指数约125mm。
+脐动脉S/D：2.8 PI 1.0 RI 0.6`;
+  const r = M.parseUltrasoundText(text, '2026-10-12');
+  eq(r.values, { bpd: 62, hc: 226, ac: 203, fl: 45, fhr: 148, afi: 12.5, dvp: 5.2 });
+  eq([r.date, r.placenta], ['2026-10-09', '前壁 I 级']);
+  eq(M.parseUltrasoundText('卵黄囊直径约4mm，胎芽长约12mm，心率约160次/分', '2026-10-12').values, { crl: 12, fhr: 160 }, '孕早期');
+  eq(M.parseUltrasoundText('ＢＰＤ：６２．４ｍｍ', '2026-10-12').values, { bpd: 62.4 }, '全角');
+});
+
+test('B 超识别：iPhone 拷贝出来的表格（一行几项、英文缩写）', () => {
+  const text = `姓名 张三 年龄 29岁
+出生日期 1997-03-02
+检查时间 2026/10/09 10:21
+BPD 62.4mm HC 226mm AC 203mm FL 45.0mm
+FHR 142bpm AFI 4.6cm EFW 640g
+胎盘：前壁 Ⅰ级
+末次月经 2026-04-24`;
+  const r = M.parseUltrasoundText(text, '2026-10-12');
+  eq(r.values, { bpd: 62.4, hc: 226, ac: 203, fl: 45, fhr: 142, afi: 4.6, efw: 640 });
+  eq(r.date, '2026-10-09', '优先用写着「检查时间」的日期');
+  eq(r.placenta, '前壁 I 级');
+});
+
+test('B 超识别：括号缩写、换行、四象限羊水、毫米写的羊水', () => {
+  let r = M.parseUltrasoundText('双顶径(BPD)：58.2mm\n股骨长\n41.3 mm\n羊水指数：3.2+4.1+2.8+2.5=12.6cm', '2026-10-12');
+  eq(r.values, { bpd: 58.2, fl: 41.3, afi: 12.6 });
+  eq(M.parseUltrasoundText('AFI 3.0+4.0+2.0+3.0cm', '2026-10-12').values, { afi: 12 }, '没写总和时自己加');
+  eq(M.parseUltrasoundText('AFI 126mm', '2026-10-12').values, { afi: 12.6 });
+  eq(M.parseUltrasoundText('头臀长 CRL 12mm，NT 1.4mm', '2026-10-12').values, { crl: 12 });
+  eq(M.parseUltrasoundText('头臀长 CRL 12mm，NT 1.4mm', '2026-10-12').note, 'NT 1.4 mm');
+});
+
+test('B 超识别：表格被一列一列拷出来时，名字和数按顺序配对', () => {
+  eq(M.parseUltrasoundText('双顶径\n头围\n腹围\n股骨长\n6.2cm\n22.6cm\n20.3cm\n4.5cm', '2026-10-12').values, { bpd: 62, hc: 226, ac: 203, fl: 45 });
+  eq(M.parseUltrasoundText('BPD\nHC\nAC\nFL\n62mm\n226mm\n203mm\n45mm', '2026-10-12').values, { bpd: 62, hc: 226, ac: 203, fl: 45 }, '只有缩写');
+  eq(M.parseUltrasoundText('测量项目\n双顶径\n股骨长\nBPD\nFL\n结果\n62 mm\n45 mm', '2026-10-12').values, { bpd: 62, fl: 45 }, '中文名一列、缩写一列');
+  eq(M.parseUltrasoundText('双顶径\n头围\n腹围\n62mm\n226mm', '2026-10-12').values, { ac: 62 }, '个数对不上时不配对，只剩紧挨着的那一对');
+});
+
+test('B 超识别：比值、超出范围、单词里的缩写都不会被误认', () => {
+  const r = M.parseUltrasoundText('HC/AC 1.11 FL/BPD 0.72 头围/腹围比值 0.98 FLOW 12 BPD 620mm 头围 HC 2.1cm', '2026-10-12');
+  eq(r.values, { hc: 21 }, '比值和 620mm 都要跳过');
+  eq(M.parseUltrasoundText('胎心率142次/分', '2026-10-12').values, { fhr: 142 }, '次/分 不能当成比值去掉');
+  eq(M.parseUltrasoundText('随便一段文字，没有数值', '2026-10-12'), { values: {}, date: null, placenta: '', note: '' });
+});
+
+test('B 超识别：日期不晚于今天，没有关键词时取最近的一个', () => {
+  eq(M.parseUltrasoundText('2026年9月25日 复查 2026.10.20', '2026-10-12').date, '2026-09-25', '以后的日期不要');
+  eq(M.parseUltrasoundText('末次月经 2026-04-24  2026-10-09', '2026-10-12').date, '2026-10-09');
+  eq(M.parseUltrasoundText('2026-02-30', '2026-10-12').date, null, '不存在的日期不要');
+});
+
 // ---------- chart ----------
 
 test('体重曲线：空数据不画，有数据时点数正确且没有 NaN', () => {

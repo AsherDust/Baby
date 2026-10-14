@@ -862,6 +862,157 @@
     return null;
   }
 
+  // ---- 从 B 超单文字里认出数值 ----
+
+  const US_LENGTH = new Set(['crl', 'bpd', 'hc', 'ac', 'fl']);
+  // 指标名和数之间允许出现的字：同一行里的空格、冒号、约、括号里的缩写之类，最多再换一次行；
+  // 不能随便跨行，不然一列指标名后面跟一列数时，会把最后一个名字配上第一个数
+  const US_GAP = '[ \\t:：=约为是（）()\\[\\]【】A-Za-z~～-]{0,14}?(?:\\s*\\n[ \\t约]*)?';
+  // HC/AC 1.11、头围/腹围 0.98 这类比值不是测量值，先去掉
+  const US_RATIO = /([A-Za-z]{2,4}\s*[/／]\s*[A-Za-z]{2,4}|[\u4e00-\u9fff]{2,4}\s*[/／]\s*[\u4e00-\u9fff]{2,4})(?:比值|比)?\s*[:：=]?\s*\d+(?:\.\d+)?\s*%?/g;
+  // 羊水指数常写成 3.2+4.1+2.8+2.5=12.6
+  const US_NUM = '(\\d{1,4}(?:\\.\\d{1,2})?(?:\\s*\\+\\s*\\d{1,3}(?:\\.\\d{1,2})?)*)(?:\\s*=\\s*(\\d{1,3}(?:\\.\\d{1,2})?))?';
+  const US_UNIT = '(?:\\s*[±]\\s*\\d+(?:\\.\\d+)?)?\\s*(mm|cm|毫米|厘米|kg|千克|g|克|次\\/分|bpm)?';
+  const GRADES = {
+    '0': '0', '０': '0',
+    'Ⅰ': 'I', 'I': 'I', '1': 'I',
+    'Ⅱ': 'II', 'II': 'II', '2': 'II',
+    'Ⅲ': 'III', 'III': 'III', '3': 'III',
+  };
+
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  /** 英文缩写前后不能紧挨着字母，免得 FL 认成 FLOW 里的 */
+  function aliasRe(alias) {
+    const body = escapeRe(alias);
+    return /^[A-Za-z]+$/.test(alias) ? `(?:^|[^A-Za-z])${body}(?![A-Za-z])` : body;
+  }
+
+  /** 统一换成这个指标用的单位；没写单位时按大小猜 */
+  function usUnit(field, raw, n, unit) {
+    const u = (unit || '').toLowerCase();
+    if (US_LENGTH.has(field.id)) {
+      if (u === 'cm' || u === '厘米') return n * 10;
+      // 不带单位的小数（比如 6.2）多半是厘米
+      if (!u && raw.includes('.') && n < 30) return n * 10;
+      return n;
+    }
+    if (field.id === 'afi' || field.id === 'dvp') {
+      if (u === 'mm' || u === '毫米' || (!u && n > field.max)) return n / 10;
+      return n;
+    }
+    if (field.id === 'efw' && (u === 'kg' || u === '千克' || (!u && n < 7))) return n * 1000;
+    return n;
+  }
+
+  /** m 是 US_NUM + US_UNIT 的匹配结果；换算后超出范围的不要 */
+  function usNumber(field, m) {
+    const sum = m[1].split('+').reduce((a, b) => a + Number(b), 0);
+    const raw = m[2] || (m[1].includes('+') ? String(sum) : m[1]);
+    const n = usUnit(field, raw, m[2] ? Number(m[2]) : sum, m[3]);
+    const v = field.step >= 1 ? Math.round(n) : Math.round(n * 10) / 10;
+    return v >= field.min && v <= field.max ? v : null;
+  }
+
+  function usValueIn(text, field) {
+    for (const alias of field.alias) {
+      const re = new RegExp(`${aliasRe(alias)}${US_GAP}${US_NUM}${US_UNIT}`, 'gi');
+      for (const m of text.matchAll(re)) {
+        const v = usNumber(field, m);
+        if (v != null) return v;
+      }
+    }
+    return null;
+  }
+
+  /** 表格有时会被一列一列地拷出来：先是一串指标名，再是同样多个数，按顺序配上 */
+  function usColumnsIn(text, values) {
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    const labels = C.US_FIELDS.map((f) => ({
+      f,
+      res: f.alias.map((a) => new RegExp(`^${escapeRe(a)}(?:\\s*[(（]\\s*[A-Za-z]{2,4}\\s*[)）]|\\s+[A-Za-z]{2,4})?\\s*[:：]?$`, 'i')),
+    }));
+    const labelOf = (line) => (labels.find((l) => l.res.some((re) => re.test(line))) || {}).f;
+    const valueRe = new RegExp(`^约?\\s*${US_NUM}${US_UNIT}$`, 'i');
+    let i = 0;
+    while (i < lines.length) {
+      const fields = [];
+      while (i < lines.length && labelOf(lines[i])) {
+        const f = labelOf(lines[i++]);
+        if (!fields.includes(f)) fields.push(f);
+      }
+      if (!fields.length) {
+        i += 1;
+        continue;
+      }
+      // 中间可能隔着「结果」「测量值」这样的表头
+      for (let skip = 0; skip < 2 && i < lines.length && !/\d/.test(lines[i]); skip += 1) i += 1;
+      const nums = [];
+      while (i < lines.length && nums.length < fields.length && valueRe.test(lines[i])) nums.push(lines[i++].match(valueRe));
+      if (fields.length < 2 || nums.length !== fields.length) continue;
+      fields.forEach((f, k) => {
+        const v = usNumber(f, nums[k]);
+        if (v != null && values[f.id] == null) values[f.id] = v;
+      });
+    }
+  }
+
+  /** 检查日期：优先找写着「检查日期 / 报告时间」的，没有就取不晚于今天的最后一个（出生日期、末次月经都更早） */
+  function usDateIn(text, today) {
+    const found = [];
+    for (const m of text.matchAll(/(20\d{2})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})/g)) {
+      const iso = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+      if (!D.isISODate(iso) || iso > today) continue;
+      found.push({ iso, keyed: /(检查|报告|超声)(日期|时间)/.test(text.slice(Math.max(0, m.index - 10), m.index)) });
+    }
+    const keyed = found.find((x) => x.keyed);
+    if (keyed) return keyed.iso;
+    return found.length ? found.map((x) => x.iso).sort().pop() : null;
+  }
+
+  function usPlacentaIn(text) {
+    const at = text.indexOf('胎盘');
+    if (at < 0) return '';
+    const seg = text.slice(at, at + 40);
+    const place = (seg.match(/(左前壁|右前壁|左后壁|右后壁|左侧壁|右侧壁|前壁|后壁|侧壁|宫底)/) || [])[1] || '';
+    const grade = (seg.match(/(III|II|I|Ⅲ|Ⅱ|Ⅰ|[0０123])\s*[级度]/) || [])[1];
+    return [place, grade ? `${GRADES[grade]} 级` : ''].filter(Boolean).join(' ');
+  }
+
+  function usNoteIn(text) {
+    const parts = [];
+    const position = text.match(/(头位|臀位|横位|枕[左右][前后横]位?)/);
+    if (position) parts.push(position[1]);
+    const cord = text.match(/脐带绕颈\s*([一二两三1-3])\s*周/);
+    if (cord) parts.push(`脐带绕颈${cord[1]}周`);
+    const nt = text.match(/(?:^|[^A-Za-z])NT[^\d\n]{0,6}(\d(?:\.\d{1,2})?)\s*mm/i);
+    if (nt) parts.push(`NT ${nt[1]} mm`);
+    return parts.join('，');
+  }
+
+  /**
+   * 从拷贝出来的 B 超单文字里认出数值，给表单预填用，保存前要人看一遍。
+   * 返回 { values: { bpd: 62.4, ... }, date, placenta, note }，认不出的不出现
+   */
+  function parseUltrasoundText(text, today) {
+    const s = String(text || '')
+      .replace(/\r/g, '')
+      // 全角的数字、字母、符号换成半角：６２ｍｍ → 62mm
+      .replace(/[\uFF01-\uFF5E]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+      .replace(US_RATIO, ' ');
+    const values = {};
+    usColumnsIn(s, values);
+    for (const field of C.US_FIELDS) {
+      if (values[field.id] != null) continue;
+      const v = usValueIn(s, field);
+      if (v != null) values[field.id] = v;
+    }
+    // 保持和 US_FIELDS 一样的顺序，表单和提示里好对照
+    const ordered = {};
+    for (const field of C.US_FIELDS) if (values[field.id] != null) ordered[field.id] = values[field.id];
+    return { values: ordered, date: usDateIn(s, today), placenta: usPlacentaIn(s), note: usNoteIn(s) };
+  }
+
   /** 新的在前，附上孕龄和上一次（更早一次）的记录，方便看长了多少 */
   function ultrasoundRows(state) {
     const due = state.profile.dueDate;
@@ -946,5 +1097,6 @@
     removeUltrasound,
     usFlag,
     ultrasoundRows,
+    parseUltrasoundText,
   };
 })();

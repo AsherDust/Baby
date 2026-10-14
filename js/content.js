@@ -226,17 +226,17 @@
     [41, 99, '过了预产期很常见，宝宝在里面多待几天也没关系。', '按医生安排做胎心监护，每天数胎动，听医生决定什么时候引产。'],
   ];
 
-  // B 超单上常见的指标；min/max 只用来挡住明显填错的数
+  // B 超单上常见的指标；min/max 只用来挡住明显填错的数；alias 是报告上可能出现的写法，长的放前面
   const US_FIELDS = [
-    { id: 'crl', name: '头臀长', abbr: 'CRL', unit: 'mm', min: 1, max: 120, step: 0.1, about: '从头顶到屁股的长度，孕早期用来核对孕周。' },
-    { id: 'bpd', name: '双顶径', abbr: 'BPD', unit: 'mm', min: 5, max: 120, step: 0.1, about: '头部左右两侧最宽处的距离。' },
-    { id: 'hc', name: '头围', abbr: 'HC', unit: 'mm', min: 20, max: 420, step: 0.1, about: '头部一圈的长度。' },
-    { id: 'ac', name: '腹围', abbr: 'AC', unit: 'mm', min: 20, max: 450, step: 0.1, about: '肚子一圈的长度，和估计体重关系最大。' },
-    { id: 'fl', name: '股骨长', abbr: 'FL', unit: 'mm', min: 3, max: 95, step: 0.1, about: '大腿骨的长度。' },
-    { id: 'fhr', name: '胎心率', abbr: 'FHR', unit: '次/分', min: 60, max: 240, step: 1, about: '一般在 110–160 次/分。' },
-    { id: 'afi', name: '羊水指数', abbr: 'AFI', unit: 'cm', min: 0, max: 50, step: 0.1, about: '四个象限羊水深度加起来，一般在 5–25 cm 之间。' },
-    { id: 'dvp', name: '最大羊水深度', abbr: 'AFV', unit: 'cm', min: 0, max: 20, step: 0.1, about: '最深的一处羊水，一般在 2–8 cm 之间。' },
-    { id: 'efw', name: '估计体重', abbr: 'EFW', unit: 'g', min: 50, max: 6500, step: 1, about: '按 B 超测量值估算，误差可能有 10–15%。' },
+    { id: 'crl', name: '头臀长', abbr: 'CRL', unit: 'mm', min: 1, max: 120, step: 0.1, about: '从头顶到屁股的长度，孕早期用来核对孕周。', alias: ['头臀长', '顶臀长', '头臀径', '胎芽长', 'CRL'] },
+    { id: 'bpd', name: '双顶径', abbr: 'BPD', unit: 'mm', min: 5, max: 120, step: 0.1, about: '头部左右两侧最宽处的距离。', alias: ['双顶径', 'BPD'] },
+    { id: 'hc', name: '头围', abbr: 'HC', unit: 'mm', min: 20, max: 420, step: 0.1, about: '头部一圈的长度。', alias: ['头围', 'HC'] },
+    { id: 'ac', name: '腹围', abbr: 'AC', unit: 'mm', min: 20, max: 450, step: 0.1, about: '肚子一圈的长度，和估计体重关系最大。', alias: ['腹围', 'AC'] },
+    { id: 'fl', name: '股骨长', abbr: 'FL', unit: 'mm', min: 3, max: 95, step: 0.1, about: '大腿骨的长度。', alias: ['股骨长', '股骨', 'FL'] },
+    { id: 'fhr', name: '胎心率', abbr: 'FHR', unit: '次/分', min: 60, max: 240, step: 1, about: '一般在 110–160 次/分。', alias: ['胎心率', '胎心', '心率', 'FHR'] },
+    { id: 'afi', name: '羊水指数', abbr: 'AFI', unit: 'cm', min: 0, max: 50, step: 0.1, about: '四个象限羊水深度加起来，一般在 5–25 cm 之间。', alias: ['羊水指数', 'AFI'] },
+    { id: 'dvp', name: '最大羊水深度', abbr: 'AFV', unit: 'cm', min: 0, max: 20, step: 0.1, about: '最深的一处羊水，一般在 2–8 cm 之间。', alias: ['最大羊水深度', '羊水最大深度', '最大羊水池深度', '羊水深度', '最大深度', '最大暗区', 'AFV', 'DVP', 'MVP'] },
+    { id: 'efw', name: '估计体重', abbr: 'EFW', unit: 'g', min: 50, max: 6500, step: 1, about: '按 B 超测量值估算，误差可能有 10–15%。', alias: ['估计体重', '估测体重', '胎儿体重', '预估体重', '估重', 'EFW'] },
   ];
 
   // 血糖按一天里测的时间点记；目标值参考《妊娠期高血糖诊治指南（2022）》，以医生给的为准

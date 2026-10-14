@@ -917,6 +917,18 @@ input::placeholder, textarea::placeholder { color: #C4B49B; }
 .us-glossary dt { font-weight: 600; }
 .us-glossary dd { margin: 0; color: var(--ink-2); }
 .us-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; }
+.us-paste { padding: 12px 14px; border: 1px dashed var(--honey); border-radius: 16px; background: var(--honey-glow); }
+.us-paste summary { display: flex; align-items: center; gap: 8px; min-height: 28px; color: var(--honey-deep); font-size: 14px; font-weight: 600; cursor: pointer; list-style: none; }
+.us-paste summary::-webkit-details-marker { display: none; }
+.us-paste summary svg { flex: none; width: 18px; height: 18px; }
+.us-paste-steps { display: grid; gap: 2px; margin: 8px 0 10px; padding-left: 20px; font-size: 13px; color: var(--ink-2); }
+.us-paste textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 12px; background: #FFFEFB; font-size: 14px; line-height: 1.5; resize: vertical; }
+.us-paste textarea:focus { outline: none; border-color: var(--honey); box-shadow: 0 0 0 4px rgba(233, 169, 60, 0.18); }
+.us-paste-result { margin: 8px 0 0; font-size: 13px; }
+.us-paste-result:empty { display: none; }
+.us-paste-result.is-ok { color: var(--leaf-deep); }
+.us-paste-result.is-empty { color: var(--red); }
+.field input.is-filled, .field textarea.is-filled { border-color: var(--honey); background: #FFF3CF; }
 
 /* ---------- 页脚 ---------- */
 
@@ -1154,7 +1166,7 @@ dialog::backdrop { background: rgba(74, 56, 40, 0.38); backdrop-filter: blur(2px
 @media (max-width: 720px), (pointer: coarse) {
   a, button, label, summary { -webkit-tap-highlight-color: transparent; }
   a, button, input, label { touch-action: manipulation; }
-  .field input, .field textarea, .quick-form input, .lmp-row input, .food-search, .bag-add-form input { font-size: 16px; }
+  .field input, .field textarea, .quick-form input, .lmp-row input, .food-search, .bag-add-form input, .us-paste textarea { font-size: 16px; }
   .bp-nums input, #gl-value, .quick-form input { font-size: 20px; }
   .field input { height: 46px; }
   .btn { height: 44px; }
