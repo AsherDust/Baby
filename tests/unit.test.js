@@ -377,6 +377,17 @@ test('胎动：5 分钟内连续的只算 1 次', () => {
   eq(M.countedKicks([]), []);
 });
 
+test('屏幕常亮：数胎动、宫缩进行中、宫缩计时页上两次之间不超过 20 分钟', () => {
+  const s = M.createState({ dueDate: DUE });
+  eq(M.keepScreenOn(s, at(0), true), false, '什么都没在计');
+  M.startKicks(s, at(0));
+  eq([M.keepScreenOn(s, at(30), false), M.keepScreenOn(s, at(60), false)], [true, false], '数胎动的 1 小时内');
+  M.toggleContraction(s, at(100));
+  eq(M.keepScreenOn(s, at(140), false), true, '宫缩还没点结束，在哪一页都亮着');
+  M.toggleContraction(s, at(101));
+  eq([M.keepScreenOn(s, at(119), true), M.keepScreenOn(s, at(120), true), M.keepScreenOn(s, at(110), false)], [true, false, false], '两次之间');
+});
+
 test('胎动：开始、点「动了」、满 1 小时自动结束', () => {
   const s = M.createState({ dueDate: DUE });
   eq(M.tapKick(s, at(0)), null, '没开始时点了不算');
@@ -602,7 +613,7 @@ test('normalize：新建的数据存取一圈不变', () => {
 
 test('normalize：血压、血糖、B 超的清理', () => {
   const base = M.normalize({ profile: { dueDate: DUE } });
-  eq([base.prefs, base.bp, base.glucose, base.ultrasounds], [{ glucoseAfter: 2 }, [], [], []]);
+  eq([base.prefs, base.bp, base.glucose, base.ultrasounds], [{ glucoseAfter: 2, since: null, lastBackup: null, backupNudged: null, installHintHidden: false }, [], [], []]);
   const s = M.normalize({
     profile: { dueDate: DUE },
     prefs: { glucoseAfter: '1' },
@@ -745,6 +756,33 @@ test('日历：有时间的产检，前一晚 8 点和提前 1 小时提醒，�
   ok(!ics.includes('建议日期'), '约好的日期不该写建议日期');
   const late = Cal.build([{ uid: 'x', title: 't', date: '2026-12-31', time: '23:30', alarms: [] }], new Date());
   ok(late.includes('DTEND:20270101T003000'), late);
+});
+
+// ---------- 备份提醒 ----------
+
+test('备份提醒：没记录不提醒，开始用一周后还没备份就提醒', () => {
+  const s = M.createState({ dueDate: DUE }, '2026-10-01');
+  eq(M.backupReminder(s, '2026-10-20'), null, '没有记录');
+  M.upsertWeight(s, '2026-10-02', 55);
+  eq(M.backupReminder(s, '2026-10-07'), null, '才用了 6 天');
+  eq(M.backupReminder(s, '2026-10-08'), { last: null, days: null });
+  const old = M.normalize({ profile: { dueDate: DUE }, weights: [{ date: '2026-10-02', kg: 55 }] });
+  eq(M.backupReminder(old, '2026-10-02'), { last: null, days: null }, '不知道哪天开始用的老数据直接提醒');
+});
+
+test('备份提醒：备份后 30 天再提醒，「过几天再说」隔一周', () => {
+  const s = M.createState({ dueDate: DUE }, '2026-09-01');
+  M.updateCheckup(s, 'nt', { done: true });
+  M.markBackedUp(s, '2026-09-10');
+  eq(M.backupReminder(s, '2026-10-09'), null, '29 天');
+  eq(M.backupReminder(s, '2026-10-10'), { last: '2026-09-10', days: 30 });
+  M.snoozeBackup(s, '2026-10-10');
+  eq(M.backupReminder(s, '2026-10-16'), null, '刚点过「过几天再说」');
+  eq(M.backupReminder(s, '2026-10-17'), { last: '2026-09-10', days: 37 });
+  M.markBackedUp(s, '2026-10-17');
+  eq([s.prefs.backupNudged, M.backupReminder(s, '2026-10-18')], [null, null], '备份后清掉「过几天再说」');
+  const back = M.normalize(JSON.parse(JSON.stringify(s)));
+  eq(back.prefs, s.prefs, '存取后不变');
 });
 
 // ---------- B 超单文字识别 ----------

@@ -1,0 +1,90 @@
+(function () {
+  'use strict';
+  // 各页共用的：页面上固定的元素、常量、小工具、设备判断，当前数据 app.state 和界面状态 ui
+  const { dates: D, model: M, storage: S } = globalThis.Baby;
+  const app = {};
+  globalThis.Baby.app = app;
+
+  const root = document.getElementById('app');
+  const toastBox = document.getElementById('toast');
+  const settingsDialog = document.getElementById('settings-dialog');
+  const checkupDialog = document.getElementById('checkup-dialog');
+  const medDialog = document.getElementById('med-dialog');
+  const sheetDialog = document.getElementById('sheet-dialog');
+  const DIALOGS = [settingsDialog, checkupDialog, medDialog, sheetDialog];
+
+  // 页面都用地址栏的 # 区分，手机上的返回键就能退回上一页
+  const SECTIONS = {
+    today: { name: '今天', subs: [''] },
+    records: { name: '记录', subs: ['weight', 'bp', 'glucose', 'meds'] },
+    checkups: { name: '产检', subs: ['schedule', 'ultrasound'] },
+    tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'bag', 'weeks'] },
+  };
+  const SUB_NAMES = {
+    weight: '体重',
+    bp: '血压',
+    glucose: '血糖',
+    meds: '用药',
+    schedule: '产检日程',
+    ultrasound: 'B 超单',
+    kicks: '数胎动',
+    contractions: '宫缩计时',
+    food: '能不能吃',
+    bag: '待产包',
+    weeks: '每周变化',
+  };
+
+  const WEIGHTS_SHOWN = 6;
+  // 首屏从 32 周起提醒收拾待产包，最好 36 周前备齐
+  const BAG_REMIND_FROM = 32 * 7;
+  const BAG_READY_BY = 36 * 7;
+  // 28 周起每天提醒数胎动；不满 37 周的规律宫缩按早产处理
+  const KICKS_FROM = 28 * 7;
+  const TERM_FROM = 37 * 7;
+  const ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ESCAPES[c]);
+  const kg = M.formatKg;
+  const kgDiff = M.formatKgDiff;
+  const clamp01 = (n) => Math.min(Math.max(n, 0), 1);
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const hhmm = (t) => `${pad2(new Date(t).getHours())}:${pad2(new Date(t).getMinutes())}`;
+  const notifyPermission = () => ('Notification' in window ? Notification.permission : 'unsupported');
+  // 每次都现查，不缓存：从浏览器「添加到主屏幕」后再打开，结果就变了
+  const isStandalone = () => navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  const isIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isWeChat = () => /MicroMessenger/i.test(navigator.userAgent);
+  const isMobile = () => isIOS() || /Android/i.test(navigator.userAgent);
+  const isTouch = () => window.matchMedia('(pointer: coarse)').matches;
+  // iPhone 上在浏览器里（不是从主屏幕图标）打开时，长时间没用的网站数据可能被系统清掉
+  const atRisk = () => isIOS() && !isStandalone();
+
+  app.state = S.load();
+  const ui = {
+    today: D.today(),
+    showAllWeights: false,
+    bagAdding: null,
+    medStage: 'all',
+    kickFeedback: '',
+    focusNext: '',
+    foodQuery: '',
+    foodLevel: 'all',
+    glucoseSlot: '',
+    clearInputs: [],
+    undo: null,
+  };
+
+  function greeting(hour) {
+    if (hour < 5) return '夜深了';
+    if (hour < 9) return '早上好';
+    if (hour < 12) return '上午好';
+    if (hour < 14) return '中午好';
+    if (hour < 18) return '下午好';
+    return '晚上好';
+  }
+
+  Object.assign(app, {
+    root, toastBox, settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, SECTIONS, SUB_NAMES,
+    WEIGHTS_SHOWN, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, kg, kgDiff, clamp01, pad2, hhmm,
+    notifyPermission, isStandalone, isIOS, isWeChat, isMobile, isTouch, atRisk, ui, greeting
+  });
+})();

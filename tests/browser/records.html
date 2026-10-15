@@ -1,0 +1,268 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script>
+localStorage.clear();
+const out = [];
+const log = (ok, name, extra = '') => {
+  out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+  document.getElementById('out').textContent = `RUNNING\n${out.join('\n')}\nHLOG ${hlog.join(' ')}`;
+};
+const hlog = [];
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:390px;height:844px';
+iframe.src = '../../index.html?today=2026-10-12';
+document.body.appendChild(iframe);
+
+let w, d;
+const errors = [];
+const blobs = [];
+function bind() {
+  w = iframe.contentWindow;
+  d = iframe.contentDocument;
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.confirm = () => true;
+  w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
+  w.URL.revokeObjectURL = () => {};
+  w.HTMLAnchorElement.prototype.click = function () {};
+  w.addEventListener('popstate', () => hlog.push(`pop:${w.history.state ? 'S' : 'N'}`));
+  const ob = w.history.back.bind(w.history); w.history.back = () => { hlog.push('back'); ob(); };
+  const op = w.history.pushState.bind(w.history); w.history.pushState = (...a) => { hlog.push('push'); op(...a); };
+  d.getElementById('sheet-dialog').addEventListener('close', () => hlog.push('close'));
+}
+const $ = (s) => d.querySelector(s);
+const $$ = (s) => [...d.querySelectorAll(s)];
+const text = (s) => ($(s) ? $(s).textContent.replace(/\s+/g, ' ').trim() : '');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const nav = async (hash) => {
+  await wait(40);
+  if (w.location.hash === hash) return;
+  await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
+};
+const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
+const reload = () => new Promise((r) => { iframe.onload = r; w.location.reload(); }).then(bind);
+const sheet = () => d.getElementById('sheet-dialog');
+const sheetForm = () => sheet().querySelector('form');
+const formErr = (f) => (f.querySelector('.form-error').hidden ? '' : f.querySelector('.form-error').textContent);
+function submit(selector, values) {
+  const f = $(selector);
+  for (const [k, v] of Object.entries(values)) f.elements[k].value = v;
+  f.requestSubmit();
+  return f;
+}
+const cell = (date, slot) => $(`.gl-cell[data-date="${date}"][data-slot="${slot}"]`);
+const isSheetEntry = () => Boolean(w.history.state && w.history.state.sheet);
+// 关面板后 app 会 history.back()，等它真的退回去再继续
+const settle = async () => {
+  await wait(0);
+  if (!isSheetEntry()) return;
+  hlog.push('wait');
+  await new Promise((r) => { w.addEventListener('popstate', () => setTimeout(r, 0), { once: true }); });
+};
+
+iframe.onload = async () => {
+  bind();
+  try {
+    const f = $('form[data-form="onboard"]');
+    f.elements.dueDate.value = '2027-01-29';
+    f.requestSubmit();
+
+    // ---- 菜单 ----
+    await nav('#/nope');
+    log($('.hero') && $('.tab[aria-current="page"]').getAttribute('href') === '#/', '不认识的地址回到首页');
+    await nav('#/records/xyz');
+    log($('.card-weight'), '不认识的子页回到这一栏的第一个');
+    log($$('.seg-tab').map((a) => a.textContent).join() === '体重,血压,血糖,用药', '记录页有体重、血压、血糖、用药');
+    await nav('#/checkups');
+    log($$('.seg-tab').map((a) => a.textContent).join() === '产检日程,B 超单', '产检页有日程和 B 超单');
+
+    // ---- 血压 ----
+    await nav('#/records/bp');
+    log($('.card-bp .empty') && !$('#bp-chart'), '血压空状态，没有曲线');
+    let bf = submit('form[data-form="add-bp"]', { sys: '', dia: '' });
+    log(/高压/.test(formErr(bf)) && state().bp.length === 0, '没填高压会提示', formErr(bf));
+    bf = submit('form[data-form="add-bp"]', { sys: '80', dia: '120' });
+    log(/填反/.test(formErr(bf)), '高压比低压小会提示填反了', formErr(bf));
+    submit('form[data-form="add-bp"]', { sys: '118', dia: '76', pulse: '80', time: '08:00' });
+    log(state().bp.length === 1 && state().bp[0].pulse === 80 && /118\/76 记好了/.test(toastText()), '记下一条血压', toastText());
+    log($('#bp-sys').value === '' && $('#bp-dia').value === '' && !$('.card-bp .form-error:not([hidden])'), '记完输入框清空、错误消失');
+    log(/正常/.test(text('.rec-row .tag')) && /心率 80/.test(text('.rec-row')), '列表显示正常和心率');
+    submit('form[data-form="add-bp"]', { date: '2026-10-11', time: '20:00', sys: '145', dia: '95', pulse: '' });
+    log(state().bp.length === 2 && $('#bp-chart svg') && $$('#bp-chart .c-line').length === 2 && $('.bp-legend'), '两条以上画出高压、低压两条线');
+    log(!$('.rec-alert'), '最近一次正常时不提醒');
+    submit('form[data-form="add-bp"]', { date: '2026-10-12', time: '21:30', sys: '162', dia: '112' });
+    log($('.rec-alert-severe') && /很高/.test(toastText()), '最近一次很高时醒目提醒', toastText());
+    log($$('.rec-row')[0].classList.contains('is-severe') && /很高/.test(text('.rec-row .tag')), '新的排在最上面，标成很高');
+    $$('.rec-row [data-action="delete-bp"]')[0].click();
+    log(state().bp.length === 2 && !$('.rec-alert'), '删掉一条，提醒跟着消失');
+    $('[data-action="undo"]').click();
+    log(state().bp.length === 3 && $('.rec-alert-severe'), '撤销删除');
+    $('#bp-sys').value = '130';
+    $$('.rec-row [data-action="delete-bp"]')[2].click();
+    log($('#bp-sys').value === '130', '重绘时没提交的输入还在');
+    $('[data-action="undo"]').click();
+
+    // ---- 血糖 ----
+    await nav('#/records/glucose');
+    log($$('.gl-table tbody tr').length === 7 && $$('.gl-table thead th').length === 6, '血糖表：最近 7 天 × 5 个时间点');
+    log($('.gl-table tbody tr').classList.contains('is-today'), '今天在第一行');
+    $('.gl-form input[value="fasting"]').click();
+    let gf = submit('form[data-form="add-glucose"]', { value: 'abc' });
+    log(/mmol/.test(formErr(gf)) && state().glucose.length === 0, '血糖不是数字会提示', formErr(gf));
+    submit('form[data-form="add-glucose"]', { value: '5,6' });
+    log(state().glucose.length === 1 && state().glucose[0].value === 5.6 && /空腹 5\.6 记好了，偏高/.test(toastText()), '记空腹 5.6（逗号也认），提示偏高', toastText());
+    log(cell('2026-10-12', 'fasting').classList.contains('is-high') && cell('2026-10-12', 'fasting').textContent === '5.6', '表格里标红');
+    log($('.gl-form input[value="fasting"]').checked, '重绘后还选着空腹');
+    $('.gl-form input[value="lunch"]').click();
+    submit('form[data-form="add-glucose"]', { value: '7.5' });
+    log(cell('2026-10-12', 'lunch').classList.contains('is-high'), '午餐后 7.5 按 2 小时算偏高');
+    $('[data-action="glucose-after"][data-after="1"]').click();
+    log(state().prefs.glucoseAfter === 1 && cell('2026-10-12', 'lunch').classList.contains('is-ok') && /餐后 1 小时 ≤7\.8/.test(text('.gl-target')), '换成餐后 1 小时，目标变成 7.8');
+    submit('form[data-form="add-glucose"]', { value: '7.0' });
+    log(state().glucose.filter((g) => g.slot === 'lunch').length === 1 && state().glucose.find((g) => g.slot === 'lunch').value === 7, '同一天同一时间点再记会覆盖');
+    $('[data-action="undo"]').click();
+    log(state().glucose.find((g) => g.slot === 'lunch').value === 7.5, '撤销覆盖，回到原来的值');
+    submit('form[data-form="add-glucose"]', { date: '2026-09-01', value: '3.0' });
+    log($$('.gl-table tbody tr').length === 8 && cell('2026-09-01', 'lunch').classList.contains('is-low'), '更早的日期另起一行，低于 3.3 标蓝');
+    log(/有低于 3\.3/.test(text('.card-glucose')) === false, '更早的低血糖不算进最近 7 天');
+
+    cell('2026-10-12', 'fasting').click();
+    log(sheet().open && sheetForm().elements.value.value === '5.6' && /目标 ≤5\.3/.test(sheet().textContent), '点格子弹出面板，带出原值和目标');
+    log(isSheetEntry(), '弹出面板时记了一条历史');
+    sheetForm().elements.value.value = '5.0';
+    sheetForm().requestSubmit();
+    await settle();
+    log(!sheet().open && state().glucose.find((g) => g.slot === 'fasting' && g.date === '2026-10-12').value === 5 && cell('2026-10-12', 'fasting').classList.contains('is-ok'), '在面板里改好保存');
+    log(!isSheetEntry() && w.location.hash === '#/records/glucose', '关掉面板后历史回到原来的页面');
+
+    cell('2026-10-11', 'night').click();
+    log(sheet().open && !sheet().querySelector('[data-action="delete-glucose"]'), '空格子也能点开补记，没有删除按钮');
+    w.history.back();
+    await settle();
+    log(!sheet().open && w.location.hash === '#/records/glucose', '按手机返回键关掉面板，页面不动');
+
+    cell('2026-10-12', 'lunch').click();
+    sheet().querySelector('[data-action="delete-glucose"]').click();
+    await settle();
+    log(!sheet().open && !state().glucose.some((g) => g.slot === 'lunch' && g.date === '2026-10-12'), '在面板里删除');
+    $('[data-action="undo"]').click();
+    log(cell('2026-10-12', 'lunch').textContent === '7.5', '撤销删除');
+
+    cell('2026-10-12', 'night').click();
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await settle();
+    log(!sheet().open && !isSheetEntry(), '点关闭也会把历史退回去', `open=${sheet().open} state=${JSON.stringify(w.history.state)} hash=${w.location.hash} len=${w.history.length}`);
+
+    // ---- B 超 ----
+    await nav('#/checkups/ultrasound');
+    log($('.card-us .empty') && $$('.us-glossary dt').length === 9, 'B 超空状态，附带 9 个指标说明');
+    $('[data-action="add-us"]').click();
+    log(sheet().open && sheetForm().querySelectorAll('.us-fields input').length === 9, '打开记 B 超的面板，9 个指标', `hash=${w.location.hash} open=${sheet().open}`);
+    sheetForm().requestSubmit();
+    log(/至少填一项/.test(formErr(sheetForm())), '什么都没填会提示');
+    sheetForm().elements['v-bpd'].value = '580';
+    sheetForm().requestSubmit();
+    log(/双顶径/.test(formErr(sheetForm())), '双顶径超出范围会提示（多半是单位填错）', formErr(sheetForm()));
+    sheetForm().elements.date.value = '2026-09-25';
+    sheetForm().elements['v-bpd'].value = '58.2';
+    sheetForm().elements['v-fl'].value = '41.3';
+    sheetForm().elements['v-afi'].value = '12';
+    sheetForm().elements.placenta.value = '后壁 0 级';
+    sheetForm().requestSubmit();
+    await settle();
+    log(!sheet().open && state().ultrasounds.length === 1 && $$('.us-item').length === 3, '保存一次 B 超，显示 3 项');
+    log(/孕 22 周/.test(text('.us-date')) && /后壁 0 级/.test(text('.us-extra')), '标出孕周和胎盘');
+
+    $('[data-action="add-us"]').click();
+    sheetForm().elements.date.value = '2026-10-09';
+    sheetForm().elements['v-bpd'].value = '62.4';
+    sheetForm().elements['v-fl'].value = '45';
+    sheetForm().elements['v-afi'].value = '4.6';
+    sheetForm().requestSubmit();
+    await settle();
+    const first = $('.us');
+    log(/10月9日/.test(first.querySelector('.us-date').textContent) && /比上次 \+4\.2/.test(first.textContent) && /比上次 \+3\.7/.test(first.textContent), '新的在上面，算出比上次长了多少', first.textContent.replace(/\s+/g, ' '));
+    log(first.querySelector('.us-item.is-low') && /偏低/.test(first.querySelector('.us-item.is-low').textContent), '羊水指数 4.6 标偏低');
+
+    first.querySelector('[data-action="edit-us"]').click();
+    log(sheetForm().elements['v-bpd'].value === '62.4' && sheetForm().elements.date.value === '2026-10-09', '编辑时带出原来的数');
+    sheetForm().elements.note.value = '<b>头位</b>';
+    sheetForm().requestSubmit();
+    await settle();
+    log(/<b>头位<\/b>/.test(text('.us .us-extra')) && !$('.us .us-extra b b'), '备注按文字显示');
+
+    $('.us [data-action="edit-us"]').click();
+    sheet().querySelector('[data-action="delete-us"]').click();
+    await settle();
+    log(state().ultrasounds.length === 1 && !sheet().open, '在编辑里删除');
+    $('[data-action="undo"]').click();
+    log(state().ultrasounds.length === 2, '撤销删除 B 超');
+
+    // ---- 粘贴 B 超单文字自动填 ----
+    $('.us [data-action="edit-us"]').click();
+    log(!sheet().querySelector('.us-paste').open, '编辑旧记录时粘贴区默认收起');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await settle();
+    $('[data-action="add-us"]').click();
+    const paste = sheet().querySelector('#us-paste');
+    log(sheet().querySelector('.us-paste').open && paste, '新记一次时粘贴区默认展开');
+    const type = (el, v) => { el.value = v; el.dispatchEvent(new w.InputEvent('input', { bubbles: true })); };
+    type(paste, '检查日期：2026-10-09\n双顶径约6.2cm，头围约22.6cm，股骨长约4.5cm\n胎心率约142次/分 AFI 12.3cm\n胎盘位于后壁，成熟度Ⅰ级。头位');
+    const uf = sheetForm().elements;
+    log(uf['v-bpd'].value === '62' && uf['v-hc'].value === '226' && uf['v-fl'].value === '45' && uf['v-fhr'].value === '142' && uf['v-afi'].value === '12.3' && uf['v-ac'].value === '',
+      '认出来的数填进对应格子，厘米换成毫米', ['bpd', 'hc', 'fl', 'fhr', 'afi', 'ac'].map((k) => uf[`v-${k}`].value).join('/'));
+    log(uf.date.value === '2026-10-09' && uf.placenta.value === '后壁 I 级' && uf.note.value === '头位', '日期、胎盘、胎位也填好', `${uf.date.value}/${uf.placenta.value}/${uf.note.value}`);
+    log(sheet().querySelectorAll('.is-filled').length === 8 && /认出了 双顶径、头围、股骨长、胎心率、羊水指数、检查日期、胎盘/.test(text('#us-paste-result')), '填好的标黄，并说明认出了哪些', text('#us-paste-result'));
+    type(uf['v-bpd'], '62.4');
+    log(!uf['v-bpd'].classList.contains('is-filled') && uf['v-hc'].classList.contains('is-filled'), '自己改过的格子不再标黄');
+    type(paste, '检查日期：2026-10-09\n双顶径约6.2cm，股骨长约4.5cm\n胎心率约142次/分 AFI 12.3cm\n胎盘位于后壁，成熟度Ⅰ级。头位');
+    log(uf['v-bpd'].value === '62.4' && uf['v-hc'].value === '' && !uf['v-hc'].classList.contains('is-filled') && uf['v-fl'].value === '45',
+      '再改粘贴的文字：自己改过的不动，删掉的那项还原', `${uf['v-bpd'].value}/${uf['v-hc'].value}/${uf['v-fl'].value}`);
+    log(/双顶径你改过，没动/.test(text('#us-paste-result')) && !/认出了 双顶径/.test(text('#us-paste-result')), '提示里说明哪些格子没动', text('#us-paste-result'));
+    type(paste, 'FL 50mm 头围 HC 230mm');
+    log(uf['v-fl'].value === '50' && uf['v-hc'].value === '230' && uf['v-fhr'].value === '' && uf['v-afi'].value === '' && uf.date.value === '2026-10-12' && uf.placenta.value === '' && uf.note.value === '' && uf['v-bpd'].value === '62.4',
+      '换一张单子再粘贴：上一张自动填的都还原，只留这张的', ['fl', 'hc', 'fhr', 'afi', 'bpd'].map((k) => uf[`v-${k}`].value).join('/') + ` ${uf.date.value} ${uf.placenta.value} ${uf.note.value}`);
+    type(uf.date, '2026-10-10');
+    type(paste, '检查日期：2026-10-09 FL 51mm');
+    log(uf.date.value === '2026-10-10' && uf['v-fl'].value === '51', '日期自己改过，再粘贴也不动');
+    type(paste, '这是一段没有数值的文字');
+    log(/没认出数值/.test(text('#us-paste-result')) && uf['v-fl'].value === '51' && uf['v-fl'].classList.contains('is-filled'), '认不出时提示，已填的不清掉');
+    type(paste, '');
+    log(text('#us-paste-result') === '' && $('#us-paste-result').offsetHeight === 0, '清空粘贴框，提示也收起');
+    sheetForm().elements['v-bpd'].focus();
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await settle();
+    log(!sheet().open && state().ultrasounds.length === 2, '取消就不保存');
+
+    // ---- 首页 ----
+    await nav('#/');
+    log(/孕 24 周常见的身体变化/.test(text('.card-mom')) && $('.card-mom a[href="#/tools/weeks"]'), '首页有「妈妈这周」，能跳到每周变化');
+
+    // ---- 备份和刷新 ----
+    $('[data-action="open-settings"]').click();
+    d.getElementById('settings-dialog').querySelector('[data-action="export-backup"]').click();
+    const backup = JSON.parse(await blobs[blobs.length - 1].text());
+    log(backup.bp.length === 3 && backup.glucose.length === 3 && backup.ultrasounds.length === 2 && backup.prefs.glucoseAfter === 1, '备份里有血压、血糖、B 超和餐后设置', `${backup.bp.length}/${backup.glucose.length}/${backup.ultrasounds.length}`);
+    d.getElementById('settings-dialog').querySelector('[data-action="close-dialog"]').click();
+    await settle();
+
+    await nav('#/checkups/ultrasound');
+    await reload();
+    log($$('.us').length === 2 && $('.seg-tab[aria-current="page"]').textContent === 'B 超单', '刷新后还在 B 超页，记录都在');
+
+    const old = state();
+    delete old.bp; delete old.glucose; delete old.ultrasounds; delete old.prefs;
+    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(old));
+    await reload();
+    log($('.card-us .empty'), '没有这几项的老数据也能打开');
+    await nav('#/records/glucose');
+    log($('[data-action="glucose-after"][data-after="2"]').getAttribute('aria-pressed') === 'true', '老数据默认按餐后 2 小时');
+  } catch (e) {
+    log(false, '脚本异常', `${e.message}\n${e.stack}`);
+  }
+  log(errors.length === 0, '页面没有报错', errors.join(' | '));
+  // 失败时附上历史记录（push/back/popstate 的顺序），方便查面板和返回键的问题
+  const failed = out.some((l) => l.startsWith('FAIL'));
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}${failed ? `\nHLOG ${hlog.join(' ')}` : ''}`;
+};
+</script>
+</body>

@@ -53,9 +53,9 @@
   ).join('');
 
   const SCENE = `
-    <circle cx="74" cy="56" r="22" fill="#FBE3A6" opacity=".55"/>
-    <path d="M0 158C52 128 118 124 178 138S296 158 360 134V210H0z" fill="#EEF2E1"/>
-    <path d="M0 182C72 160 152 158 222 170S322 186 360 176V210H0z" fill="#E0E9D0"/>
+    <circle class="art-sun" cx="74" cy="56" r="22" fill="#FBE3A6" opacity=".55"/>
+    <path class="art-hill" d="M0 158C52 128 118 124 178 138S296 158 360 134V210H0z" fill="#EEF2E1"/>
+    <path class="art-hill-near" d="M0 182C72 160 152 158 222 170S322 186 360 176V210H0z" fill="#E0E9D0"/>
     <path d="M258 178c3-24 2-46-7-68" fill="none" stroke="#8C6A47" stroke-width="10" stroke-linecap="round"/>
     <path d="M255 136c11-7 22-9 33-9" fill="none" stroke="#8C6A47" stroke-width="5.5" stroke-linecap="round"/>
     <circle cx="234" cy="88" r="31" fill="#A9C193"/>

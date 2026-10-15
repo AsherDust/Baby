@@ -1,0 +1,151 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script src="../../js/dates.js"></script>
+<script src="../../js/content.js"></script>
+<script src="../../js/model.js"></script>
+<script src="scenes.js"></script>
+<script>
+// 文字和背景的对比度：每一页和几个弹出面板都查一遍，太淡的列出来。
+// run.sh 里的 contrast:dark 让浏览器按深色模式再跑一遍。
+const out = [];
+const log = (ok, name, extra = '') => {
+  out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+  document.getElementById('out').textContent = `RUNNING\n${out.join('\n')}`;
+};
+const TODAY = '2026-10-12';
+const KEY = 'pregnancy-desk:v1';
+const DARK = matchMedia('(prefers-color-scheme: dark)').matches;
+const MIN_RATIO = 3;
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:390px;height:844px';
+document.body.appendChild(iframe);
+let w, d;
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const open = (scene, route) => {
+  localStorage.clear();
+  const s = seedScene(scene);
+  if (s) localStorage.setItem(KEY, JSON.stringify(s));
+  return new Promise((r) => {
+    iframe.onload = r;
+    iframe.src = `../../index.html?today=${TODAY}&n=${Math.random()}#/${route}`;
+  }).then(() => { w = iframe.contentWindow; d = iframe.contentDocument; });
+};
+
+const rgba = (str) => {
+  const m = /rgba?\(([^)]+)\)/.exec(str);
+  if (!m) return null;
+  const [r, g, b, a = 1] = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+  return { r, g, b, a };
+};
+const colorsIn = (str) => (str.match(/rgba?\([^)]+\)/g) || []).map(rgba);
+const over = (top, under) => {
+  const a = top.a + under.a * (1 - top.a);
+  if (!a) return { r: 0, g: 0, b: 0, a: 0 };
+  const mix = (k) => (top[k] * top.a + under[k] * under.a * (1 - top.a)) / a;
+  return { r: mix('r'), g: mix('g'), b: mix('b'), a };
+};
+const lum = (c) => {
+  const f = (v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+};
+const ratio = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+const hex = (c) => `#${[c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+
+// 从元素往外找背景，一直叠到不透明为止；渐变取每个色标，最后按最差的算
+function backgrounds(el) {
+  const layers = [];
+  let fade = 1;
+  for (let n = el; n; n = n.parentElement) {
+    const cs = w.getComputedStyle(n);
+    const solid = rgba(cs.backgroundColor);
+    const stops = /gradient/.test(cs.backgroundImage) ? colorsIn(cs.backgroundImage) : [];
+    if (stops.length) layers.push(stops);
+    if (solid && solid.a > 0) layers.push([solid]);
+    const opaque = (solid && solid.a === 1) || (stops.length && stops.every((c) => c.a === 1));
+    if (opaque) break;
+    fade *= Number(cs.opacity);
+  }
+  let under = [{ r: 255, g: 255, b: 255, a: 1 }];
+  for (const layer of layers.reverse()) under = layer.flatMap((top) => under.map((u) => over(top, u))).slice(0, 24);
+  return { under, fade };
+}
+
+function audit(root, where) {
+  const seen = new Set();
+  const targets = [];
+  const walker = d.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+    if (t.textContent.trim() && t.parentElement && !seen.has(t.parentElement)) {
+      seen.add(t.parentElement);
+      targets.push(t.parentElement);
+    }
+  }
+  root.querySelectorAll('input:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea').forEach((el) => { if (el.value) targets.push(el); });
+  const bad = [];
+  for (const el of targets) {
+    if (!el.getClientRects().length || el.closest('svg, [hidden], [aria-hidden="true"]')) continue;
+    const cs = w.getComputedStyle(el);
+    if (cs.visibility !== 'visible' || Number(cs.opacity) === 0) continue;
+    const { under, fade } = backgrounds(el);
+    const fg = rgba(cs.color);
+    fg.a *= fade;
+    const worst = Math.min(...under.map((bg) => ratio(over(fg, bg), bg)));
+    if (worst < MIN_RATIO) {
+      const label = `${el.parentElement.className || el.parentElement.tagName.toLowerCase()} > ${el.tagName.toLowerCase()}${el.className ? `.${String(el.className).trim().replace(/\s+/g, '.')}` : ''}`;
+      bad.push(`${where}：${label}「${(el.value || el.textContent).trim().slice(0, 14)}」${worst.toFixed(2)}（${hex(over(fg, under[0]))} / ${hex(under[0])}）`);
+    }
+  }
+  return bad;
+}
+
+const PAGES = [
+  ['main', 'today'], ['main', 'records/weight'], ['main', 'records/bp'], ['main', 'records/glucose'], ['main', 'records/meds'],
+  ['main', 'checkups/schedule'], ['main', 'checkups/ultrasound'], ['main', 'tools'], ['main', 'tools/food'], ['main', 'tools/weeks'],
+  ['late', 'today'], ['late', 'tools/kicks'], ['late', 'tools/bag'], ['bag-done', 'tools/bag'], ['checkup-day', 'today'],
+  ['labor', 'today'], ['labor', 'tools/kicks'], ['labor', 'tools/contractions'], ['fresh', 'today'], ['empty', ''],
+];
+const SHEETS = [
+  ['main', 'today', '[data-action="open-settings"]'],
+  ['main', 'records/meds', '[data-action="add-med"]'],
+  ['main', 'checkups/schedule', '[data-action="add-checkup"]'],
+  ['main', 'checkups/ultrasound', '[data-action="add-us"]', '检查日期：2026-10-09\n双顶径约6.2cm 股骨长约4.5cm\n胎盘位于后壁，成熟度Ⅰ级'],
+];
+
+(async () => {
+  try {
+    log(true, DARK ? '深色模式' : '浅色模式');
+    let bad = [];
+    for (const [scene, route] of PAGES) {
+      await open(scene, route);
+      await wait(300);
+      bad = bad.concat(audit(d.getElementById('app'), `${scene} #/${route}`));
+    }
+    for (const [scene, route, button, paste] of SHEETS) {
+      await open(scene, route);
+      d.querySelector(button).click();
+      if (paste) {
+        const t = d.getElementById('us-paste');
+        t.value = paste;
+        t.dispatchEvent(new w.InputEvent('input', { bubbles: true }));
+      }
+      await wait(600);
+      bad = bad.concat(audit(d.querySelector('dialog[open]'), `${scene} #/${route} ${button}`));
+    }
+    await open('main', 'records/bp');
+    d.getElementById('bp-sys').value = '30';
+    d.getElementById('bp-sys').form.requestSubmit();
+    await wait(100);
+    const error = d.querySelector('.form-error:not([hidden])');
+    log(Boolean(error), '查到了表单出错的提示');
+    if (error) bad = bad.concat(audit(error.parentElement, '血压表单出错'));
+    await open('main', 'today');
+    d.querySelector('[data-action="snooze-backup"]').click();
+    await wait(600);
+    bad = bad.concat(audit(d.getElementById('toast'), '提示条'));
+    for (const line of [...new Set(bad)]) log(false, line);
+    log(bad.length === 0, `文字对比度都不低于 ${MIN_RATIO}:1`);
+  } catch (err) {
+    log(false, `出错：${err.message}`);
+  }
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+})();
+</script>

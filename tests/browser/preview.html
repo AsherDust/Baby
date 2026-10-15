@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%;display:block}</style>
+</head><body>
+<script src="../../js/dates.js"></script>
+<script src="../../js/content.js"></script>
+<script src="../../js/model.js"></script>
+<script src="scenes.js"></script>
+<script>
+// 截图用的预览页，参数：
+//   s      数据场景：empty / main / fresh / checkup-day / late / bag-done / labor
+//   today  假装今天是哪天，默认 2026-10-12
+//   w      页面宽度（px），手机用 390
+//   r      打开哪一页，例如 records/glucose
+//   stage / scroll / click / open / paste  打开后点哪里、滚到哪里、往 B 超粘贴框里填什么
+//   errors 页面报错时写进标题
+//   ios    假装是 iPhone：safari / wechat / app（从主屏幕图标打开）
+const p = new URLSearchParams(location.search);
+const scenario = p.get('s') || 'empty';
+const today = p.get('today') || '2026-10-12';
+localStorage.clear();
+const seeded = seedScene(scenario);
+if (seeded) localStorage.setItem('pregnancy-desk:v1', JSON.stringify(seeded));
+const w = p.get('w');
+document.write(`<iframe src="../../index.html?today=${today}#/${p.get('r') || ''}" style="width:${w ? `${w}px` : '100%'}"></iframe>`);
+document.querySelector('iframe').addEventListener('load', (e) => {
+  const d = e.target.contentDocument;
+  if (p.get('ios')) {
+    const fw = e.target.contentWindow;
+    const ua = `Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1${p.get('ios') === 'wechat' ? ' MicroMessenger/8.0.50' : ''}`;
+    const props = { userAgent: ua, platform: 'iPhone', standalone: p.get('ios') === 'app' };
+    for (const [k, v] of Object.entries(props)) Object.defineProperty(fw.navigator, k, { value: v, configurable: true });
+    fw.dispatchEvent(new fw.StorageEvent('storage', { key: 'pregnancy-desk:v1' }));
+  }
+  if (p.get('stage')) d.querySelector(`[data-action="med-stage"][data-stage="${p.get('stage')}"]`).click();
+  if (p.get('scroll')) d.querySelector(p.get('scroll')).scrollIntoView();
+  if (p.get('click')) d.querySelector(p.get('click')).click();
+  if (p.get('open')) d.querySelector(`[data-action="open-${p.get('open')}"]`).click();
+  if (p.get('paste')) {
+    const t = d.getElementById('us-paste');
+    t.value = p.get('paste');
+    t.dispatchEvent(new e.target.contentWindow.InputEvent('input', { bubbles: true }));
+  }
+  if (p.get('errors')) e.target.contentWindow.addEventListener('error', (ev) => { document.title = `ERR ${ev.message}`; });
+});
+</script>
+</body></html>

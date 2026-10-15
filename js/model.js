@@ -87,7 +87,7 @@
     return null;
   }
 
-  function createState(profile) {
+  function createState(profile, today = null) {
     return {
       version: VERSION,
       profile: {
@@ -95,7 +95,7 @@
         preWeight: profile.preWeight ?? null,
         nickname: text(profile.nickname, 12),
       },
-      prefs: { glucoseAfter: 2 },
+      prefs: { glucoseAfter: 2, since: D.isISODate(today) ? today : null, lastBackup: null, backupNudged: null, installHintHidden: false },
       weights: [],
       checkups: C.defaultCheckups(),
       bag: C.defaultBag(),
@@ -289,7 +289,13 @@
         preWeight: p.preWeight == null ? null : parseKg(p.preWeight),
         nickname: text(p.nickname, 12),
       },
-      prefs: { glucoseAfter: prefs.glucoseAfter === 1 ? 1 : 2 },
+      prefs: {
+        glucoseAfter: prefs.glucoseAfter === 1 ? 1 : 2,
+        since: D.isISODate(prefs.since) ? prefs.since : null,
+        lastBackup: D.isISODate(prefs.lastBackup) ? prefs.lastBackup : null,
+        backupNudged: D.isISODate(prefs.backupNudged) ? prefs.backupNudged : null,
+        installHintHidden: prefs.installHintHidden === true,
+      },
       weights: [...weights.values()].sort(byDate),
       checkups,
       bag,
@@ -663,6 +669,16 @@
     return c && c.end == null ? c : null;
   }
 
+  // 两次宫缩之间隔着不到这么久，算还在计时
+  const AWAKE_BETWEEN = 20 * 60000;
+
+  /** 正在数胎动、或者正在宫缩计时页上计时（含两次之间的空档）时，屏幕最好别自动锁上 */
+  function keepScreenOn(state, now, onContractionPage) {
+    if (activeKicks(state, now) || activeContraction(state)) return true;
+    const last = state.contractions[state.contractions.length - 1];
+    return Boolean(onContractionPage && last && now - last.start < AWAKE_BETWEEN);
+  }
+
   /** 宫缩开始点一下、结束再点一下；开始新的一次时顺手清掉 7 天前的记录 */
   function toggleContraction(state, now) {
     const running = activeContraction(state);
@@ -860,6 +876,40 @@
     if (id === 'afi') return value < 5 ? 'low' : value >= 25 ? 'high' : null;
     if (id === 'dvp') return value < 2 ? 'low' : value >= 8 ? 'high' : null;
     return null;
+  }
+
+  // ---- 备份提醒 ----
+
+  const BACKUP_FIRST = 7; // 开始用一周后还没备份过就提醒
+  const BACKUP_EVERY = 30; // 之后每个月提醒一次
+  const BACKUP_SNOOZE = 7; // 点了「过几天再说」，一周内不再提
+
+  function hasRecords(state) {
+    return ['weights', 'bp', 'glucose', 'ultrasounds', 'meds', 'kicks', 'contractions'].some((k) => state[k].length > 0)
+      || state.checkups.some((c) => c.done || c.date);
+  }
+
+  /** 该提醒备份时返回 { last: 上次备份的日期或 null, days: 过去几天 }，不用提醒时返回 null */
+  function backupReminder(state, today) {
+    const { lastBackup, since, backupNudged } = state.prefs;
+    if (!hasRecords(state)) return null;
+    if (backupNudged && D.diffDays(backupNudged, today) < BACKUP_SNOOZE) return null;
+    if (lastBackup) {
+      const days = D.diffDays(lastBackup, today);
+      return days >= BACKUP_EVERY ? { last: lastBackup, days } : null;
+    }
+    // 不知道哪天开始用的老数据，直接提醒
+    if (since && D.diffDays(since, today) < BACKUP_FIRST) return null;
+    return { last: null, days: null };
+  }
+
+  function markBackedUp(state, today) {
+    state.prefs.lastBackup = today;
+    state.prefs.backupNudged = null;
+  }
+
+  function snoozeBackup(state, today) {
+    state.prefs.backupNudged = today;
   }
 
   // ---- 从 B 超单文字里认出数值 ----
@@ -1073,6 +1123,7 @@
     removeKicks,
     kickReview,
     activeContraction,
+    keepScreenOn,
     toggleContraction,
     removeContraction,
     contractionRows,
@@ -1098,5 +1149,8 @@
     usFlag,
     ultrasoundRows,
     parseUltrasoundText,
+    backupReminder,
+    markBackedUp,
+    snoozeBackup,
   };
 })();

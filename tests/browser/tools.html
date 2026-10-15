@@ -1,0 +1,233 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script>
+localStorage.clear();
+const out = [];
+const log = (ok, name, extra = '') => {
+  out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+  console.log(`STEP ${out[out.length - 1]}`);
+};
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:1280px;height:900px';
+iframe.src = '../../index.html?today=2026-10-12';
+document.body.appendChild(iframe);
+
+const MIN = 60000;
+const T = new Date(2026, 9, 12, 10, 0, 0).getTime();
+let fakeNow = T;
+let w, d;
+const errors = [];
+const locks = [];
+const held = () => locks.filter((l) => !l.released).length;
+function bind() {
+  w = iframe.contentWindow;
+  d = iframe.contentDocument;
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.confirm = () => true;
+  w.alert = (m) => errors.push(`alert(${m})`);
+  const real = w.Date.now.bind(w.Date);
+  w.Date.now = () => (fakeNow == null ? real() : fakeNow);
+  const wakeLock = {
+    request: async () => {
+      const lock = new w.EventTarget();
+      lock.released = false;
+      lock.release = async () => { lock.released = true; lock.dispatchEvent(new w.Event('release')); };
+      locks.push(lock);
+      return lock;
+    },
+  };
+  Object.defineProperty(w.navigator, 'wakeLock', { value: wakeLock, configurable: true });
+}
+const $ = (s) => d.querySelector(s);
+const $$ = (s) => [...d.querySelectorAll(s)];
+const text = (s) => ($(s) ? $(s).textContent.replace(/\s+/g, ' ').trim() : '');
+const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const nav = async (hash) => {
+  await wait(40);
+  if (w.location.hash === hash) return;
+  await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
+};
+const route = () => w.location.hash;
+const click = (s) => $(s).click();
+const reload = () => new Promise((r) => { iframe.onload = r; w.location.reload(); }).then(bind);
+
+iframe.onload = async () => {
+  bind();
+  try {
+    const f = $('form[data-form="onboard"]');
+    f.elements.dueDate.value = '2026-11-30';
+    f.requestSubmit();
+
+    // ---- 数胎动 ----
+    log(!$('.tool-menu'), '首页不再罗列小工具');
+    await nav('#/tools');
+    log($$('.tool-menu .tool').length === 5 && $$('.tool-menu .tool').map((t) => t.dataset.tool).join() === 'kicks,contractions,food,bag,weeks', '工具菜单有 5 个');
+    log(/今天还没数/.test(text('.tool[data-tool="kicks"]')), '数胎动：今天还没数');
+    await nav('#/');
+    log(/数胎动/.test(text('.panel-today')) && $('.panel-today [data-action="start-kicks"]'), '33 周时「今天该记」里有数胎动');
+
+    click('.panel-today [data-action="start-kicks"]');
+    await wait(60);
+    log(route() === '#/tools/kicks' && d.activeElement && d.activeElement.id === 'kick-tap', '点「开始数」进入数胎动页，焦点在「动了」上', route());
+    log(text('.kick-clock') === '还剩60:00', '倒计时从 60:00 开始', text('.kick-clock'));
+    log(held() === 1, '数胎动时屏幕常亮', `${held()} 个`);
+    log(!$('.live-bar'), '数胎动页自己不显示顶部提示条');
+    await nav('#/');
+    log($('.live[href="#/tools/kicks"]') && /正在数/.test(text('.panel-today')), '首页顶部和「今天该记」都显示正在数');
+    await nav('#/records/weight');
+    log($('.live[href="#/tools/kicks"]'), '换到别的页面也挂着正在数的提示');
+    click('.live[href="#/tools/kicks"]');
+    await wait(60);
+    log(route() === '#/tools/kicks' && $('#kick-tap'), '点提示条回到数胎动');
+    $('#kick-tap').focus();
+
+    fakeNow = T + 1 * MIN; click('#kick-tap');
+    log(text('.kick-count') === '1次' && /算上 1 次/.test(text('.kick-note')), '第一下算 1 次', text('.kick-count'));
+    fakeNow = T + 3 * MIN; click('#kick-tap');
+    log(text('.kick-count') === '1次' && /并成 1 次/.test(text('.kick-note')), '5 分钟内的第二下并进去', text('.kick-note'));
+    fakeNow = T + 7 * MIN; click('#kick-tap');
+    log(text('.kick-count') === '2次' && /一共点了 3 下/.test(text('.kick-note')), '过了 5 分钟再算 1 次');
+    log(d.activeElement.id === 'kick-tap', '点完焦点还在按钮上');
+
+    fakeNow = T + 30 * MIN;
+    await wait(1200);
+    log(text('.kick-clock') === '还剩30:00', '倒计时每秒刷新', text('.kick-clock'));
+
+    fakeNow = T + 40 * MIN;
+    click('[data-action="end-kicks"]');
+    log(/这次数了 40 分钟，胎动 2 次/.test(toastText()), '提前结束有提示', toastText());
+    log(/数了 40 分钟，2 次/.test(text('.kick-result')) && $('.kick-result-short'), '没数满时提示数满更准');
+    click('[data-action="undo"]');
+    log($('#kick-tap') && state().kicks[0].end === null, '撤销后接着数');
+
+    fakeNow = T + 61 * MIN;
+    await wait(1200);
+    log(/1 小时到啦，这次胎动 2 次/.test(toastText()), '满 1 小时自动结束并提示', toastText());
+    await wait(0);
+    log(held() === 0 && locks.length === 1, '数完就恢复自动锁屏，中间换页也没有重复要', `持有 ${held()}，要过 ${locks.length} 次`);
+    log($('.kick-result-low') && /少于 3 次/.test(text('.kick-result')), '少于 3 次给出提醒');
+    await nav('#/');
+    log(/今天胎动偏少/.test(text('.panel-today')) && !$('.live-bar'), '「今天该记」里也提醒胎动偏少，顶部提示条消失');
+    await nav('#/tools/kicks');
+    log($$('.kick-row').length === 1 && /2次/.test(text('.kick-row')), '记录列表里有这次');
+
+    click('.kick-row [data-action="delete-kicks"]');
+    log(!$('.kick-row') && state().kicks.length === 0, '删掉一次记录');
+    click('[data-action="undo"]');
+    log($$('.kick-row').length === 1, '撤销删除');
+
+    click('.page-head .back');
+    await wait(60);
+    log(route() === '#/tools' && $('.tool-menu'), '点「‹ 工具」回到工具菜单');
+
+    // ---- 宫缩计时 ----
+    log($('.tool[data-tool="contractions"]').getAttribute('href') === '#/tools/contractions', '宫缩计时是一个单独的页面');
+    await nav('#/tools/contractions');
+    log(/宫缩开始/.test(text('#ctx-btn')) && text('.page-title') === '宫缩计时', '打开宫缩计时');
+    let t = T + 2 * 60 * MIN;
+    for (let i = 0; i < 12; i += 1) {
+      fakeNow = t; click('#ctx-btn');
+      if (i === 0) {
+        log($('#ctx-btn.is-on') && /宫缩结束/.test(text('#ctx-btn')), '点一下开始计时');
+        await nav('#/');
+        log($('.live-alert[href="#/tools/contractions"]'), '宫缩计时中，首页挂着提示');
+        await nav('#/tools/contractions');
+      }
+      fakeNow = t + 60000; click('#ctx-btn');
+      t += 5 * MIN;
+    }
+    log($$('.ctx-table tbody tr').length === 12, '记下 12 次', $$('.ctx-table tbody tr').length);
+    const first = $$('.ctx-table tbody tr')[0].textContent;
+    log(/1 分钟/.test(first) && /5 分钟/.test(first), '算出持续 1 分钟、间隔 5 分钟', first.replace(/\s+/g, ' '));
+    fakeNow = t - 4 * MIN; click('#ctx-btn'); click('#ctx-btn');
+    click('.ctx-table tbody tr [data-action="delete-contraction"]');
+    log(state().contractions.length === 12, '删掉误点的一条');
+    fakeNow = t - 3 * MIN;
+    click('#ctx-btn'); click('#ctx-btn');
+    const tr = state().contractions.length;
+    click('.ctx-table tbody tr [data-action="delete-contraction"]');
+    click('[data-action="undo"]');
+    log(state().contractions.length === tr, '撤销删除宫缩记录');
+    click('.ctx-table tbody tr [data-action="delete-contraction"]');
+
+    fakeNow = t;
+    await nav('#/tools');
+    log(/最近 1 小时 12 次/.test(text('.tool[data-tool="contractions"]')), '工具菜单显示最近的规律');
+    await nav('#/tools/contractions');
+    log(/12/.test(text('.ctx-stats div')) && /5/.test(text('.ctx-stats div:nth-child(2)')), '统计最近 1 小时', text('.ctx-stats'));
+    log($('.ctx-go') && /没满 37 周/.test(text('.ctx-advice')), '不满 37 周的规律宫缩提示马上去医院', text('.ctx-advice'));
+    log($$('.go-now li').length === 6, '列出直接去医院的情况');
+
+    fakeNow = t + MIN; click('#ctx-btn');
+    await wait(0);
+    log(held() === 1, '宫缩计时时屏幕常亮');
+    fakeNow = t + 7 * MIN;
+    await wait(1200);
+    log($('.ctx-long'), '超过 5 分钟提醒是不是忘了点结束');
+    click('.ctx-long [data-action="delete-contraction"]');
+    log(!$('#ctx-btn.is-on') && !$('.ctx-long'), '「这次不算」后回到开始');
+
+    click('[data-action="clear-contractions"]');
+    log(!$('.ctx-table') && state().contractions.length === 0, '清空记录');
+    await wait(0);
+    log(held() === 0, '没在计时就恢复自动锁屏');
+    click('[data-action="undo"]');
+    log(state().contractions.length === 12, '撤销清空');
+
+    // ---- 能不能吃 ----
+    await nav('#/tools/food');
+    const all = $$('.food').length;
+    log(all > 50, '打开能不能吃，列出全部', all);
+    const q = $('#food-q');
+    q.focus();
+    q.value = '螃蟹';
+    q.dispatchEvent(new w.Event('input', { bubbles: true }));
+    log($$('.food').length === 1 && /可以吃/.test(text('.food')) && d.activeElement === q, '搜螃蟹，输入框焦点不丢');
+    q.value = '刺身';
+    q.dispatchEvent(new w.Event('input', { bubbles: true }));
+    log(/生鱼片/.test(text('.food')) && $('.food-no'), '按别名也能搜到');
+    click('#food-level-ok');
+    log(/没找到/.test(text('.food-results')) && $('#food-q').value === '刺身', '筛选级别时保留搜索词');
+    $('#food-q').value = '';
+    $('#food-q').dispatchEvent(new w.Event('input', { bubbles: true }));
+    log($$('.food').length > 10 && $$('.food').every((el) => el.classList.contains('food-ok')), '只看「可以吃」');
+    log($('#food-level-ok').getAttribute('aria-pressed') === 'true', '筛选按钮高亮');
+    $('#food-q').value = '<img src=x onerror=alert(1)>';
+    $('#food-q').dispatchEvent(new w.Event('input', { bubbles: true }));
+    log(!$('.food-results img'), '搜索词按文字显示');
+    await nav('#/tools/weeks');
+    log($('#wk-now') && /33 周/.test(text('#wk-now .wk-sizes')) && /32–35 周/.test(text('#wk-now .wk-range')), '每周变化标出现在这一段', text('#wk-now .wk-range'));
+    log($$('.wk').length === 13 && $('.wk-size.is-now'), '13 个阶段，宝宝大小也标出本周');
+
+    // ---- 保存 ----
+    // 刷新时页面先按真实时间跑一遍，这一段改用真实时钟
+    fakeNow = null;
+    await nav('#/tools/kicks');
+    click('#kick-start');
+    click('#kick-tap');
+    await nav('#/tools');
+    await reload();
+    log($('.tool.is-live[data-tool="kicks"]') && state().kicks.length === 2 && state().kicks[1].taps.length === 1, '刷新后还在数');
+    const shifted = state();
+    shifted.kicks[1].start -= 2 * 60 * MIN;
+    shifted.kicks[1].taps = shifted.kicks[1].taps.map((x) => x - 2 * 60 * MIN);
+    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(shifted));
+    await reload();
+    log(state().kicks[1].end === shifted.kicks[1].start + 60 * MIN && !$('.tool.is-live'), '关着页面过了 1 小时，再打开时自动收尾');
+    log(/今天数了 1 回/.test(text('.tool[data-tool="kicks"]')), '首页显示今天数了几回', text('.tool[data-tool="kicks"]'));
+
+    const old = state();
+    delete old.kicks;
+    delete old.contractions;
+    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(old));
+    await reload();
+    log(/今天还没数/.test(text('.tool[data-tool="kicks"]')), '没有这两项的老数据也能打开');
+  } catch (e) {
+    log(false, '脚本异常', `${e.message}\n${e.stack}`);
+  }
+  log(errors.length === 0, '页面没有报错', errors.join(' | '));
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+};
+</script>
+</body>

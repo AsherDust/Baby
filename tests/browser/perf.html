@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body><pre id="out">RUNNING</pre>
+<script src="../../js/dates.js"></script>
+<script src="../../js/content.js"></script>
+<script src="../../js/model.js"></script>
+<script>
+localStorage.clear();
+const M = Baby.model;
+const D = Baby.dates;
+const s = M.createState({ dueDate: '2027-01-29', preWeight: 52, nickname: '豆豆' });
+const today = '2026-12-20';
+const day = (n) => D.addDays(today, -n);
+for (let i = 250; i >= 0; i--) M.upsertWeight(s, day(i), Math.round((52 + (250 - i) * 0.05 + Math.sin(i) * 0.3) * 10) / 10);
+for (let i = 60; i >= 0; i--) {
+  M.addBp(s, { date: day(i), time: '08:00', sys: 110 + (i % 9), dia: 70 + (i % 7), pulse: 80, note: '' });
+  M.addBp(s, { date: day(i), time: '20:30', sys: 115 + (i % 11), dia: 74 + (i % 5), pulse: 84, note: '' });
+}
+for (let i = 90; i >= 0; i--) for (const slot of ['fasting', 'breakfast', 'lunch', 'dinner', 'night']) M.setGlucose(s, { date: day(i), slot, value: (5 + (i % 7) * 0.3).toFixed(1) });
+for (let i = 0; i < 12; i++) M.addUltrasound(s, { date: day(240 - i * 20), values: { bpd: String(20 + i * 6), hc: String(80 + i * 20), ac: String(70 + i * 18), fl: String(10 + i * 5), fhr: '145' }, placenta: '后壁 0 级', note: '' });
+const now = Date.now();
+s.kicks = Array.from({ length: 60 }, (_, i) => {
+  const start = now - (i + 1) * 86400000;
+  return { id: `k${i}`, start, end: start + 3600000, taps: Array.from({ length: 10 }, (_, j) => start + (j + 1) * 300000) };
+});
+const raw = JSON.stringify(s);
+localStorage.setItem('pregnancy-desk:v1', raw);
+
+const out = [`数据量：${(raw.length / 1024).toFixed(0)} KB（体重 ${s.weights.length}，血压 ${s.bp.length}，血糖 ${s.glucose.length}，B 超 ${s.ultrasounds.length}，胎动 ${s.kicks.length} 次）`];
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:390px;height:844px';
+iframe.src = `../../index.html?today=${today}`;
+iframe.onload = () => {
+  const w = iframe.contentWindow;
+  const time = (fn, n = 15) => {
+    fn();
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) fn();
+    return (performance.now() - t0) / n;
+  };
+  const parse = time(() => w.Baby.model.normalize(JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'))));
+  const save = time(() => w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(w.Baby.model.normalize(JSON.parse(raw)))));
+  out.push(`读出并整理一次数据：${parse.toFixed(2)} ms；存一次：${save.toFixed(2)} ms`);
+  for (const route of ['#/', '#/records/weight', '#/records/bp', '#/records/glucose', '#/records/meds', '#/checkups/schedule', '#/checkups/ultrasound', '#/tools/kicks', '#/tools/weeks']) {
+    w.location.hash = route;
+    const ms = time(() => {
+      w.dispatchEvent(new w.StorageEvent('storage', { key: 'pregnancy-desk:v1' }));
+      void w.document.body.offsetHeight;
+    });
+    const nodes = w.document.getElementById('app').getElementsByTagName('*').length;
+    out.push(`${route.padEnd(24)} 重画一次 ${(ms - parse).toFixed(1).padStart(5)} ms，页面元素 ${nodes}`);
+  }
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+};
+document.body.appendChild(iframe);
+</script>
+</body></html>

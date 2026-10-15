@@ -1,0 +1,185 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script>
+localStorage.clear();
+const out = [];
+const log = (ok, name, extra = '') => out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:1280px;height:900px';
+iframe.src = '../../index.html?today=2026-10-12';
+document.body.appendChild(iframe);
+
+let w, d;
+const errors = [];
+const blobs = [];
+const downloads = [];
+function bind() {
+  w = iframe.contentWindow;
+  d = iframe.contentDocument;
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.confirm = () => true;
+  w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
+  w.URL.revokeObjectURL = () => {};
+  w.HTMLAnchorElement.prototype.click = function () { downloads.push(this.download); };
+}
+const $ = (s) => d.querySelector(s);
+const $$ = (s) => [...d.querySelectorAll(s)];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// 先等一下，让关弹窗时的 history.back() 走完，再换页
+const nav = async (hash) => {
+  await wait(40);
+  if (w.location.hash === hash) return;
+  await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
+};
+const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const toastText = () => d.getElementById('toast').textContent;
+
+iframe.onload = async () => {
+  bind();
+  try {
+    const f = $('form[data-form="onboard"]');
+    log(!!f, '首次打开显示引导页');
+    f.requestSubmit();
+    log(!$('.form-error').hidden && /预产期/.test($('.form-error').textContent), '没填预产期时提示错误');
+    $('details.lmp').open = true;
+    f.elements.lmp.value = '2026-04-24';
+    $('[data-action="apply-lmp"]').click();
+    log(f.elements.dueDate.value === '2027-01-29', '末次月经推算预产期', f.elements.dueDate.value);
+    f.elements.preWeight.value = '52';
+    f.elements.nickname.value = '豆<img src=x>';
+    f.requestSubmit();
+    log(/24/.test($('.week-big')?.textContent || ''), '提交后进入工作台，显示孕 24 周');
+    log($('.baby-like').textContent.includes('豆<img src=x>') && !$('.baby-like img'), '小名被转义，不会被当成 HTML');
+
+    const q = $('form[data-form="quick-weight"]');
+    q.elements.kg.value = '56.2';
+    q.requestSubmit();
+    log(state().weights.length === 1 && state().weights[0].kg === 56.2, '首屏快速记体重');
+    log(/体重记好了/.test($('.panel-today').textContent), '记完后首屏显示已记录');
+
+    log($$('.tabbar .tab').length === 4 && $('.tab[aria-current="page"]').textContent.includes('今天'), '有 4 个主菜单，当前是「今天」');
+    log(!$('.card-weight') && !$('.card-checkups') && !$('.card-bag') && $('.card-mom'), '首页只放今天的内容，不再罗列全部');
+    $('.tab[href="#/records"]').click();
+    await nav('#/records');
+    log($('.card-weight') && $('.seg-tab[aria-current="page"]').textContent === '体重', '点「记录」默认进体重');
+
+    let af = $('form[data-form="add-weight"]');
+    af.elements.date.value = '2026-10-05';
+    af.elements.kg.value = '55.9';
+    af.requestSubmit();
+    log(state().weights.map((x) => x.date).join() === '2026-10-05,2026-10-12', '补记其它日期');
+    log(!!$('#weight-chart svg') && $$('#weight-chart circle').length === 2, '画出体重曲线');
+    af = $('form[data-form="add-weight"]');
+    af.elements.kg.value = 'abc';
+    af.requestSubmit();
+    log(state().weights.length === 2 && /数字/.test(toastText()), '非法体重被拒绝并提示', toastText());
+    af.elements.date.value = '2026-10-20';
+    af.elements.kg.value = '56';
+    af.requestSubmit();
+    log(state().weights.length === 2 && /晚于今天/.test(toastText()), '未来日期被拒绝', toastText());
+
+    $('[data-action="delete-weight"][data-date="2026-10-05"]').click();
+    log(state().weights.length === 1, '删除体重');
+    $('[data-action="undo"]').click();
+    log(state().weights.length === 2, '撤销删除体重');
+
+    await nav('#/checkups');
+    log($('.card-checkups') && $('.seg-tab[aria-current="page"]').textContent === '产检日程', '产检页默认是日程');
+    $('[data-action="edit-checkup"][data-id="ogtt"]').click();
+    const cd = d.getElementById('checkup-dialog');
+    log(cd.open, '打开产检编辑弹窗');
+    let cf = cd.querySelector('form');
+    cf.elements.date.value = '2026-10-13';
+    cf.elements.time.value = '08:30';
+    cf.requestSubmit();
+    const ogtt = state().checkups.find((c) => c.id === 'ogtt');
+    log(!cd.open && ogtt.date === '2026-10-13' && ogtt.time === '08:30', '保存预约日期和时间');
+    log($('.tab[href="#/checkups"] .tab-dot'), '「产检」菜单上有提醒小红点');
+    await nav('#/');
+    log(/明天产检：糖耐量 OGTT · 08:30/.test($('.banner')?.textContent || ''), '首页顶部出现明天产检横幅');
+    await nav('#/checkups');
+
+    $('[data-action="add-checkup"]').click();
+    cf = cd.querySelector('form');
+    cf.requestSubmit();
+    log(cd.open && /名字/.test(cf.querySelector('.form-error').textContent), '添加产检时校验名称');
+    cf.elements.title.value = '复查血常规';
+    cf.requestSubmit();
+    log(cd.open && /日期/.test(cf.querySelector('.form-error').textContent), '自定义产检必须有日期');
+    cf.elements.date.value = '2026-11-02';
+    cf.elements.items.value = '血常规\n铁蛋白';
+    cf.requestSubmit();
+    const custom = state().checkups.find((c) => c.title === '复查血常规');
+    log(!cd.open && custom && custom.items.length === 2 && custom.custom, '添加自定义产检');
+    const titles = $$('.ck-title').map((e) => e.textContent);
+    const ci = titles.indexOf('复查血常规');
+    log(ci > titles.indexOf('糖耐量 OGTT') && ci < titles.indexOf('28 周产检'), '自定义产检按孕周插进日程', titles.join('|'));
+
+    log(/有 4 次产检/.test($('.past-strip')?.textContent || ''), '提示 4 次过去的产检没标完成');
+    $('[data-action="mark-past-done"]').click();
+    log(state().checkups.filter((c) => ['early-us', 'booking', 'nt', 'screening'].includes(c.id)).every((c) => c.done) && !$('.past-strip'), '一键标记过去的产检');
+    await nav('#/');
+    log(/大排畸 B 超：窗口期还剩 3 天/.test($('.panel-today').textContent), '首屏提醒窗口期还剩 3 天');
+    await nav('#/checkups');
+    $('[data-action="toggle-done"][data-id="anomaly"]').click();
+    log(state().checkups.find((c) => c.id === 'anomaly').done, '标记单项完成');
+    await nav('#/');
+    log(/明天产检：糖耐量 OGTT/.test($('.panel-today').textContent), '首屏切到下一次产检');
+    await nav('#/checkups');
+
+    $('[data-action="export-ics"]').click();
+    log(downloads.includes('产检日程.ics'), '导出整个日程到日历', downloads.join());
+    const ics = await blobs[blobs.length - 1].text();
+    log(/BEGIN:VCALENDAR/.test(ics) && /DTSTART:20261013T083000/.test(ics) && /TRIGGER:-PT12H30M/.test(ics), '日历文件包含预约时间和提醒');
+    log(!/早孕检查/.test(ics) && /复查血常规/.test(ics.replace(/\r\n /g, '')), '已完成的不导出，自定义的会导出');
+    $('[data-action="export-ics-one"][data-id="ogtt"]').click();
+    log(downloads.includes('产检-糖耐量 OGTT.ics'), '单项加到日历', downloads.join());
+
+    await nav('#/');
+    $('[data-action="open-settings"]').click();
+    const sd = d.getElementById('settings-dialog');
+    log(sd.open, '打开设置');
+    let sf = sd.querySelector('form');
+    sf.elements.dueDate.value = '2030-01-01';
+    sf.requestSubmit();
+    log(sd.open && !sf.querySelector('.form-error').hidden, '设置里校验预产期');
+    sf.elements.dueDate.value = '2027-02-05';
+    sf.requestSubmit();
+    log(!sd.open && state().profile.dueDate === '2027-02-05' && /^\s*23/.test($('.week-big').textContent), '改预产期后孕周跟着变', $('.week-big').textContent);
+    log(state().profile.nickname === '豆<img src=x>' && state().profile.preWeight === 52, '设置保存时保留小名和孕前体重');
+
+    $('[data-action="open-settings"]').click();
+    sd.querySelector('[data-action="export-backup"]').click();
+    log(downloads.some((n) => /备份-2026-10-12\.json$/.test(n)), '导出备份', downloads.join());
+    const backup = JSON.parse(await blobs[blobs.length - 1].text());
+    log(backup.app === 'pregnancy-desk' && backup.weights.length === 2 && backup.checkups.length === 17, '备份内容完整');
+    sd.querySelector('[data-action="close-dialog"]').click();
+
+    await nav('#/checkups');
+    $('[data-action="open-settings"]').click();
+    sd.querySelector('[data-action="reset-checkups"]').click();
+    log(state().checkups.some((c) => c.title === '复查血常规') && !state().checkups.find((c) => c.id === 'ogtt').date, '恢复默认日程，保留自己加的');
+    $('[data-action="undo"]').click();
+    log(state().checkups.find((c) => c.id === 'ogtt').date === '2026-10-13', '撤销恢复默认');
+
+    $('[data-action="edit-checkup"][data-id="w41"]').click();
+    cd.querySelector('[data-action="delete-checkup"]').click();
+    log(!state().checkups.some((c) => c.id === 'w41') && !cd.open, '删除一项产检');
+
+    await nav('#/records/weight');
+    await new Promise((r) => { iframe.onload = r; w.location.reload(); });
+    bind();
+    log($$('.wl-row').length === 2 && $('.seg-tab[aria-current="page"]').textContent === '体重', '刷新后停在原来的页面，数据都还在');
+    await nav('#/');
+    log(/^\s*23/.test($('.week-big').textContent) && /明天产检/.test($('.banner').textContent), '首页数据也都在');
+
+    $('[data-action="open-settings"]').click();
+    d.getElementById('settings-dialog').querySelector('[data-action="clear-all"]').click();
+    log(!!$('form[data-form="onboard"]') && !w.localStorage.getItem('pregnancy-desk:v1'), '清空数据回到引导页');
+  } catch (e) {
+    log(false, '脚本异常', `${e.message}\n${e.stack}`);
+  }
+  log(errors.length === 0, '页面没有报错', errors.join(' | '));
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+};
+</script>
+</body>

@@ -1,0 +1,170 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script>
+localStorage.clear();
+const out = [];
+const log = (ok, name, extra = '') => out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:1280px;height:900px';
+iframe.src = '../../index.html?today=2026-10-12';
+document.body.appendChild(iframe);
+
+let w, d;
+const errors = [];
+const blobs = [];
+function bind() {
+  w = iframe.contentWindow;
+  d = iframe.contentDocument;
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.confirm = () => true;
+  w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
+  w.URL.revokeObjectURL = () => {};
+  w.HTMLAnchorElement.prototype.click = function () {};
+}
+const $ = (s) => d.querySelector(s);
+const $$ = (s) => [...d.querySelectorAll(s)];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// 先等一下，让关弹窗时的 history.back() 走完，再换页
+const nav = async (hash) => {
+  await wait(40);
+  if (w.location.hash === hash) return;
+  await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
+};
+const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
+const dialog = () => d.getElementById('med-dialog');
+const form = () => dialog().querySelector('form');
+const reload = () => new Promise((r) => { iframe.onload = r; w.location.reload(); }).then(bind);
+const names = () => $$('.med-name').map((n) => n.firstChild.textContent);
+const row = (name) => $$('.med').find((li) => li.querySelector('.med-name').firstChild.textContent === name);
+const chip = (stage) => $(`[data-action="med-stage"][data-stage="${stage}"]`);
+function fill(f, v) {
+  for (const [k, val] of Object.entries(v)) f.elements[k].value = val;
+}
+function addMed(v) {
+  $('[data-action="add-med"]').click();
+  fill(form(), { dose: '', end: '', note: '', ...v });
+  form().requestSubmit();
+}
+
+iframe.onload = async () => {
+  bind();
+  try {
+    const f = $('form[data-form="onboard"]');
+    f.elements.dueDate.value = '2027-01-29';
+    f.requestSubmit();
+    await nav('#/records/meds');
+    log($('.seg-tab[aria-current="page"]').textContent === '用药', '记录页切到「用药」');
+
+    log(/还没有记录/.test($('.card-meds .card-meta').textContent) && /记第一样/.test($('.card-meds').textContent), '空状态有说明和「记第一样」');
+    $('.card-meds [data-action="add-med"]').click();
+    log(dialog().open, '点「记第一样」打开对话框');
+    log(form().elements.start.value === '2026-10-12' && form().elements.start.max === '2026-10-12', '开始日期默认今天，不能选以后');
+    log(form().elements.kind.value === 'supplement' && $$('#med-dialog [data-action="med-suggest"]').length === 6, '默认补剂，有 6 个常用建议');
+
+    form().requestSubmit();
+    const err = dialog().querySelector('.form-error');
+    log(dialog().open && !err.hidden && /名字/.test(err.textContent), '没写名字会提示', err.textContent);
+
+    dialog().querySelector('[data-action="med-suggest"][data-name="叶酸"]').click();
+    log(form().elements.name.value === '叶酸' && d.activeElement === form().elements.dose, '点建议填上名字，光标跳到用量');
+    fill(form(), { dose: '每天 0.4 mg', start: '2026-02-01', end: '2026-07-17' });
+    form().requestSubmit();
+    log(!dialog().open && /记下了「叶酸」/.test(toastText()), '保存后关闭并提示', toastText());
+    log(state().meds.length === 1 && state().meds[0].end === '2026-07-17', '存进本地');
+    log(/0\.4 mg/.test(row('叶酸').querySelector('.med-extra').textContent), '显示用量');
+    log(/孕前 – 12 周 · 共 167 天/.test(row('叶酸').querySelector('.med-ga').textContent), '孕前吃到 12 周，共 167 天', row('叶酸').querySelector('.med-ga').textContent);
+    log(chip('pre') && /1/.test(chip('pre').textContent) && /1/.test(chip('t1').textContent) && chip('t2').disabled, '阶段按钮：孕前和孕早期各 1，孕中期没记录不能点');
+
+    $('[data-action="add-med"]').click();
+    fill(form(), { name: '黄体酮', start: '2026-05-28', end: '2026-07-03', note: '医生开的' });
+    form().querySelector('input[name="kind"][value="medicine"]').click();
+    log(form().elements.kind.value === 'medicine', '点「药物」能切换类型');
+    form().requestSubmit();
+    log(row('黄体酮').classList.contains('med-medicine') && /药物/.test(row('黄体酮').querySelector('.tag-med').textContent), '药物有自己的标签和颜色');
+
+    addMed({ name: '钙片', start: '2026-09-11' });
+    log(names().join() === '叶酸,黄体酮,钙片', '按开始日期排', names().join());
+    log(/正在吃 1 样 · 一共记了 3 样/.test($('.card-meds .card-meta').textContent), '卡片显示正在吃几样');
+    log(/在吃/.test(row('钙片').textContent) && /至今/.test(row('钙片').querySelector('.med-when').textContent), '没填结束日期就是在吃');
+    log(/20 周起 · 已经 32 天/.test(row('钙片').querySelector('.med-ga').textContent), '在吃的显示从几周开始、吃了几天', row('钙片').querySelector('.med-ga').textContent);
+
+    $('[data-action="add-med"]').click();
+    fill(form(), { name: '铁剂', start: '2026-10-01', end: '2026-09-01' });
+    form().requestSubmit();
+    log(dialog().open && /早于开始日期/.test(dialog().querySelector('.form-error').textContent), '结束早于开始会提示');
+    fill(form(), { start: '2026-10-20', end: '' });
+    form().requestSubmit();
+    log(dialog().open && /晚于今天/.test(dialog().querySelector('.form-error').textContent), '开始日期不能晚于今天');
+    dialog().dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    log(!dialog().open && state().meds.length === 3, '点遮罩关闭，不保存');
+
+    const bar = row('叶酸').querySelector('.med-bar');
+    log(parseFloat(bar.style.left) === 0 && parseFloat(bar.style.width) > 20, '时间轴从最早一样的开始画起', bar.getAttribute('style'));
+    const today = parseFloat(row('钙片').querySelector('.med-today').style.left);
+    const cal = row('钙片').querySelector('.med-bar');
+    log(Math.abs(parseFloat(cal.style.left) + parseFloat(cal.style.width) - today) < 0.5, '在吃的条画到今天', `${cal.getAttribute('style')} / ${today}`);
+    log($$('.med-axis span').map((s) => s.textContent).join() === '孕前,孕早期,孕中期,孕晚期', '时间轴标出四个阶段');
+
+    chip('t1').click();
+    log(names().join() === '叶酸,黄体酮' && chip('t1').getAttribute('aria-pressed') === 'true', '只看孕早期');
+    log(/孕早期（1–13 周）吃过 2 样：叶酸、黄体酮/.test($('.med-summary').textContent), '孕早期汇总', $('.med-summary') && $('.med-summary').textContent);
+    log($('.med-axis .is-focus').textContent === '孕早期', '时间轴高亮孕早期');
+    chip('t1').click();
+    log(names().length === 3 && !$('.med-summary') && chip('all').getAttribute('aria-pressed') === 'true', '再点一次回到全部');
+    chip('pre').click();
+    log(names().join() === '叶酸' && /孕前吃过 1 样：叶酸/.test($('.med-summary').textContent), '孕前汇总');
+    chip('t2').click();
+
+    row('钙片').querySelector('[data-action="stop-med"]').click();
+    log(state().meds.find((m) => m.name === '钙片').end === '2026-10-12' && /「钙片」记为今天停了/.test(toastText()), '「今天停了」记下结束日期', toastText());
+    log(!row('钙片').querySelector('[data-action="stop-med"]') && /共 32 天/.test(row('钙片').querySelector('.med-ga').textContent), '停了以后显示共几天');
+    $('[data-action="undo"]').click();
+    log(state().meds.find((m) => m.name === '钙片').end === null && /在吃/.test(row('钙片').textContent), '撤销后还是在吃');
+
+    chip('all').click();
+    row('黄体酮').querySelector('[data-action="edit-med"]').click();
+    log(dialog().open && form().elements.name.value === '黄体酮' && form().elements.kind.value === 'medicine' && form().elements.end.value === '2026-07-03', '编辑时带出原来的内容');
+    log(!dialog().querySelector('.suggest'), '编辑时不显示常用建议');
+    fill(form(), { note: '医生开的，保胎' });
+    form().requestSubmit();
+    log(/医生开的，保胎/.test(row('黄体酮').querySelector('.med-extra').textContent) && /保存好了/.test(toastText()), '改好后保存');
+
+    row('黄体酮').querySelector('[data-action="edit-med"]').click();
+    dialog().querySelector('[data-action="delete-med"]').click();
+    log(!dialog().open && !row('黄体酮') && state().meds.length === 2, '在编辑里删除');
+    $('[data-action="undo"]').click();
+    log(state().meds[1].name === '黄体酮' && names().join() === '叶酸,黄体酮,钙片', '撤销删除');
+
+    addMed({ name: '<b>维生素</b>', start: '2026-10-01' });
+    log(!row('<b>维生素</b>').querySelector('b'), '名字里的尖括号按文字显示');
+
+    chip('t2').click();
+    const vit = state().meds.find((m) => m.name === '<b>维生素</b>').id;
+    for (const name of ['钙片', '<b>维生素</b>']) {
+      row(name).querySelector('[data-action="edit-med"]').click();
+      dialog().querySelector('[data-action="delete-med"]').click();
+    }
+    log(!state().meds.some((m) => m.id === vit) && chip('all').getAttribute('aria-pressed') === 'true' && names().length === 2, '正在看的阶段删空了，自动回到全部');
+
+    $('[data-action="open-settings"]').click();
+    d.getElementById('settings-dialog').querySelector('[data-action="export-backup"]').click();
+    const backup = JSON.parse(await blobs[blobs.length - 1].text());
+    log(Array.isArray(backup.meds) && backup.meds.length === 2, '备份里包含用药记录');
+    d.getElementById('settings-dialog').querySelector('[data-action="close-dialog"]').click();
+
+    await reload();
+    log(names().join() === '叶酸,黄体酮', '刷新后记录还在');
+
+    const old = state();
+    delete old.meds;
+    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(old));
+    await reload();
+    log(/还没有记录/.test($('.card-meds .card-meta').textContent), '没有用药记录的老数据也能正常打开');
+  } catch (e) {
+    log(false, '脚本异常', `${e.message}\n${e.stack}`);
+  }
+  log(errors.length === 0, '页面没有报错', errors.join(' | '));
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+};
+</script>
+</body>

@@ -1,0 +1,182 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script src="../../js/dates.js"></script>
+<script src="../../js/content.js"></script>
+<script src="../../js/model.js"></script>
+<script>
+// 数据安全：备份提醒、导出（下载 / 分享面板）、iPhone 加到主屏幕提示、开始页导入、申请长期保存
+localStorage.clear();
+const out = [];
+const log = (ok, name, extra = '') => {
+  out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+  document.getElementById('out').textContent = `RUNNING\n${out.join('\n')}`;
+};
+const TODAY = '2026-10-12';
+const APP = `../../index.html?today=${TODAY}`;
+const KEY = 'pregnancy-desk:v1';
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:390px;height:844px';
+document.body.appendChild(iframe);
+
+let w, d;
+const errors = [];
+const blobs = [];
+let confirms = 0;
+function bind() {
+  w = iframe.contentWindow;
+  d = iframe.contentDocument;
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
+  w.confirm = () => { confirms += 1; return true; };
+  w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
+  w.URL.revokeObjectURL = () => {};
+  w.HTMLAnchorElement.prototype.click = function () {};
+}
+const $ = (s) => d.querySelector(s);
+const text = (s) => ($(s) ? $(s).textContent.replace(/\s+/g, ' ').trim() : '');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const state = () => JSON.parse(localStorage.getItem(KEY));
+const save = (s) => localStorage.setItem(KEY, JSON.stringify(s));
+const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
+const open = (src) => new Promise((r) => { iframe.onload = r; iframe.src = `${src}&n=${Math.random()}`; }).then(bind);
+// app 每次渲染都现查设备类型；改完数据或设备再让它重新读一遍、重画
+const rerender = () => w.dispatchEvent(new w.StorageEvent('storage', { key: KEY }));
+const pretend = (props) => { for (const [k, v] of Object.entries(props)) Object.defineProperty(w.navigator, k, { value: v, configurable: true }); };
+const settings = () => d.getElementById('settings-dialog');
+// 关面板后 app 会 history.back()，等它真的退回去再继续
+const closeSettings = async () => {
+  settings().querySelector('[data-action="close-dialog"]').click();
+  await wait(0);
+  if (w.history.state && w.history.state.sheet) await new Promise((r) => w.addEventListener('popstate', () => setTimeout(r, 0), { once: true }));
+};
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
+const WECHAT = `${IPHONE} MicroMessenger/8.0.50`;
+
+// 用了 10 天、记过体重、没备份过
+const seed = Baby.model.createState({ dueDate: '2027-01-29' }, '2026-10-02');
+Baby.model.upsertWeight(seed, '2026-10-05', 55.2);
+save(seed);
+
+(async () => {
+  try {
+    await open(APP);
+    let persistCalls = 0;
+    let kept = false;
+    pretend({ storage: { persisted: () => Promise.resolve(kept), persist: () => { persistCalls += 1; return Promise.resolve(true); } } });
+
+    // ---- 备份提醒 ----
+    log(/还没备份过/.test(text('.safety')) && $('.safety [data-action="export-backup"]'), '用了 10 天没备份过，首页提醒备份', text('.safety'));
+    $('.safety [data-action="snooze-backup"]').click();
+    log(!$('.safety') && state().prefs.backupNudged === TODAY && /过一个星期/.test(toastText()), '点「过几天再说」，提醒收起');
+    save({ ...state(), prefs: { ...state().prefs, backupNudged: '2026-10-01' } });
+    rerender();
+    log($('.safety'), '过了一周又提醒');
+    $('.safety [data-action="export-backup"]').click();
+    const file = JSON.parse(await blobs[blobs.length - 1].text());
+    await wait(0);
+    log(file.prefs.lastBackup === TODAY && file.weights.length === 1, '下载的备份里记着备份日期');
+    log(state().prefs.lastBackup === TODAY && !$('.safety') && /下载好了/.test(toastText()), '备份后提醒消失，并提示下载好了', toastText());
+    log(persistCalls === 1, '有了记录后向浏览器申请长期保存，只申请一次', `调用了 ${persistCalls} 次`);
+
+    // ---- 设置里的状态 ----
+    $('[data-action="open-settings"]').click();
+    await wait(0);
+    log(/上次备份：10月12日/.test(text('#settings-dialog .backup-state')), '设置里显示上次备份日期', text('#settings-dialog .backup-state'));
+    log(settings().querySelector('.storage-state').hidden, '电脑上浏览器没答应长期保存时不多说');
+    await closeSettings();
+    kept = true;
+    $('[data-action="open-settings"]').click();
+    await wait(0);
+    log(/已经答应长期保存/.test(text('#settings-dialog .storage-state')), '浏览器答应长期保存时在设置里说一声');
+    await closeSettings();
+    kept = false;
+
+    // ---- 手机上用分享面板 ----
+    const realMatch = w.matchMedia.bind(w);
+    w.matchMedia = (q) => (q.includes('pointer: coarse') ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : realMatch(q));
+    const shared = [];
+    let shareError = '';
+    pretend({ canShare: () => true, share: (data) => { shared.push(data.files[0]); return shareError ? Promise.reject(new w.DOMException('x', shareError)) : Promise.resolve(); } });
+    const backdate = () => { save({ ...state(), prefs: { ...state().prefs, lastBackup: '2026-09-01' } }); rerender(); };
+    backdate();
+    const downloads = blobs.length;
+    $('[data-action="open-settings"]').click();
+    settings().querySelector('[data-action="export-backup"]').click();
+    await wait(0);
+    log(shared.length === 1 && shared[0].name === '孕期工作台备份-2026-10-12.json' && blobs.length === downloads, '手机上弹分享面板，不再下载', `${shared.length} ${shared[0] && shared[0].name} ${blobs.length - downloads}`);
+    log(JSON.parse(await shared[0].text()).prefs.lastBackup === TODAY && state().prefs.lastBackup === TODAY && /存好了/.test(text('#settings-dialog .backup-state')), '分享完记下备份日期');
+    await closeSettings();
+
+    backdate();
+    shareError = 'AbortError';
+    $('[data-action="open-settings"]').click();
+    settings().querySelector('[data-action="export-backup"]').click();
+    await wait(0);
+    log(shared.length === 2 && blobs.length === downloads && state().prefs.lastBackup === '2026-09-01', '取消分享不算备份，也不下载');
+    shareError = 'NotAllowedError';
+    settings().querySelector('[data-action="export-backup"]').click();
+    await wait(0);
+    log(blobs.length === downloads + 1 && state().prefs.lastBackup === TODAY, '分享出错时退回下载');
+    await closeSettings();
+    w.matchMedia = realMatch;
+
+    // ---- iPhone 浏览器里提示加到主屏幕 ----
+    log(!$('.safety'), '电脑上不提示加到主屏幕');
+    pretend({ userAgent: IPHONE, platform: 'iPhone', standalone: false });
+    rerender();
+    log(/加到主屏幕/.test(text('.safety')) && /分享按钮/.test(text('.safety')) && /分开的两份/.test(text('.safety')), 'iPhone 浏览器里提示加到主屏幕，并说明要先导出再导入', text('.safety'));
+    pretend({ userAgent: WECHAT });
+    rerender();
+    log(/在 Safari 中打开/.test(text('.safety')), '微信里先教怎么换到 Safari');
+    pretend({ userAgent: IPHONE, standalone: true });
+    rerender();
+    log(!$('.safety'), '从主屏幕图标打开就不提示');
+    pretend({ standalone: false });
+    rerender();
+    $('.safety [data-action="hide-install-hint"]').click();
+    log(!$('.safety') && state().prefs.installHintHidden === true, '点「知道了」后不再提示');
+    $('[data-action="open-settings"]').click();
+    await wait(0);
+    log(/建议加到主屏幕/.test(text('#settings-dialog .storage-state')), '设置里仍然说明浏览器里打开有被清理的风险');
+    await closeSettings();
+    const backupText = await blobs[blobs.length - 1].text();
+
+    // ---- 手机上不提网页通知，改成导入日历 ----
+    w.location.hash = '#/checkups/schedule';
+    await new Promise((r) => w.addEventListener('hashchange', r, { once: true }));
+    log($('.remind-strip [data-action="export-ics"]') && !$('[data-action="enable-notify"]') && /手机日历/.test(text('.remind-strip')), 'iPhone 上提醒条只给「导入日历」，不给网页通知');
+    pretend({ userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36', platform: 'Linux armv8l' });
+    rerender();
+    log($('.remind-strip [data-action="export-ics"]') && !$('[data-action="enable-notify"]'), '安卓上也一样');
+    w.location.hash = '#/';
+    await new Promise((r) => w.addEventListener('hashchange', r, { once: true }));
+
+    // ---- 开始页导入备份 ----
+    localStorage.clear();
+    await open(APP);
+    log($('form[data-form="onboard"]') && /有之前导出的备份/.test(text('.onboard-import')), '开始页有「导入备份」');
+    let picker = null;
+    w.HTMLInputElement.prototype.click = function () { if (this.type === 'file') picker = this; };
+    // 读文件是真的异步，虚拟时间可能先跑完；等到页面有反应（报错或进了首页）为止
+    const pick = async (content) => {
+      $('.onboard-import [data-action="import-backup"]').click();
+      Object.defineProperty(picker, 'files', { value: [new w.File([content], 'b.json', { type: 'application/json' })] });
+      picker.dispatchEvent(new w.Event('change'));
+      for (let i = 0; i < 100 && !$('.hero') && !text('form[data-form="onboard"] .form-error'); i++) await wait(20);
+    };
+    await pick('不是备份');
+    log(/打不开/.test(text('form[data-form="onboard"] .form-error')), '选错文件时在开始页提示');
+    pretend({ userAgent: IPHONE, platform: 'iPhone', standalone: true });
+    rerender();
+    log(/之前在浏览器里记过/.test(text('.onboard-import')), '从主屏幕图标第一次打开，说明怎么把浏览器里的记录搬过来');
+    const asked = confirms;
+    await pick(backupText);
+    log($('.hero') && state() && state().weights.length === 1 && confirms === asked && /导入好了/.test(toastText()), '在开始页导入备份，直接进首页，不用确认覆盖',
+      `hero=${Boolean($('.hero'))} weights=${state() && state().weights.length} confirms=${confirms - asked} toast=${toastText()} err=${text('form[data-form="onboard"] .form-error')} backup=${backupText.slice(0, 60)}`);
+  } catch (e) {
+    log(false, '脚本异常', `${e.message}\n${e.stack}`);
+  }
+  log(errors.length === 0, '页面没有报错', errors.join(' | '));
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+})();
+</script>
+</body>
