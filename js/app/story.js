@@ -92,7 +92,7 @@
         <p class="eyebrow">今晚的睡前故事</p>
         <p class="story-card-title" lang="${info.collection.lang === 'en' ? 'en' : 'zh-CN'}">${esc(story.title)}</p>
         <p class="story-card-meta">${storyMeta(info)}${read ? ' · 今晚读过了' : ''}</p>
-        ${bird ? `<blockquote class="story-bird"><p>${multiline(bird)}</p><cite>泰戈尔《飞鸟集》，郑振铎 译</cite></blockquote>` : ''}
+        ${bird ? `<p class="story-bird-tag">每晚一句</p><blockquote class="story-bird"><p>${multiline(bird)}</p><cite>泰戈尔《飞鸟集》，郑振铎 译</cite></blockquote>` : ''}
         <span class="story-card-go">${read ? '再听一遍' : '去听故事'}${A.icon.chevronRight}</span>
       </a>`;
   }

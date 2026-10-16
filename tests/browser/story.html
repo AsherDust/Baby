@@ -100,7 +100,7 @@ iframe.onload = async () => {
     // ---- 首页卡片、工具目录 ----
     await wait(40);
     log($('.panel-story[href="#/tools/story"]') && $('.story-card-title').textContent.trim(), '晚上首页有今晚的故事');
-    log(/郑振铎/.test(text('.story-bird cite')) && text('.story-bird p').length > 5, '附上飞鸟集里的一句', text('.story-bird'));
+    log(/郑振铎/.test(text('.story-bird cite')) && text('.story-bird p').length > 5 && text('.story-bird-tag') === '每晚一句', '附上飞鸟集里的一句，标明是每晚一句，不是故事摘要', text('.story-bird'));
     const cardTitle = text('.story-card-title');
     fakeNow = MORNING;
     await nav('#/tools');

@@ -1292,7 +1292,8 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
 .story-card-moon svg { width: 32px; height: 32px; }
 .story-card-title { margin: 0 44px 4px 0; font-family: var(--serif); font-size: 21px; font-weight: 700; letter-spacing: 0.03em; line-height: 1.4; }
 .story-card-meta { margin: 0; font-size: 13px; color: var(--ink-3); }
-.story-bird { margin: 14px 0 0; padding: 2px 0 2px 14px; border-left: 2px solid var(--sky-line); font-family: var(--serif); font-size: 14.5px; line-height: 1.8; color: var(--ink-2); }
+.story-bird-tag { margin: 16px 0 8px; padding-top: 14px; border-top: 1px dashed var(--sky-line); font-size: 12px; font-weight: 600; letter-spacing: 0.12em; color: var(--sky-deep); }
+.story-bird { margin: 0; padding: 2px 0 2px 14px; border-left: 2px solid var(--sky-line); font-family: var(--serif); font-size: 14.5px; line-height: 1.8; color: var(--ink-2); }
 .story-bird p { margin: 0; }
 .story-bird cite { display: block; margin-top: 4px; font-family: var(--sans); font-size: 12px; font-style: normal; color: var(--ink-3); }
 .story-card-go { display: inline-flex; align-items: center; gap: 2px; margin-top: 12px; font-size: 13.5px; font-weight: 600; color: var(--sky-deep); }
