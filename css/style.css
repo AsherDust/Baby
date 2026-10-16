@@ -1288,6 +1288,11 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
 .panel-story:hover { border-color: var(--sky); transform: translateY(-1px); }
 .panel-story .eyebrow, .story-head .eyebrow { color: var(--sky-deep); }
 .panel-story .eyebrow::before, .story-head .eyebrow::before { background: var(--sky); }
+.story-card { position: relative; }
+/* 和「去听故事」一个样子；左右留出点按的余量，文字和卡片内容右边对齐 */
+.story-card-close { position: absolute; right: 12px; bottom: 15px; display: inline-flex; align-items: center; gap: 3px; height: 36px; padding: 0 12px; border: 0; border-radius: 99px; background: none; color: var(--sky-deep); font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background-color 0.15s; }
+.story-card-close svg { width: 14px; height: 14px; }
+.story-card-close:hover { background: var(--sky-soft); }
 .story-card-moon { position: absolute; top: 18px; right: 20px; color: var(--sky-deep); }
 .story-card-moon svg { width: 32px; height: 32px; }
 .story-card-title { margin: 0 44px 4px 0; font-family: var(--serif); font-size: 21px; font-weight: 700; letter-spacing: 0.03em; line-height: 1.4; }
@@ -1534,6 +1539,7 @@ button.shelf-item:hover, .shelf-item[aria-current="true"] { border-color: var(--
 /* 手机上的故事页：正文留宽一点，朗读条停在底部菜单上面 */
 @media (max-width: 720px) {
   .panel-story { margin-bottom: 14px; }
+  .story-card-close { right: 6px; bottom: 14px; }
   .story-title { font-size: 23px; }
   .story-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .panel.story-text { padding: 22px 18px; font-size: 16.5px; }

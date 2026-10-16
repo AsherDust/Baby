@@ -299,6 +299,17 @@
       else render();
     },
 
+    'hide-story-card'() {
+      const ctx = storyNight(Date.now());
+      if (!ctx) return;
+      const prefs = app.state.prefs;
+      const before = prefs.storyCardHidden;
+      prefs.storyCardHidden = ctx.night;
+      persist();
+      render();
+      toast('今晚不再显示，想听时到「工具 → 睡前故事」', () => { prefs.storyCardHidden = before; });
+    },
+
     'story-retry'() {
       const ctx = storyNight(Date.now());
       if (ctx && ctx.story) delete storyTexts[ctx.story.c];

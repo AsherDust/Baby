@@ -179,6 +179,26 @@ iframe.onload = async () => {
     log(held() === 0, '读完恢复自动锁屏');
     await nav('#/');
     log(text('.story-card-title') === '匆匆' && /今晚读过了/.test(text('.story-card-meta')) && /再听一遍/.test(text('.story-card-go')), '首页卡片也显示读过了');
+    log(!$('.panel-story .story-card-close') && $('.story-card .story-card-close'), '关闭按钮不在卡片链接里面');
+    click('.story-card-close');
+    log(!$('.story-card') && /今晚不再显示/.test(toastText()), '点关闭，卡片收起');
+    click('[data-action="undo"]');
+    log($('.story-card'), '撤销后卡片回来');
+    click('.story-card-close');
+    log(JSON.parse(w.localStorage.getItem('pregnancy-desk:v1')).prefs.storyCardHidden === '2026-10-16', '关掉的是哪一晚存下来了');
+    await nav('#/tools');
+    await nav('#/');
+    log(!$('.story-card'), '换页回来也不再出现');
+    w.Baby.app.ui.today = '2026-10-17';
+    fakeNow = new Date(2026, 9, 17, 2, 0, 0).getTime();
+    w.Baby.app.render();
+    log(!$('.story-card'), '过了午夜还算同一晚，不出现');
+    fakeNow = new Date(2026, 9, 17, 21, 0, 0).getTime();
+    w.Baby.app.render();
+    log($('.story-card'), '第二天晚上又出现');
+    w.Baby.app.ui.today = '2026-10-16';
+    fakeNow = EVENING;
+    w.Baby.app.render();
     await nav('#/tools/story');
     await loaded();
 

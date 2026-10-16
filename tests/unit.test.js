@@ -614,7 +614,7 @@ test('normalize：新建的数据存取一圈不变', () => {
 
 test('normalize：血压、血糖、B 超的清理', () => {
   const base = M.normalize({ profile: { dueDate: DUE } });
-  eq([base.prefs, base.bp, base.glucose, base.ultrasounds], [{ glucoseAfter: 2, since: null, lastBackup: null, backupNudged: null, installHintHidden: false }, [], [], []]);
+  eq([base.prefs, base.bp, base.glucose, base.ultrasounds], [{ glucoseAfter: 2, since: null, lastBackup: null, backupNudged: null, installHintHidden: false, storyCardHidden: null }, [], [], []]);
   const s = M.normalize({
     profile: { dueDate: DUE },
     prefs: { glucoseAfter: '1' },
@@ -1126,6 +1126,15 @@ test('normalize：心情日记的清理，老数据没有这一项时为空', ()
   ]);
   raw.journal = 'oops';
   eq(M.normalize(raw).journal, []);
+});
+
+test('normalize：首页故事卡片关掉的那一晚', () => {
+  const raw = M.createState({ dueDate: DUE });
+  eq(raw.prefs.storyCardHidden, null);
+  raw.prefs.storyCardHidden = '2026-10-16';
+  eq(M.normalize(raw).prefs.storyCardHidden, '2026-10-16');
+  raw.prefs.storyCardHidden = 'tonight';
+  eq(M.normalize(raw).prefs.storyCardHidden, null);
 });
 
 // ---------- chart ----------

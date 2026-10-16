@@ -77,24 +77,29 @@
     return { text: `今晚：${esc(ctx.story.title)} · 约 ${ctx.story.min} 分钟` };
   }
 
-  /** 晚上 7 点到凌晨 4 点，首页出现今晚的故事和飞鸟集里的一句 */
+  /** 晚上 7 点到凌晨 4 点，首页出现今晚的故事和飞鸟集里的一句；今晚关掉过就不再出现 */
   function viewStoryCard(now) {
     if (!St.isEvening(new Date(now).getHours())) return '';
     const ctx = storyNight(now);
     if (!ctx || !ctx.story) return '';
     const { index, night, story } = ctx;
+    if (app.state.prefs.storyCardHidden === night) return '';
     const info = St.info(index, story);
     const read = app.state.stories.done[story.id] === night;
     const bird = St.birdOf(index, night);
+    // 关闭按钮不能放进整张卡片的链接里，所以套一层，按钮叠在右下角
     return `
-      <a class="panel panel-story" href="#/tools/story">
-        <span class="story-card-moon">${A.icon.moon}</span>
-        <p class="eyebrow">今晚的睡前故事</p>
-        <p class="story-card-title" lang="${info.collection.lang === 'en' ? 'en' : 'zh-CN'}">${esc(story.title)}</p>
-        <p class="story-card-meta">${storyMeta(info)}${read ? ' · 今晚读过了' : ''}</p>
-        ${bird ? `<p class="story-bird-tag">每晚一句</p><blockquote class="story-bird"><p>${multiline(bird)}</p><cite>泰戈尔《飞鸟集》，郑振铎 译</cite></blockquote>` : ''}
-        <span class="story-card-go">${read ? '再听一遍' : '去听故事'}${A.icon.chevronRight}</span>
-      </a>`;
+      <div class="story-card">
+        <a class="panel panel-story" href="#/tools/story">
+          <span class="story-card-moon">${A.icon.moon}</span>
+          <p class="eyebrow">今晚的睡前故事</p>
+          <p class="story-card-title" lang="${info.collection.lang === 'en' ? 'en' : 'zh-CN'}">${esc(story.title)}</p>
+          <p class="story-card-meta">${storyMeta(info)}${read ? ' · 今晚读过了' : ''}</p>
+          ${bird ? `<p class="story-bird-tag">每晚一句</p><blockquote class="story-bird"><p>${multiline(bird)}</p><cite>泰戈尔《飞鸟集》，郑振铎 译</cite></blockquote>` : ''}
+          <span class="story-card-go">${read ? '再听一遍' : '去听故事'}${A.icon.chevronRight}</span>
+        </a>
+        <button type="button" class="story-card-close" data-action="hide-story-card" aria-label="今晚不再显示故事卡片">${A.icon.x}今晚不显示</button>
+      </div>`;
   }
 
   // ---------- 故事页 ----------
