@@ -19,15 +19,20 @@
   const multiline = (s) => esc(s).replace(/\n/g, '<br>');
   const isSubhead = (p) => /^【.+】$/.test(p);
 
-  /** 这台设备上能读这种语言的声音，好听的、普通话的排前面 */
+  /**
+   * 这台设备上能读这种语言的声音，好听的、普通话的排前面。
+   * iPhone 的 Safari 会把同一个声音列两遍，voiceURI 也一样，朗读时按它找声音，只留一个
+   */
   function voicesFor(lang) {
     if (!canSpeak()) return [];
     const want = lang === 'zh' ? /^(zh|cmn)/i : /^en/i;
     const main = lang === 'zh' ? /CN|Hans/i : /GB|US/i;
     const rank = (v) => (NICE_VOICES[lang].test(v.name) ? 0 : 4) + (main.test(v.lang) ? 0 : 2) + (v.localService ? 0 : 1) - qualityOf(v)[2];
+    const seen = new Set();
     return window.speechSynthesis.getVoices()
       .filter((v) => want.test(v.lang) && !ODD_VOICES.test(v.name))
-      .sort((a, b) => rank(a) - rank(b));
+      .sort((a, b) => rank(a) - rank(b))
+      .filter((v) => !seen.has(voiceKey(v)) && seen.add(voiceKey(v)));
   }
 
   /** 选过的声音；没选过或这台设备没有就用排第一的。以前存的是声音名字，也认 */
