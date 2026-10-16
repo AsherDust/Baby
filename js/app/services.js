@@ -32,7 +32,7 @@
 
   // 从主屏幕图标打开时没有刷新按钮，切回前台多半也只是把后台的旧页面拿出来，不会重新加载。
   // 切回来时把页面用到的文件和服务器上的比一比（缓存里存的就是这次打开用的），变了就提示更新
-  const UPDATE_GAP = 2 * 60 * 1000;
+  const UPDATE_GAP = 60 * 60 * 1000;
   let updateCheckedAt = Date.now();
   async function checkForUpdate(now = Date.now()) {
     if (!ui.updateReady) {
