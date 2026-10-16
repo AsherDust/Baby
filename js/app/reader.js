@@ -148,8 +148,8 @@
     ui.reading = null;
   }
 
-  function setStoryVoice(lang, name) {
-    app.state.stories.voices[lang] = String(name).slice(0, 120);
+  function setStoryVoice(lang, key) {
+    app.state.stories.voices[lang] = String(key).slice(0, 120);
     persist();
     if (ui.reading && ui.reading.playing) speakFrom(ui.reading.index);
   }

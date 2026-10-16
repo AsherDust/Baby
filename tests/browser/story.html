@@ -22,7 +22,8 @@ const held = () => locks.filter((l) => !l.released).length;
 // 假的朗读：记下每句读了什么，endOne() 当作这一句读完
 const VOICES = [
   { name: 'Meijia', lang: 'zh-TW', localService: true },
-  { name: 'Tingting', lang: 'zh-CN', localService: true },
+  { name: 'Tingting', lang: 'zh-CN', localService: true, voiceURI: 'com.apple.voice.compact.zh-CN.Tingting' },
+  { name: 'Tingting', lang: 'zh-CN', localService: true, voiceURI: 'com.apple.voice.enhanced.zh-CN.Tingting' },
   { name: 'Zarvox', lang: 'en-US', localService: true },
   { name: 'Daniel', lang: 'en-GB', localService: true },
   { name: 'Samantha', lang: 'en-US', localService: true },
@@ -127,7 +128,7 @@ iframe.onload = async () => {
 
     click('[data-action="story-play"]');
     log(spoken.length === 1 && paras[0].startsWith(lastSaid().text.slice(0, 10)), '点朗读，从第一段读起', lastSaid().text);
-    log(lastSaid().voice && lastSaid().voice.name === 'Tingting' && lastSaid().lang === 'zh-CN' && lastSaid().rate === 0.9, '默认用普通话声音、适中语速', JSON.stringify(lastSaid().voice));
+    log(lastSaid().voice && /enhanced/.test(lastSaid().voice.voiceURI) && lastSaid().lang === 'zh-CN' && lastSaid().rate === 0.9, '默认用普通话的增强版声音、适中语速', JSON.stringify(lastSaid().voice));
     log(reading() && reading().dataset.i === '0' && $('.story-player') && /正在朗读/.test(text('.story-player')), '第一段高亮，下面出现朗读条');
     await wait(0);
     log(held() === 1, '朗读时屏幕常亮', held());
@@ -149,13 +150,20 @@ iframe.onload = async () => {
 
     click('[data-action="story-rate"][data-rate="0.75"]');
     log(state().stories.rate === 0.75 && lastSaid().rate === 0.75 && reading().dataset.i === '3', '改语速马上用上');
-    const voices = $$('.story-voice[data-lang="zh"] option').map((o) => o.value);
-    log(voices.join() === 'Tingting,Meijia', '中文声音：普通话排前面', voices.join());
+    const zhNames = $$('.story-voice[data-lang="zh"] option').map((o) => o.textContent);
+    log(zhNames.join() === 'Tingting（增强） · 普通话,Tingting · 普通话,Meijia · 台湾口音', '中文声音：增强版、普通话排前面，同名的分得清', zhNames.join());
     const enVoices = $$('.story-voice[data-lang="en"] option').map((o) => o.value);
     log(enVoices.length === 2 && !enVoices.includes('Zarvox'), '英文声音去掉搞怪的', enVoices.join());
-    const sel = $('.story-voice[data-lang="zh"]');
-    sel.value = 'Meijia';
-    sel.dispatchEvent(new w.Event('change', { bubbles: true }));
+    const pickVoice = (value) => {
+      const sel = $('.story-voice[data-lang="zh"]');
+      sel.value = value;
+      sel.dispatchEvent(new w.Event('change', { bubbles: true }));
+    };
+    pickVoice('com.apple.voice.compact.zh-CN.Tingting');
+    log(lastSaid().voice.voiceURI === 'com.apple.voice.compact.zh-CN.Tingting' && $('.story-voice[data-lang="zh"]').selectedIndex === 1, '同名的标准版也选得上');
+    state().stories.voices.zh = 'Tingting';
+    log(w.Baby.app.voiceFor('zh').name === 'Tingting', '以前存的声音名字也认');
+    pickVoice('Meijia');
     log(state().stories.voices.zh === 'Meijia' && lastSaid().voice.name === 'Meijia', '换声音马上用上');
 
     // 读到最后

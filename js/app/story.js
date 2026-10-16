@@ -9,6 +9,11 @@
   // 系统自带的搞怪声音（macOS 上的 Bells、Zarvox 之类），不适合睡前听
   const ODD_VOICES = /Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Good News|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Junior|Ralph|Fred|Kathy|Grandma|Grandpa|Rocko|Shelley|Sandy|Flo|Eddy|Reed/;
   const NICE_VOICES = { zh: /Tingting|Ting-Ting|Lili|Yu-shu|Shasha|普通话|Mandarin/, en: /Samantha|Daniel|Karen|Moira|Serena|Arthur|Martha|UK English Female|US English/ };
+  // 苹果设备上同一个声音可能同时有自带的标准版和下载的增强版、高级版，名字一样，只有 voiceURI 不同
+  const QUALITY = [[/premium/i, '高级', 0.6], [/enhanced/i, '增强', 0.3]];
+  const REGION = { 'zh-CN': '普通话', 'zh-TW': '台湾口音', 'zh-HK': '粤语', 'en-GB': '英式', 'en-US': '美式', 'en-AU': '澳洲', 'en-IE': '爱尔兰' };
+  const voiceKey = (v) => v.voiceURI || v.name;
+  const qualityOf = (v) => QUALITY.find(([re]) => re.test(v.voiceURI || '')) || [null, '', 0];
 
   const canSpeak = () => 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
   const multiline = (s) => esc(s).replace(/\n/g, '<br>');
@@ -19,16 +24,28 @@
     if (!canSpeak()) return [];
     const want = lang === 'zh' ? /^(zh|cmn)/i : /^en/i;
     const main = lang === 'zh' ? /CN|Hans/i : /GB|US/i;
-    const rank = (v) => (NICE_VOICES[lang].test(v.name) ? 0 : 4) + (main.test(v.lang) ? 0 : 2) + (v.localService ? 0 : 1);
+    const rank = (v) => (NICE_VOICES[lang].test(v.name) ? 0 : 4) + (main.test(v.lang) ? 0 : 2) + (v.localService ? 0 : 1) - qualityOf(v)[2];
     return window.speechSynthesis.getVoices()
       .filter((v) => want.test(v.lang) && !ODD_VOICES.test(v.name))
       .sort((a, b) => rank(a) - rank(b));
   }
 
-  /** 选过的声音；没选过或这台设备没有就用排第一的 */
+  /** 选过的声音；没选过或这台设备没有就用排第一的。以前存的是声音名字，也认 */
   function voiceFor(lang) {
     const list = voicesFor(lang);
-    return list.find((v) => v.name === app.state.stories.voices[lang]) || list[0] || null;
+    const saved = app.state.stories.voices[lang];
+    return list.find((v) => voiceKey(v) === saved) || list.find((v) => v.name === saved) || list[0] || null;
+  }
+
+  /** 下拉框里的名字：标上增强版、口音；还分不出来的加个序号 */
+  function voiceLabels(list) {
+    const count = {};
+    return list.map((v) => {
+      const quality = qualityOf(v)[1];
+      const label = `${v.name}${quality ? `（${quality}）` : ''} · ${REGION[v.lang.replace('_', '-')] || v.lang}`;
+      count[label] = (count[label] || 0) + 1;
+      return count[label] > 1 ? `${label} ${count[label]}` : label;
+    });
   }
 
   /** 这一晚和今晚的故事；故事目录没加载出来时返回 null */
@@ -211,11 +228,12 @@
       const list = voicesFor(lang);
       if (list.length < 2) return '';
       const chosen = voiceFor(lang);
+      const labels = voiceLabels(list);
       return `
         <label class="story-setting">
           <span>${label}</span>
           <select class="story-voice" data-lang="${lang}">
-            ${list.map((v) => `<option value="${esc(v.name)}"${v === chosen ? ' selected' : ''}>${esc(v.name)}（${esc(v.lang)}）</option>`).join('')}
+            ${list.map((v, i) => `<option value="${esc(voiceKey(v))}"${v === chosen ? ' selected' : ''}>${esc(labels[i])}</option>`).join('')}
           </select>
         </label>`;
     };
