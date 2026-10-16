@@ -27,6 +27,29 @@
     <path d="M9.2 17.6L6 18.5l3.2 1" fill="${INK}" stroke="${INK}" stroke-width="1" stroke-linejoin="round"/>
     <path d="M27 12.9c1-2.6 2.8-4 5-4.3" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round"/>`;
 
+  const SWEAT = (x, y) =>
+    `<path d="M${x} ${y}c-1.2 1.7-1.6 2.8-1.6 3.4a1.6 1.6 0 0 0 3.2 0c0-.6-.4-1.7-1.6-3.4z" fill="#9CC9E8" stroke="${INK}" stroke-width=".9"/>`;
+
+  // 心情小脸：32×32，圆脸 + 五官，配色按心情
+  const FACE = (fill, inner, cheeks = true) => `
+    <circle cx="16" cy="16.5" r="12.5" fill="${fill}" stroke="${INK}" stroke-width="1.6"/>
+    ${cheeks ? '<ellipse cx="9.4" cy="19.6" rx="2.1" ry="1.3" fill="#E98B6D" opacity=".5"/><ellipse cx="22.6" cy="19.6" rx="2.1" ry="1.3" fill="#E98B6D" opacity=".5"/>' : ''}
+    <g fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</g>`;
+  const EYES = `<circle cx="12" cy="14.6" r="1.4" fill="${INK}" stroke="none"/><circle cx="20" cy="14.6" r="1.4" fill="${INK}" stroke="none"/>`;
+  const MOOD_FACES = {
+    happy: FACE('#F6C858', `<path d="M10.2 15c.8-1.7 2.8-1.7 3.6 0M18.2 15c.8-1.7 2.8-1.7 3.6 0"/><path d="M11.6 18.6c1.2 3.6 7.6 3.6 8.8 0z" fill="${INK}"/>`),
+    calm: FACE('#B5D3A4', '<path d="M10.2 14.4c.8 1.4 2.8 1.4 3.6 0M18.2 14.4c.8 1.4 2.8 1.4 3.6 0"/><path d="M13 20c1.6 1.4 4.4 1.4 6 0"/>'),
+    excited: FACE('#F7AE8E', `<circle cx="12" cy="14.2" r="1.9" fill="${INK}" stroke="none"/><circle cx="20" cy="14.2" r="1.9" fill="${INK}" stroke="none"/><circle cx="12.7" cy="13.5" r=".6" fill="#FFF" stroke="none"/><circle cx="20.7" cy="13.5" r=".6" fill="#FFF" stroke="none"/><path d="M12.2 18.4h7.6c0 2.9-1.7 4.4-3.8 4.4s-3.8-1.5-3.8-4.4z" fill="${INK}"/><path d="M27.2 1.8l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z" fill="#F2B544" stroke-width="1"/>`),
+    tired: FACE('#CDBFE6', '<path d="M10.2 15.4h3.6M18.2 15.4h3.6"/><ellipse cx="16" cy="21" rx="1.6" ry="1.8"/><path d="M23.6 3.6h3.2l-3.2 3.6h3.2" stroke-width="1.3"/>', false),
+    low: FACE('#A9C4DC', `${EYES}<path d="M12.4 21.6c1.9-2 5.3-2 7.2 0"/><path d="M9.6 17.4c-.9 1.3-1.2 2.2-1.2 2.7a1.2 1.2 0 0 0 2.4 0c0-.5-.3-1.4-1.2-2.7z" fill="#7FB2DA" stroke-width="1"/>`, false),
+    anxious: FACE('#EDBBC8', `${EYES}<path d="M9.6 11.8l3.4-1.3M22.4 11.8L19 10.5"/><path d="M11.4 20.8c.9-1 1.8-1 2.3 0s1.4 1 2.3 0 1.4-1 2.3 0 1.4 1 2.3 0"/>${SWEAT(26.4, 5.4)}`, false),
+  };
+
+  const BURST_BITS = {
+    heart: '<path d="M8 14L2.6 8.9A3.2 3.2 0 0 1 8 4.6a3.2 3.2 0 0 1 5.4 4.3z" fill="#EC8A70"/>',
+    drop: '<path d="M8 1.8c2.6 3.4 4.4 5.9 4.4 8.2a4.4 4.4 0 0 1-8.8 0c0-2.3 1.8-4.8 4.4-8.2z" fill="#F2B544"/><path d="M6.2 10.6a1.9 1.9 0 0 0 1.6 1.8" stroke="#FFF1CC" stroke-width="1.2" fill="none" stroke-linecap="round"/>',
+  };
+
   const BALLOON_BODY = `
     <path d="M15 2.5C8.1 2.5 3 7.9 3 14.6c0 7.6 6.3 14.2 12 15.6 5.7-1.4 12-8 12-15.6C27 7.9 21.9 2.5 15 2.5z" fill="#93B6CC" stroke="${INK}" stroke-width="1.5"/>
     <path d="M9.2 9.6c-1.6 2-2.2 4.4-1.8 6.6" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>
@@ -123,14 +146,22 @@
     stop: icon('<rect x="6.5" y="6.5" width="11" height="11" rx="2.2"/>', 2),
     shuffle: icon('<path d="M4 7h3.2c4.3 0 5.3 10 9.6 10H20M4 17h3.2c1.6 0 2.7-1.4 3.6-3.3M13.2 10.3C14.1 8.4 15.2 7 16.8 7H20M17.6 4.6L20 7l-2.4 2.4M17.6 14.6L20 17l-2.4 2.4"/>'),
     textSize: icon('<path d="M3.5 18.5L8.5 6l5 12.5M5.3 14.2h6.4M14.8 18.5l3-7.2 3 7.2M15.8 16.2h4"/>'),
+    smile: icon('<circle cx="12" cy="12" r="8.5"/><path d="M8.6 13.8a4.2 4.2 0 0 0 6.8 0"/><path d="M9.3 9.6h.01M14.7 9.6h.01" stroke-width="2.6"/>'),
+    pencil: icon('<path d="M5 19l1-4.2L15.6 5.2a1.9 1.9 0 0 1 2.7 0l.5.5a1.9 1.9 0 0 1 0 2.7L9.2 18z"/><path d="M13.8 7l3.2 3.2"/>'),
   };
 
   Baby.art = {
     honeyPot: svg('0 0 64 64', HONEY_POT),
     bee: svg('0 0 40 30', BEE),
+    beeWorried: svg('0 0 40 30', BEE + SWEAT(34.2, 10.4)),
     balloon: svg('0 0 30 52', BALLOON_BODY + BALLOON_STRING),
     honeycomb: svg('0 0 130 100', HONEYCOMB),
     scene: svg('0 0 360 210', SCENE),
+    mood: Object.fromEntries(Object.entries(MOOD_FACES).map(([id, inner]) => [id, svg('0 0 32 32', inner)])),
+    burst: {
+      ...Object.fromEntries(Object.entries(BURST_BITS).map(([id, inner]) => [id, svg('0 0 16 16', inner)])),
+      comb: svg('0 0 16 16', `<path d="${hexPath(8, 8, 6.4)}" fill="#F6D58E" stroke="#E2B867" stroke-width="1.2"/>`),
+    },
     icon: icons,
   };
 })();

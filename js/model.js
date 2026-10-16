@@ -4,6 +4,7 @@
   const D = Baby.dates;
   const C = Baby.content;
   const St = Baby.stories;
+  const J = Baby.journal;
 
   const VERSION = 1;
   const KG_MIN = 25;
@@ -107,6 +108,7 @@
       glucose: [],
       ultrasounds: [],
       stories: St.empty(),
+      journal: [],
       notified: {},
     };
   }
@@ -308,6 +310,7 @@
       glucose: [...glucose.values()].sort(byDateSlot),
       ultrasounds,
       stories: St.normalize(raw.stories),
+      journal: J.normalize(raw.journal),
       notified,
     };
   }

@@ -2,7 +2,7 @@
   'use strict';
   // 睡前故事：下载正文、朗读、故事页上的按钮
   const { stories: St, app } = globalThis.Baby;
-  const { root, ui, storyTexts, afterRender, canSpeak, voiceFor, storyNight, render, currentRoute, toast, persist } = app;
+  const { root, ui, storyTexts, afterRender, canSpeak, voiceFor, storyNight, render, currentRoute, toast, oops, persist } = app;
 
   // 段和段之间停一下；一次交给语音的字数有上限，太长时有的浏览器读到一半会自己停
   const PARA_GAP = 350;
@@ -109,7 +109,7 @@
       u.onerror = (e) => {
         if (id !== run || e.error === 'interrupted' || e.error === 'canceled') return;
         pauseReading();
-        toast('朗读停住了，点「继续」接着读');
+        oops('朗读停住了，点「继续」接着读');
       };
       synth.speak(u);
     };

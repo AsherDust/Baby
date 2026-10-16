@@ -1,6 +1,6 @@
 // 截图和对比度测试共用的示例数据：
 //   empty / main / fresh / checkup-day / late / bag-done / labor
-// 需要先加载 dates.js、content.js、stories.js、model.js；empty 返回 null
+// 需要先加载 dates.js、content.js、stories.js、journal.js、model.js；empty 返回 null
 function seedScene(name) {
   if (name === 'empty') return null;
   const M = Baby.model;
@@ -29,8 +29,17 @@ function seedScene(name) {
   M.addUltrasound(s, { date: '2026-07-06', values: { crl: '62.5', fhr: '158' }, placenta: '', note: 'NT 1.4 mm' });
   M.addUltrasound(s, { date: '2026-09-25', values: { bpd: '58.2', hc: '212', ac: '186', fl: '41.3', fhr: '146', dvp: '5.1', efw: '520' }, placenta: '后壁 0 级', note: '大排畸未见异常' });
   M.addUltrasound(s, { date: '2026-10-09', values: { bpd: '62.4', hc: '226', ac: '203', fl: '45.0', fhr: '142', afi: '4.6', efw: '640' }, placenta: '后壁 0 级', note: '' });
+  s.journal = Baby.journal.normalize([
+    { id: 'j1', date: '2026-10-12', time: '21:40', mood: 'excited', text: '今天豆豆踢得特别有劲，像在肚子里翻跟头。\n爸爸贴着肚子讲了半天故事，不知道听没听见。' },
+    { id: 'j2', date: '2026-10-12', time: '09:15', mood: 'tired', text: '昨晚起夜三次，早上有点没精神。' },
+    { id: 'j3', date: '2026-10-11', time: '20:05', mood: 'anxious', text: '后天要做糖耐，有点紧张，怕喝糖水会吐。' },
+    { id: 'j4', date: '2026-10-08', time: '18:30', mood: 'happy', text: '买了第一件小衣服，奶黄色的，好小一件！' },
+    { id: 'j5', date: '2026-10-03', time: '', mood: 'calm', text: '' },
+    { id: 'j6', date: '2026-09-25', time: '16:20', mood: 'happy', text: '大排畸顺利通过，医生说豆豆很配合，一下就拍好了。' },
+    { id: 'j7', date: '2026-09-18', time: '22:10', mood: 'low', text: '腰酸得睡不着，翻来覆去。' },
+  ]);
   if (name === 'checkup-day') M.upsertWeight(s, '2026-10-13', 56.1);
-  if (name === 'fresh') { s.meds = []; s.weights = []; s.checkups = Baby.content.defaultCheckups(); s.profile.preWeight = null; s.profile.nickname = ''; }
+  if (name === 'fresh') { s.meds = []; s.weights = []; s.journal = []; s.checkups = Baby.content.defaultCheckups(); s.profile.preWeight = null; s.profile.nickname = ''; }
   if (name === 'late' || name === 'bag-done') {
     s.profile.dueDate = '2026-11-30';
     s.checkups.forEach((c) => { c.date = null; c.time = ''; c.done = c.target < 231; });

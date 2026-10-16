@@ -1,22 +1,55 @@
 (function () {
   'use strict';
   // 表单提交和按钮动作
-  const { dates: D, content: C, model: M, storage: S, app } = globalThis.Baby;
+  const { dates: D, content: C, model: M, storage: S, journal: J, app } = globalThis.Baby;
   const {
-    settingsDialog, checkupDialog, medDialog, sheetDialog, notifyPermission, ui, render, go, closeDialog,
-    openGlucoseSheet, openUltrasoundSheet, openSettings, openCheckupDialog, openMedDialog, formError, toast, persist,
-    saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose, checkNotifications, storyActions
+    settingsDialog, checkupDialog, medDialog, sheetDialog, notifyPermission, JOURNAL_SHOWN, ui, render, go, closeDialog,
+    openGlucoseSheet, openUltrasoundSheet, openJournalSheet, openSettings, openCheckupDialog, openMedDialog, formError,
+    toast, oops, say, cheer, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose,
+    checkNotifications, storyActions
   } = app;
+
+  const submitButton = (form) => form.querySelector('button:not([type="button"])');
+  const journalFields = (form) => ({
+    mood: form.elements.mood.value,
+    text: form.elements.text.value,
+    date: form.elements.date.value,
+  });
 
   const forms = {
     onboard(form) {
       const { profile, error } = readProfile(form);
       if (error) return formError(form, error);
+      cheer(submitButton(form));
       app.state = M.createState(profile, ui.today);
       persist();
       render();
-      toast('准备好啦，从今天开始慢慢记');
+      toast(say('onboard'));
       checkNotifications();
+    },
+
+    journal(form) {
+      const f = journalFields(form);
+      const error = J.entryError(f, ui.today);
+      if (error) return formError(form, error);
+      cheer(submitButton(form));
+      const entry = J.add(app.state, f, ui.today, Date.now());
+      persist();
+      ui.journalMood = '';
+      ui.clearInputs.push('j-text', 'j-date');
+      render();
+      toast(say(`mood-${entry.mood}`), () => J.remove(app.state, entry.id));
+    },
+
+    'journal-edit'(form) {
+      const f = journalFields(form);
+      const error = J.entryError(f, ui.today);
+      if (error) return formError(form, error);
+      J.update(app.state, form.dataset.id, f);
+      persist();
+      closeDialog(sheetDialog);
+      render();
+      toast(say('saved'));
     },
 
     settings(form) {
@@ -27,7 +60,7 @@
       persist();
       closeDialog(settingsDialog);
       render();
-      toast(dueChanged ? '预产期更新了，建议日期也跟着调整好了' : '保存好了');
+      toast(dueChanged ? '预产期更新了，建议日期也跟着调整好了' : say('saved'));
     },
 
     'quick-weight'(form) {
@@ -82,7 +115,7 @@
       persist();
       closeDialog(sheetDialog);
       render();
-      toast(id ? '保存好了' : '这次 B 超记好了');
+      toast(say(id ? 'saved' : 'ultrasound'));
     },
 
     checkup(form) {
@@ -107,7 +140,7 @@
       persist();
       closeDialog(checkupDialog);
       render();
-      toast(ck ? '保存好了' : '加好了，已经按孕周排进日程');
+      toast(ck ? say('saved') : '加好了，已经按孕周排进日程');
     },
 
     med(form) {
@@ -128,14 +161,14 @@
       persist();
       closeDialog(medDialog);
       render();
-      toast(id ? '保存好了' : `记下了「${fields.name}」`);
+      toast(id ? say('saved') : `记下了「${fields.name}」`);
     },
 
     'bag-item'(form) {
       const name = form.elements.name.value.trim().slice(0, M.BAG_NAME_MAX);
       const error = M.bagItemError(app.state, name);
       if (error) {
-        toast(error);
+        oops(error);
         form.elements.name.focus();
         return;
       }
@@ -154,6 +187,29 @@
 
     'reload-app'() {
       location.reload();
+    },
+
+    'journal-start'(el) {
+      ui.journalMood = el.dataset.mood;
+      go('#/journal', 'j-text');
+    },
+
+    'edit-journal'(el) {
+      openJournalSheet(el.dataset.id);
+    },
+
+    'delete-journal'(el) {
+      const removed = J.remove(app.state, el.dataset.id);
+      closeDialog(sheetDialog);
+      if (!removed) return;
+      persist();
+      render();
+      toast('删掉了这条心情', () => app.state.journal.splice(removed.index, 0, removed.entry));
+    },
+
+    'journal-more'() {
+      ui.journalShown += JOURNAL_SHOWN;
+      render();
     },
 
     'close-dialog'(el) {
@@ -187,9 +243,10 @@
       const ck = app.state.checkups.find((c) => c.id === el.dataset.id);
       if (!ck) return;
       ck.done = !ck.done;
+      if (ck.done) cheer(el);
       persist();
       render();
-      toast(ck.done ? `「${ck.title}」完成啦，辛苦了` : `「${ck.title}」改回没完成`, () => { ck.done = !ck.done; });
+      toast(ck.done ? say('checkupDone', { title: ck.title }) : `「${ck.title}」改回没完成`, () => { ck.done = !ck.done; });
     },
 
     'mark-past-done'() {
@@ -271,15 +328,17 @@
       render();
     },
 
-    'end-kicks'() {
+    'end-kicks'(el) {
       const now = Date.now();
       const k = M.endKicks(app.state, now);
       if (!k) return;
+      const r = M.kickReview(app.state, now).find((x) => x.session === k);
+      if (r.verdict === 'ok') cheer(el);
       ui.kickFeedback = '';
       persist();
       render();
-      const r = M.kickReview(app.state, now).find((x) => x.session === k);
-      toast(`这次数了 ${r.minutes} 分钟，胎动 ${r.count} 次`, () => { k.end = null; });
+      const message = `这次数了 ${r.minutes} 分钟，胎动 ${r.count} 次`;
+      toast(r.verdict === 'ok' ? `${message}，${say('kicksDone')}` : message, () => { k.end = null; });
     },
 
     'delete-kicks'(el) {
@@ -365,9 +424,11 @@
     'toggle-bag-item'(el) {
       const item = M.toggleBagItem(app.state, el.dataset.id);
       if (!item) return;
+      const complete = item.done && !M.bagSummary(app.state).left;
+      if (complete) cheer(el);
       persist();
       render();
-      if (item.done && !M.bagSummary(app.state).left) toast('最后一样也备好了，辛苦啦');
+      if (complete) toast(say('bagDone'));
     },
 
     'add-bag-item'(el) {
@@ -401,31 +462,32 @@
 
     'export-ics-one'(el) {
       const row = M.scheduleRows(app.state, ui.today).find((r) => r.ck.id === el.dataset.id);
-      if (!row || row.status.diff < 0) return toast('先填好日期，再加到日历');
+      if (!row || row.status.diff < 0) return oops('先填好日期，再加到日历');
       downloadCalendar([row], `产检-${row.ck.title}.ics`);
       toast('打开下载的文件就能加进日历');
     },
 
     async 'enable-notify'() {
-      if (notifyPermission() === 'unsupported') return toast('这个浏览器不支持网页通知，用「导入日历」更稳');
+      if (notifyPermission() === 'unsupported') return oops('这个浏览器不支持网页通知，用「导入日历」更稳');
       const result = await Notification.requestPermission();
       render();
       if (result === 'granted') {
         toast('好啦，页面开着时到日子会弹通知');
         checkNotifications();
       } else {
-        toast('通知没打开，可以在浏览器的网站设置里允许，或者用「导入日历」');
+        oops('通知没打开，可以在浏览器的网站设置里允许，或者用「导入日历」');
       }
     },
 
-    async 'export-backup'() {
+    async 'export-backup'(el) {
       const backedUp = { ...app.state, prefs: { ...app.state.prefs, lastBackup: ui.today, backupNudged: null } };
       const how = await saveFile(S.backupText(backedUp, new Date()), `孕期工作台备份-${ui.today}.json`, 'application/json');
       if (how === 'cancelled') return;
+      cheer(el);
       M.markBackedUp(app.state, ui.today);
       persist();
       render();
-      const message = how === 'shared' ? '备份存好了。' : '备份已经下载好了，放在安全的地方。';
+      const message = how === 'shared' ? say('backup') : '备份已经下载好了，放在安全的地方。';
       if (!settingsDialog.open) return toast(message);
       formError(settingsDialog.querySelector('form'), '');
       settingsDialog.querySelector('.backup-state').textContent = message;
@@ -449,7 +511,7 @@
           toast('备份导入好了');
         } catch (e) {
           if (form) formError(form, e.message);
-          else toast(e.message);
+          else oops(e.message);
         }
       });
       input.click();

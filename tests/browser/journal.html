@@ -1,0 +1,167 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script>
+localStorage.clear();
+const out = [];
+const log = (ok, name, extra = '') => out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:390px;height:844px';
+iframe.src = '../../index.html?today=2026-10-12';
+document.body.appendChild(iframe);
+
+let w, d;
+const errors = [];
+const blobs = [];
+function bind() {
+  w = iframe.contentWindow;
+  d = iframe.contentDocument;
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.confirm = () => true;
+  w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
+  w.URL.revokeObjectURL = () => {};
+  w.HTMLAnchorElement.prototype.click = function () {};
+}
+const $ = (s) => d.querySelector(s);
+const $$ = (s) => [...d.querySelectorAll(s)];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const nav = async (hash) => {
+  await wait(40);
+  if (w.location.hash === hash) return;
+  await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
+};
+const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
+const reload = () => new Promise((r) => { iframe.onload = r; w.location.reload(); }).then(bind);
+const composer = () => $('form[data-form="journal"]');
+const sheet = () => d.getElementById('sheet-dialog');
+const pick = (root, mood) => root.querySelector(`.mood-opt.mood-${mood}`).click();
+const checked = (root) => (root.querySelector('input[name="mood"]:checked') || {}).value || '';
+const bursts = () => d.querySelectorAll('.burst').length;
+
+iframe.onload = async () => {
+  bind();
+  try {
+    const f = $('form[data-form="onboard"]');
+    f.elements.dueDate.value = '2027-01-29';
+    f.elements.nickname.value = '豆豆';
+    f.requestSubmit();
+    await wait(10);
+    log(/准备好啦，和豆豆一起慢慢记/.test(toastText()) && $('#toast .toast-cheer .toast-bee svg'), '开始用时小蜜蜂提示条带上宝宝小名', toastText());
+    log(bursts() === 1 && $$('.burst i').length === 9, '开始用时冒爱心和蜂蜜');
+    log($$('.tabbar .tab').length === 5 && $('.tab[href="#/journal"]').textContent.includes('心情'), '底栏第 5 个是「心情」');
+
+    log(/今天心情怎么样/.test($('.panel-today').textContent) && $$('.mood-quick-btn').length === 6, '首页有一排心情小脸');
+    $('.mood-quick-btn[data-mood="tired"]').click();
+    await wait(40);
+    log(w.location.hash === '#/journal' && $('.tab[aria-current="page"]').getAttribute('href') === '#/journal', '点小脸进到心情页');
+    log(checked(composer()) === 'tired' && d.activeElement && d.activeElement.id === 'j-text', '选好了这个心情，光标在写字的框里', `${checked(composer())} ${d.activeElement && d.activeElement.id}`);
+    log($('.card-mood-tl .empty-bee'), '还没记过时显示空的时间线');
+
+    pick(composer(), 'happy');
+    composer().querySelectorAll('input[name="mood"]').forEach((r) => { r.checked = false; });
+    w.Baby.app.ui.journalMood = '';
+    composer().requestSubmit();
+    log(/先选一个心情吧/.test(composer().querySelector('.form-error').textContent) && state().journal.length === 0, '没选心情时不让记');
+
+    pick(composer(), 'happy');
+    $('#j-text').value = '今天去散步了\n\n\n\n看到晚霞';
+    w.Baby.app.render();
+    log(checked(composer()) === 'happy' && $('#j-text').value.startsWith('今天去散步了'), '重绘后选好的心情和写了一半的字都还在');
+    composer().requestSubmit();
+    await wait(10);
+    let j = state().journal;
+    log(j.length === 1 && j[0].mood === 'happy' && j[0].text === '今天去散步了\n\n看到晚霞' && /^\d\d:\d\d$/.test(j[0].time) && j[0].date === '2026-10-12', '记下一条，带上几点', JSON.stringify(j[0]));
+    log(/记下了，豆豆也跟着开心/.test(toastText()) && $('#toast [data-action="undo"]'), '提示按心情说话，带撤销', toastText());
+    log(bursts() >= 1, '记下时冒爱心');
+    log($('#j-text').value === '' && checked(composer()) === '', '记完后清空，可以接着写');
+    log($('.mood-entry.mood-happy') && $('.mood-day-rel').textContent === '今天' && /孕 24⁺³ 周/.test($('.mood-day-date').textContent), '时间线上出现今天这条，带孕周');
+    log($('.mood-entry-text').textContent === '今天去散步了\n\n看到晚霞', '换行保留下来');
+
+    $('[data-action="undo"]').click();
+    log(state().journal.length === 0 && /已撤销/.test(toastText()), '撤销刚记的');
+
+    pick(composer(), 'happy');
+    composer().requestSubmit();
+    log(/开心的日子记下来了/.test(toastText()), '同样的事第二次换个说法', toastText());
+    log(!$('.mood-entry-text'), '只选心情不写字也能记');
+
+    pick(composer(), 'low');
+    $('#j-date').value = '2026-10-13';
+    composer().requestSubmit();
+    log(/不能晚于今天/.test(composer().querySelector('.form-error').textContent) && state().journal.length === 1, '日期不能选明天');
+    $('#j-date').value = '2026-10-10';
+    $('#j-text').value = '<img src=x onerror="window.hacked=1">腰酸';
+    composer().requestSubmit();
+    j = state().journal;
+    log(j.length === 2 && j[1].date === '2026-10-10' && j[1].time === '', '补记以前的日子，不带几点', JSON.stringify(j[1]));
+    log($$('.mood-day').length === 2 && $$('.mood-day-num')[0].textContent === '10' && /10月/.test($$('.mood-day')[1].textContent), '按天分组，以前的显示几号几月');
+    log(!$('.mood-entry-text img') && $$('.mood-entry-text')[0].textContent.startsWith('<img') && !w.hacked, '写的字原样显示，不当成网页代码');
+    log($('.mood-month').textContent.includes('2026 年 10 月') && /2 条/.test($('.mood-month small').textContent), '月份标题带条数');
+
+    await nav('#/');
+    log(/今天的心情：开心/.test($('.panel-today').textContent) && $('.todo-icon-mood svg') && $('.panel-today a[href="#/journal"]'), '首页显示今天的心情，可以再写一条');
+
+    await nav('#/journal');
+    pick(composer(), 'excited');
+    const low = state().journal.find((e) => e.mood === 'low');
+    $(`[data-action="edit-journal"][data-id="${low.id}"]`).click();
+    log(sheet().open && checked(sheet()) === 'low' && sheet().querySelector('textarea').value.endsWith('腰酸'), '点铅笔打开这条，内容都填好了');
+    pick(sheet(), 'calm');
+    log(w.Baby.app.ui.journalMood === 'excited', '面板里换心情不影响上面正在写的');
+    sheet().querySelector('textarea').value = '腰酸，睡前泡了脚';
+    sheet().querySelector('input[name="date"]').value = '2026-10-12';
+    sheet().querySelector('form').requestSubmit();
+    j = state().journal;
+    const edited = j.find((e) => e.id === low.id);
+    log(!sheet().open && edited.mood === 'calm' && edited.date === '2026-10-12' && edited.text === '腰酸，睡前泡了脚' && /保存好了/.test(toastText()), '改好后保存', toastText());
+    log($$('.mood-day').length === 1 && j[j.length - 1].id === low.id, '改到今天后排进今天，没时间的排后面');
+    log(checked(composer()) === 'excited', '上面选好的心情还在');
+
+    $(`[data-action="edit-journal"][data-id="${low.id}"]`).click();
+    sheet().querySelector('[data-action="delete-journal"]').click();
+    log(!sheet().open && state().journal.length === 1 && /删掉了这条心情/.test(toastText()), '删掉一条');
+    $('[data-action="undo"]').click();
+    log(state().journal.length === 2 && state().journal[1].id === low.id, '撤销删除，回到原来的位置');
+
+    const s = state();
+    const moods = ['happy', 'calm', 'excited', 'tired', 'low', 'anxious'];
+    for (let i = 0; i < 45; i += 1) {
+      s.journal.push({ id: `j-old-${i}`, date: w.Baby.dates.addDays('2026-10-01', -i), time: '20:00', mood: moods[i % 6], text: `第 ${i} 天` });
+    }
+    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(s));
+    await reload();
+    await nav('#/journal');
+    log($$('.mood-entry').length === 20 && /还有 27 条/.test($('[data-action="journal-more"]').textContent), '一次先显示 20 条', `${$$('.mood-entry').length}`);
+    const sept = $$('.mood-month').find((h) => h.textContent.includes('9 月'));
+    log(sept && /30 条/.test(sept.textContent), '月份条数算上没显示出来的', sept && sept.textContent);
+    $('[data-action="journal-more"]').click();
+    $('[data-action="journal-more"]').click();
+    log($$('.mood-entry').length === 47 && !$('[data-action="journal-more"]') && $$('.mood-month').length === 3, '点「看更早的」显示更多，到底就没有按钮了');
+
+    $('[data-action="open-settings"]').click();
+    d.getElementById('settings-dialog').querySelector('[data-action="export-backup"]').click();
+    await wait(10);
+    const backup = JSON.parse(await blobs[blobs.length - 1].text());
+    log(Array.isArray(backup.journal) && backup.journal.length === 47, '备份里包含心情日记');
+    d.getElementById('settings-dialog').querySelector('[data-action="close-dialog"]').click();
+
+    await nav('#/');
+    $('.quick-form .btn').click();
+    log($('#toast .toast-oops') && /先填一下体重/.test(toastText()), '出错时换成担心的小蜜蜂');
+
+    const realMatch = w.matchMedia.bind(w);
+    w.matchMedia = (q) => (q.includes('reduced-motion') ? { matches: true } : realMatch(q));
+    d.querySelectorAll('.burst').forEach((b) => b.remove());
+    await nav('#/journal');
+    pick(composer(), 'calm');
+    composer().requestSubmit();
+    await wait(10);
+    log(state().journal.length === 48 && bursts() === 0, '系统设置了减弱动态效果时不冒爱心');
+    w.matchMedia = realMatch;
+  } catch (e) {
+    log(false, '脚本异常', `${e.message}\n${e.stack}`);
+  }
+  log(errors.length === 0, '页面没有报错', errors.join(' | '));
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+};
+</script>
+</body>

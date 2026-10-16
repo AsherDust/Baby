@@ -2,6 +2,7 @@
 <script src="../../js/dates.js"></script>
 <script src="../../js/content.js"></script>
 <script src="../../js/stories.js"></script>
+<script src="../../js/journal.js"></script>
 <script src="../../js/model.js"></script>
 <script src="scenes.js"></script>
 <script>
@@ -103,9 +104,11 @@ const PAGES = [
   ['main', 'checkups/schedule'], ['main', 'checkups/ultrasound'], ['main', 'tools'], ['main', 'tools/food'], ['main', 'tools/weeks'],
   ['late', 'today'], ['late', 'tools/kicks'], ['late', 'tools/bag'], ['bag-done', 'tools/bag'], ['checkup-day', 'today'],
   ['labor', 'today'], ['labor', 'tools/kicks'], ['labor', 'tools/contractions'], ['fresh', 'today'], ['empty', ''],
+  ['main', 'journal'], ['fresh', 'journal'],
 ];
 const SHEETS = [
   ['main', 'today', '[data-action="open-settings"]'],
+  ['main', 'journal', '[data-action="edit-journal"]'],
   ['main', 'records/meds', '[data-action="add-med"]'],
   ['main', 'checkups/schedule', '[data-action="add-checkup"]'],
   ['main', 'checkups/ultrasound', '[data-action="add-us"]', '检查日期：2026-10-09\n双顶径约6.2cm 股骨长约4.5cm\n胎盘位于后壁，成熟度Ⅰ级'],
@@ -142,6 +145,18 @@ const SHEETS = [
     d.querySelector('[data-action="snooze-backup"]').click();
     await wait(600);
     bad = bad.concat(audit(d.getElementById('toast'), '提示条'));
+    d.querySelector('.quick-form .btn').click();
+    await wait(600);
+    log(Boolean(d.querySelector('#toast .toast-oops')), '查到了出错的提示条');
+    bad = bad.concat(audit(d.getElementById('toast'), '出错的提示条'));
+    await open('main', 'journal');
+    d.querySelector('.mood-opt.mood-calm').click();
+    await wait(400);
+    bad = bad.concat(audit(d.getElementById('app'), '选好心情的心情页'));
+    d.querySelector('form[data-form="journal"]').requestSubmit();
+    await wait(600);
+    log(Boolean(d.querySelector('#toast [data-action="undo"]')), '查到了带撤销的提示条');
+    bad = bad.concat(audit(d.getElementById('toast'), '带撤销的提示条'));
 
     // 睡前故事：晚上首页的卡片；故事页摆成读过、有收藏、有隐藏、朗读停在第二段的样子
     const evening = new Date(2026, 9, 12, 21, 0).getTime();

@@ -3,9 +3,9 @@
   // 事件绑定、每秒刷新、启动
   const { dates: D, model: M, storage: S, app } = globalThis.Baby;
   const {
-    root, DIALOGS, ui, scrollToNow, viewFoodResults, paintClocks, render, currentRoute, drawCharts, syncWakeLock,
-    onDialogClose, closeDialog, fillFromReport, toast, persist, checkNotifications, forms, actions, stopReading,
-    setStoryVoice, checkForUpdate
+    root, toastBox, DIALOGS, ui, scrollToNow, viewFoodResults, paintClocks, render, currentRoute, drawCharts,
+    syncWakeLock, onDialogClose, closeDialog, fillFromReport, toast, say, cheer, persist, checkNotifications, forms,
+    actions, stopReading, setStoryVoice, checkForUpdate
   } = app;
 
   document.addEventListener('click', (e) => {
@@ -25,6 +25,7 @@
 
   document.addEventListener('change', (e) => {
     if (e.target.name === 'slot' && e.target.closest('.gl-form')) ui.glucoseSlot = e.target.value;
+    if (e.target.name === 'mood' && e.target.closest('form[data-form="journal"]')) ui.journalMood = e.target.value;
     if (e.target.classList.contains('story-voice')) setStoryVoice(e.target.dataset.lang, e.target.value);
   });
 
@@ -89,7 +90,8 @@
     persist();
     render();
     const r = M.kickReview(app.state, now).find((x) => x.session === finished);
-    toast(`1 小时到啦，这次胎动 ${r.count} 次`);
+    toast(`1 小时到啦，这次胎动 ${r.count} 次${r.verdict === 'ok' ? `，${say('kicksDone')}` : ''}`);
+    if (r.verdict === 'ok') cheer(toastBox.querySelector('.toast-bee'));
   }
 
   function tick() {

@@ -17,6 +17,7 @@
   const SECTIONS = {
     today: { name: '今天', subs: [''] },
     records: { name: '记录', subs: ['weight', 'bp', 'glucose', 'meds'] },
+    journal: { name: '心情', subs: [''] },
     checkups: { name: '产检', subs: ['schedule', 'ultrasound'] },
     tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'bag', 'weeks', 'story'] },
   };
@@ -36,6 +37,8 @@
   };
 
   const WEIGHTS_SHOWN = 6;
+  // 心情时间线一次显示几条，点「看更早的」再多显示这么多
+  const JOURNAL_SHOWN = 20;
   // 首屏从 32 周起提醒收拾待产包，最好 36 周前备齐
   const BAG_REMIND_FROM = 32 * 7;
   const BAG_READY_BY = 36 * 7;
@@ -70,6 +73,9 @@
     foodQuery: '',
     foodLevel: 'all',
     glucoseSlot: '',
+    // 心情页上选好、还没记下的心情；首页点小脸进来时也先放这里
+    journalMood: '',
+    journalShown: JOURNAL_SHOWN,
     clearInputs: [],
     undo: null,
     // 正在朗读：{ id, index（第几段）, total, playing }
@@ -94,7 +100,7 @@
 
   Object.assign(app, {
     root, toastBox, settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, SECTIONS, SUB_NAMES,
-    WEIGHTS_SHOWN, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, kg, kgDiff, clamp01, pad2, hhmm,
+    WEIGHTS_SHOWN, JOURNAL_SHOWN, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, kg, kgDiff, clamp01, pad2, hhmm,
     notifyPermission, isStandalone, isIOS, isWeChat, isMobile, isTouch, atRisk, ui, storyTexts, afterRender, greeting
   });
 })();

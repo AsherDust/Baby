@@ -1,5 +1,5 @@
 /* global load, print */
-['dates', 'content', 'stories', 'model', 'storage', 'calendar', 'chart'].forEach((name) => load(`js/${name}.js`));
+['dates', 'content', 'stories', 'journal', 'model', 'storage', 'calendar', 'chart'].forEach((name) => load(`js/${name}.js`));
 load('data/stories/index.js');
 
 const { dates: D, content: C, stories: St, model: M, storage: S, calendar: Cal, chart: Chart } = globalThis.Baby;
@@ -1049,6 +1049,83 @@ test('故事库：编号唯一、都能存下，每部都有内容', () => {
   ok(idx.birds.length >= 30 && idx.birds.every((b) => typeof b === 'string' && b.length > 4), '飞鸟集');
   const st = St.empty();
   ok(nights(60).every((d) => St.tonight(idx, st, d)), '每晚都有');
+});
+
+// ---------- journal ----------
+
+const J = globalThis.Baby.journal;
+const mood = (over = {}) => ({ date: '2026-10-12', mood: 'happy', text: '今天天气很好', ...over });
+const NOON = new Date(2026, 9, 12, 12, 5).getTime();
+
+test('心情：表单校验', () => {
+  eq(J.entryError(mood(), '2026-10-12'), null);
+  eq(J.entryError(mood({ text: '' }), '2026-10-12'), null, '只选心情不写字也行');
+  eq(J.entryError(mood({ mood: '' }), '2026-10-12'), '先选一个心情吧');
+  eq(J.entryError(mood({ mood: 'angry' }), '2026-10-12'), '先选一个心情吧');
+  eq(J.entryError(mood({ date: '' }), '2026-10-12'), '选一下日期');
+  eq(J.entryError(mood({ date: '2026-10-13' }), '2026-10-12'), '日期不能晚于今天');
+  ok(J.entryError(mood({ text: '好'.repeat(J.TEXT_MAX + 1) }), '2026-10-12').includes('太长'));
+  eq(J.entryError(mood({ text: `${'好'.repeat(J.TEXT_MAX - 2)}\n\n\n\n\n` }), '2026-10-12'), null, '多余的空行不算字数');
+});
+
+test('心情：新增带上几点，补记的不带；新的排前面，修改后重新排，删除能放回去', () => {
+  const s = M.createState({ dueDate: DUE });
+  eq(s.journal, []);
+  const a = J.add(s, mood({ text: '  第一行\r\n\r\n\r\n\r\n第二行  ' }), '2026-10-12', NOON);
+  eq([a.time, a.text], ['12:05', '第一行\n\n第二行']);
+  ok(/^j-/.test(a.id));
+  const b = J.add(s, mood({ date: '2026-10-10', mood: 'tired' }), '2026-10-12', NOON);
+  eq(b.time, '', '补记的不知道几点');
+  const c = J.add(s, mood({ mood: 'calm' }), '2026-10-12', NOON + 3600e3);
+  eq(s.journal.map((e) => e.id), [c.id, a.id, b.id]);
+  J.update(s, b.id, mood({ date: '2026-10-12', mood: 'low', text: '改过' }));
+  eq(s.journal.map((e) => e.id), [c.id, a.id, b.id], '没有时间的排在同一天最后');
+  J.update(s, c.id, mood({ date: '2026-10-01', mood: 'calm' }));
+  eq(s.journal.map((e) => e.id), [a.id, b.id, c.id]);
+  eq(J.update(s, 'nope', mood()), null);
+  const removed = J.remove(s, b.id);
+  eq([removed.entry.text, removed.index, s.journal.length], ['改过', 1, 2]);
+  s.journal.splice(removed.index, 0, removed.entry);
+  eq(s.journal.map((e) => e.id), [a.id, b.id, c.id]);
+  eq(J.remove(s, 'nope'), null);
+  eq(J.onDay(s.journal, '2026-10-12').length, 2);
+  eq(J.moodOf('tired').name, '累');
+});
+
+test('心情时间线：按天分组带孕龄，每月条数算全部，只显示前几条', () => {
+  const s = M.createState({ dueDate: DUE });
+  [['2026-09-28', 'calm'], ['2026-10-01', 'happy'], ['2026-10-12', 'tired'], ['2026-10-12', 'excited']].forEach(([date, m], i) =>
+    J.add(s, mood({ date, mood: m }), '2026-10-12', NOON + i * 60e3));
+  const all = J.timeline(s.journal, DUE);
+  eq(all.days.map((d) => [d.date, d.entries.length]), [['2026-10-12', 2], ['2026-10-01', 1], ['2026-09-28', 1]]);
+  eq(all.days[0].entries.map((e) => e.mood), ['excited', 'tired']);
+  eq(all.days[0].ga, D.gestation(DUE, '2026-10-12').days);
+  eq([all.days[2].month, all.months, all.more], ['2026-09', { '2026-10': 3, '2026-09': 1 }, 0]);
+  const some = J.timeline(s.journal, DUE, 3);
+  eq([some.days.length, some.more, some.months['2026-09']], [2, 1, 1]);
+  eq(J.timeline([], DUE), { days: [], months: {}, more: 0 });
+});
+
+test('normalize：心情日记的清理，老数据没有这一项时为空', () => {
+  const old = M.createState({ dueDate: DUE });
+  delete old.journal;
+  eq(M.normalize(old).journal, []);
+  const raw = M.createState({ dueDate: DUE });
+  raw.journal = [
+    { id: 'j-1', date: '2026-10-01', time: '08:00', mood: 'calm', text: '早' },
+    { id: 'j-2', date: '2026-10-03', time: '25:00', mood: 'happy', text: 42 },
+    { id: 'j-1', date: '2026-10-05', time: '', mood: 'low', text: '重复的 id' },
+    { id: 'j-3', date: '2026-02-30', mood: 'happy' },
+    { id: 'j-4', date: '2026-10-04', mood: 'grumpy' },
+    { date: '2026-10-04', mood: 'happy' },
+    null,
+  ];
+  eq(M.normalize(raw).journal, [
+    { id: 'j-2', date: '2026-10-03', time: '', mood: 'happy', text: '' },
+    { id: 'j-1', date: '2026-10-01', time: '08:00', mood: 'calm', text: '早' },
+  ]);
+  raw.journal = 'oops';
+  eq(M.normalize(raw).journal, []);
 });
 
 // ---------- chart ----------

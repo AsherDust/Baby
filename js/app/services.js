@@ -1,23 +1,29 @@
 (function () {
   'use strict';
   // 提示条、保存、导出文件、读表单
-  const { dates: D, content: C, model: M, storage: S, calendar: Cal, app } = globalThis.Baby;
+  const { dates: D, content: C, model: M, storage: S, calendar: Cal, art: A, app } = globalThis.Baby;
   const { toastBox, esc, kg, notifyPermission, isTouch, ui, GL_TAGS, glText, render } = app;
 
   // ---------- 提示条 ----------
 
+  // 打开的弹窗之外的内容点不到也看不见，要放进最上面那个弹窗里
+  const topLayer = () => [...document.querySelectorAll('dialog[open]')].pop() || document.body;
+
   let toastTimer = 0;
-  /** undo 给一个「撤销」按钮；button 换成别的按钮，例如 { label: '更新', action: 'reload-app' } */
-  function toast(message, undo, button) {
-    // 打开的弹窗之外的内容点不到，提示条要放进最上面那个弹窗里，「撤销」才按得到
-    const host = [...document.querySelectorAll('dialog[open]')].pop() || document.body;
+  /**
+   * 小蜜蜂提示条。undo 给一个「撤销」按钮；button 换成别的按钮，例如 { label: '更新', action: 'reload-app' }；
+   * tone 为 'oops' 时是出错，换成担心的蜜蜂
+   */
+  function toast(message, undo, button, tone = 'cheer') {
+    const host = topLayer();
     if (toastBox.parentNode !== host) host.appendChild(toastBox);
     ui.undo = undo || null;
     const btn = button ? `<button type="button" class="toast-btn" data-action="${button.action}">${esc(button.label)}</button>`
       : undo ? '<button type="button" class="toast-btn" data-action="undo">撤销</button>' : '';
     toastBox.innerHTML = `
-      <div class="toast" role="status">
-        <span>${esc(message)}</span>
+      <div class="toast toast-${tone}" role="status">
+        <span class="toast-bee">${tone === 'oops' ? A.beeWorried : A.bee}</span>
+        <span class="toast-msg">${esc(message)}</span>
         ${btn}
       </div>`;
     toastBox.classList.add('show');
@@ -26,6 +32,41 @@
       toastBox.classList.remove('show');
       ui.undo = null;
     }, button ? 10000 : undo ? 6000 : 3200);
+  }
+
+  const oops = (message) => toast(message, null, null, 'oops');
+
+  const said = {};
+  /** 同一件事几种说法轮着用，免得每次都一样；{baby} 换成宝宝小名，其它 {名字} 从 vars 里取 */
+  function say(key, vars = {}) {
+    const list = C.CHEERS[key];
+    said[key] = ((said[key] ?? -1) + 1) % list.length;
+    const baby = (app.state && app.state.profile.nickname) || '宝宝';
+    return list[said[key]].replace(/\{(\w+)\}/g, (_, k) => (k === 'baby' ? baby : vars[k] ?? ''));
+  }
+
+  // 做完一件要紧事时，从按钮那里冒出几颗爱心和蜂蜜。
+  // 按钮马上会被重绘掉、所在的弹窗可能马上关掉，所以先记下位置，等这一轮处理完再挂到最上层
+  const BURST = ['heart', 'drop', 'heart', 'comb', 'heart', 'drop', 'heart', 'comb', 'heart'];
+  function cheer(from) {
+    if (!from || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const r = from.getBoundingClientRect();
+    if (!r.width && !r.height) return;
+    setTimeout(() => {
+      const box = document.createElement('div');
+      box.className = 'burst';
+      box.setAttribute('aria-hidden', 'true');
+      box.style.left = `${(r.left + r.width / 2).toFixed(1)}px`;
+      box.style.top = `${(r.top + r.height / 2).toFixed(1)}px`;
+      box.innerHTML = BURST.map((kind, i) => {
+        const angle = ((i - (BURST.length - 1) / 2) * 21 - 90 + (Math.random() * 10 - 5)) * (Math.PI / 180);
+        const dist = 54 + Math.random() * 40;
+        const style = `--x:${(Math.cos(angle) * dist).toFixed(1)}px;--y:${(Math.sin(angle) * dist).toFixed(1)}px;--r:${Math.round(Math.random() * 70 - 35)}deg;--d:${i * 22}ms`;
+        return `<i style="${style}">${A.burst[kind]}</i>`;
+      }).join('');
+      topLayer().appendChild(box);
+      setTimeout(() => box.remove(), 1500);
+    }, 0);
   }
 
   // ---------- 新版本 ----------
@@ -57,7 +98,7 @@
   }
 
   function persist() {
-    if (!S.save(app.state)) return toast('没保存成功：浏览器存储可能满了或被禁用了');
+    if (!S.save(app.state)) return oops('没保存成功：浏览器存储可能满了或被禁用了');
     askToKeep();
   }
 
@@ -119,11 +160,11 @@
   function saveWeight(date, raw, inputsToClear) {
     const value = M.parseKg(raw);
     if (value == null) {
-      toast(String(raw).trim() ? '体重填个数字就好，例如 56.2' : '先填一下体重');
+      oops(String(raw).trim() ? '体重填个数字就好，例如 56.2' : '先填一下体重');
       return;
     }
     if (!D.isISODate(date) || date > ui.today) {
-      toast('日期不能晚于今天');
+      oops('日期不能晚于今天');
       return;
     }
     const ref = M.weightSummary(app.state, ui.today).latest;
@@ -137,7 +178,7 @@
     ui.clearInputs.push(...inputsToClear);
     render();
     const label = date === ui.today ? '今天' : D.formatDate(date);
-    toast(`${label} ${kg(value)} kg 记好啦`, () => {
+    toast(`${label} ${kg(value)} kg ${say('weight')}`, () => {
       if (before) M.upsertWeight(app.state, date, before.kg);
       else M.removeWeight(app.state, date);
     });
@@ -174,6 +215,7 @@
   }
 
   Object.assign(app, {
-    toast, checkForUpdate, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose, checkNotifications
+    toast, oops, say, cheer, checkForUpdate, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose,
+    checkNotifications
   });
 })();

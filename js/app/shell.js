@@ -5,7 +5,8 @@
   const {
     root, SECTIONS, SUB_NAMES, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds, viewMom,
     viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
-    viewFoodTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby, viewToday
+    viewFoodTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby, viewToday,
+    viewJournalPage
   } = app;
 
   // ---------- 渲染 ----------
@@ -57,7 +58,9 @@
   function viewApp() {
     const route = currentRoute();
     const ctx = { today: ui.today, now: Date.now(), ga: D.gestation(app.state.profile.dueDate, ui.today) };
-    const pages = { today: viewTodayPage, records: viewRecordsPage, checkups: viewCheckupsPage, tools: viewToolsPage };
+    const pages = {
+      today: viewTodayPage, records: viewRecordsPage, checkups: viewCheckupsPage, tools: viewToolsPage, journal: viewJournalPage
+    };
     return `
       ${viewHeader(route)}
       ${viewTabbar(route)}
@@ -87,7 +90,7 @@
 
   /** 手机上固定在底部、电脑上在顶部的主菜单 */
   function viewTabbar(route) {
-    const icons = { today: A.icon.home, records: A.icon.notes, checkups: A.icon.calendarHeart, tools: A.icon.grid };
+    const icons = { today: A.icon.home, records: A.icon.notes, checkups: A.icon.calendarHeart, tools: A.icon.grid, journal: A.icon.smile };
     const dot = M.reminders(M.scheduleRows(app.state, ui.today)).length ? 'checkups' : '';
     return `
       <nav class="tabbar" aria-label="主菜单">

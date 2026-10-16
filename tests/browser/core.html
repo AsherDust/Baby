@@ -56,7 +56,7 @@ iframe.onload = async () => {
     log(state().weights.length === 1 && state().weights[0].kg === 56.2, '首屏快速记体重');
     log(/体重记好了/.test($('.panel-today').textContent), '记完后首屏显示已记录');
 
-    log($$('.tabbar .tab').length === 4 && $('.tab[aria-current="page"]').textContent.includes('今天'), '有 4 个主菜单，当前是「今天」');
+    log($$('.tabbar .tab').map((t) => t.textContent.trim()).join(' ') === '今天 记录 心情 产检 工具' && $('.tab[aria-current="page"]').textContent.includes('今天'), '有 5 个主菜单，「心情」在中间，当前是「今天」');
     log(!$('.card-weight') && !$('.card-checkups') && !$('.card-bag') && $('.card-mom'), '首页只放今天的内容，不再罗列全部');
     $('.tab[href="#/records"]').click();
     await nav('#/records');

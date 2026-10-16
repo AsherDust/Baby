@@ -4,7 +4,7 @@
   const { dates: D, content: C, model: M, art: A, app } = globalThis.Baby;
   const {
     BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, esc, kg, kgDiff, clamp01, isWeChat, atRisk, todayKicks, kickResult,
-    bagTiming
+    bagTiming, todoMood
   } = app;
 
   /** 首页的数据安全提示，一次只出一个：iPhone 浏览器里先劝加到主屏幕，否则到时候提醒备份 */
@@ -116,6 +116,7 @@
         <p class="eyebrow">今天该记</p>
         <ul class="todo">
           ${todoWeight(M.weightSummary(app.state, today))}
+          ${todoMood(today)}
           ${todoKicks(ga, now)}
           ${todoCheckup(M.nextCheckup(rows))}
           ${todoBag(ga)}

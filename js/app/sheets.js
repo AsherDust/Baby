@@ -1,9 +1,10 @@
 (function () {
   'use strict';
   // 弹窗和底部面板
-  const { dates: D, content: C, model: M, art: A, app } = globalThis.Baby;
+  const { dates: D, content: C, model: M, journal: J, art: A, app } = globalThis.Baby;
   const {
-    settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, esc, atRisk, ui, glText, usText, profileFields
+    settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, esc, atRisk, ui, glText, usText, profileFields,
+    moodPicker
   } = app;
 
   // 弹窗打开时往历史里压一条，手机上按返回键（或侧滑返回）就是关弹窗，而不是退出页面
@@ -117,6 +118,32 @@
         <p class="form-error" hidden></p>
         <div class="dialog-actions">
           ${r ? `<button type="button" class="btn btn-quiet" data-action="delete-us" data-id="${esc(r.id)}">删除这次</button>` : ''}
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-ghost" data-action="close-dialog">取消</button>
+          <button class="btn">保存</button>
+        </div>
+      </form>`;
+    showDialog(sheetDialog);
+  }
+
+  function openJournalSheet(id) {
+    const e = app.state.journal.find((x) => x.id === id);
+    if (!e) return;
+    sheetDialog.innerHTML = `
+      <form class="dialog-body" data-form="journal-edit" data-id="${esc(e.id)}" novalidate>
+        ${dialogHead('改一改这条心情', `${D.formatDate(e.date, { weekday: true, relativeTo: ui.today })}${e.time ? ` ${e.time}` : ''}`)}
+        ${moodPicker(e.mood)}
+        <label class="field">
+          <span>想说的话 <small>可以不写</small></span>
+          <textarea name="text" rows="5" maxlength="${J.TEXT_MAX}">${esc(e.text)}</textarea>
+        </label>
+        <label class="field">
+          <span>日期</span>
+          <input type="date" name="date" max="${ui.today}" value="${e.date}">
+        </label>
+        <p class="form-error" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-quiet" data-action="delete-journal" data-id="${esc(e.id)}">删除</button>
           <span class="spacer"></span>
           <button type="button" class="btn btn-ghost" data-action="close-dialog">取消</button>
           <button class="btn">保存</button>
@@ -348,7 +375,7 @@
   }
 
   Object.assign(app, {
-    onDialogClose, closeDialog, openGlucoseSheet, openUltrasoundSheet, fillFromReport, openSettings,
+    onDialogClose, closeDialog, openGlucoseSheet, openUltrasoundSheet, openJournalSheet, fillFromReport, openSettings,
     openCheckupDialog, openMedDialog, formError
   });
 })();

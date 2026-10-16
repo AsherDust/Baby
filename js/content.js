@@ -377,6 +377,25 @@
     return BAG.map(([group, id, name, note]) => ({ id, group, name, note, done: false, custom: false }));
   }
 
+  // 记完、做完时提示条上的话，同一件事几种说法轮着用；{baby} 换成宝宝小名。
+  // 体重、血压、血糖这些数值只说记好了，不评价；胎动偏少、出错时也不说俏皮话
+  const CHEERS = {
+    onboard: ['准备好啦，和{baby}一起慢慢记'],
+    saved: ['保存好了', '好嘞，保存好了', '改好啦，保存好了'],
+    weight: ['记好啦', '记好啦，{baby}在悄悄长大'],
+    checkupDone: ['「{title}」完成啦，辛苦了', '「{title}」完成啦，{baby}说谢谢妈妈', '「{title}」完成啦，奖励自己点好吃的'],
+    bagDone: ['最后一样也备好了，辛苦啦', '待产包全齐啦，就等{baby}来见面'],
+    kicksDone: ['{baby}知道你在陪着', '辛苦啦，{baby}很给面子', '每天这样陪陪{baby}真好'],
+    ultrasound: ['这次 B 超记好了', 'B 超记好啦，又见到{baby}了'],
+    backup: ['备份存好了，安心啦', '备份存好了，记录丢不了啦'],
+    'mood-happy': ['记下了，{baby}也跟着开心', '开心的日子记下来了'],
+    'mood-calm': ['记下了，平平静静也很好', '记下了，今天也是好好的一天'],
+    'mood-excited': ['记下了，{baby}也在期待见到你', '记下了，好事都在路上'],
+    'mood-tired': ['记下了，累了就歇一歇', '辛苦啦，今天早点休息'],
+    'mood-low': ['记下了，抱抱你', '写下来会好一点，抱抱你'],
+    'mood-anxious': ['记下了，担心的事可以问问医生', '抱抱你，一步一步来'],
+  };
+
   /** 按名称和别名搜索，level 为 'all' 时不过滤 */
   function searchFoods(query, level = 'all') {
     const q = String(query ?? '').trim().toLowerCase();
@@ -394,6 +413,7 @@
     US_FIELDS,
     GLUCOSE_SLOTS,
     MOM,
+    CHEERS,
     babyAt,
     tipAt,
     momAt,
