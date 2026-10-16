@@ -17,7 +17,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
   sleep 0.3
 done
 
-[ $# -eq 0 ] && set -- core bag meds tools records safety contrast contrast:dark
+[ $# -eq 0 ] && set -- core bag meds tools records safety story contrast contrast:dark
 status=0
 for name in "$@"; do
   page=${name%:dark}

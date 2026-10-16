@@ -1156,6 +1156,96 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
+/* ---------- 睡前故事 ---------- */
+
+.panel-story { display: block; margin-bottom: 18px; border-color: var(--sky-line); background: linear-gradient(160deg, var(--sky-soft) 0%, var(--card) 72%); color: inherit; text-decoration: none; transition: border-color 0.15s, transform 0.15s; }
+.panel-story:hover { border-color: var(--sky); transform: translateY(-1px); }
+.panel-story .eyebrow, .story-head .eyebrow { color: var(--sky-deep); }
+.panel-story .eyebrow::before, .story-head .eyebrow::before { background: var(--sky); }
+.story-card-moon { position: absolute; top: 18px; right: 20px; color: var(--sky-deep); }
+.story-card-moon svg { width: 32px; height: 32px; }
+.story-card-title { margin: 0 44px 4px 0; font-family: var(--serif); font-size: 21px; font-weight: 700; letter-spacing: 0.03em; line-height: 1.4; }
+.story-card-meta { margin: 0; font-size: 13px; color: var(--ink-3); }
+.story-bird { margin: 14px 0 0; padding: 2px 0 2px 14px; border-left: 2px solid var(--sky-line); font-family: var(--serif); font-size: 14.5px; line-height: 1.8; color: var(--ink-2); }
+.story-bird p { margin: 0; }
+.story-bird cite { display: block; margin-top: 4px; font-family: var(--sans); font-size: 12px; font-style: normal; color: var(--ink-3); }
+.story-card-go { display: inline-flex; align-items: center; gap: 2px; margin-top: 12px; font-size: 13.5px; font-weight: 600; color: var(--sky-deep); }
+.story-card-go svg { width: 16px; height: 16px; }
+
+.page-story { max-width: 760px; }
+.story-head { margin-bottom: 14px; }
+.story-title { margin: 0; font-family: var(--serif); font-size: 26px; letter-spacing: 0.03em; line-height: 1.35; }
+.story-meta { margin: 6px 0 0; font-size: 13.5px; color: var(--ink-3); }
+.story-actions .btn[aria-pressed="true"] { border-color: var(--honey); background: var(--honey-glow); color: var(--honey-deep); }
+.story-actions [data-action="story-fav"][aria-pressed="true"] svg { fill: currentColor; }
+.story-hint { margin-top: 10px; }
+
+.story-text { margin-bottom: 14px; padding: 28px 32px; font-family: var(--serif); font-size: 17px; line-height: 2; }
+.story-text[lang="en"] { font-family: var(--num); font-size: 17.5px; line-height: 1.8; }
+.story-p { margin: 0 0 0.9em; text-indent: 2em; border-radius: 6px; transition: background-color 0.3s, box-shadow 0.3s; }
+.story-text[lang="en"] .story-p { text-indent: 0; }
+.story-p[data-action] { cursor: pointer; }
+.story-p.is-reading { background: var(--honey-glow); box-shadow: 0 0 0 6px var(--honey-glow); }
+.story-sub { margin: 1.6em 0 0.6em; text-indent: 0; font-weight: 700; letter-spacing: 0.06em; color: var(--honey-deep); }
+.story-text[lang="en"] .story-sub { font-style: italic; letter-spacing: 0; }
+.story-sub:first-child { margin-top: 0; }
+.story-text.is-poem .story-p { margin: 0; text-indent: 0; text-align: center; }
+.story-text.is-big { font-size: 21px; line-height: 2.1; }
+.story-text.is-big[lang="en"] { font-size: 21px; line-height: 1.9; }
+.story-wait { display: grid; place-items: center; gap: 10px; min-height: 160px; font-family: var(--sans); font-size: 14px; line-height: 1.7; text-align: center; color: var(--ink-3); }
+.story-wait p { margin: 0; }
+.story-end { display: grid; justify-items: center; gap: 8px; margin-top: 28px; padding-top: 22px; border-top: 1px dashed var(--line-strong); font-family: var(--sans); text-align: center; }
+.story-done { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 15px; font-weight: 600; color: var(--leaf-deep); }
+.story-done svg { width: 18px; height: 18px; }
+.story-source, .story-more { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--ink-3); }
+
+.story-player {
+  position: sticky;
+  bottom: 16px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 7px 8px 7px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--tabbar);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.story-player-text { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-size: 14px; color: var(--ink-2); }
+.story-player-text svg { flex: none; width: 18px; height: 18px; color: var(--sky-deep); }
+.story-player-text b { font-family: var(--num); font-size: 16px; font-weight: 400; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.panel.story-shelf { margin-bottom: 14px; padding: 0; }
+.story-shelf > summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; padding: 18px 48px 18px 24px; position: relative; font-family: var(--serif); font-size: 17px; font-weight: 700; cursor: pointer; list-style: none; }
+.story-shelf > summary::-webkit-details-marker { display: none; }
+.story-shelf > summary::after { content: ""; position: absolute; top: 24px; right: 26px; width: 8px; height: 8px; border-right: 2px solid var(--ink-3); border-bottom: 2px solid var(--ink-3); transform: rotate(45deg); transition: transform 0.2s; }
+.story-shelf[open] > summary::after { top: 28px; transform: rotate(-135deg); }
+.story-shelf > summary small { font-family: var(--sans); font-size: 12.5px; font-weight: 400; color: var(--ink-3); }
+.shelf-group { padding: 4px 24px 18px; }
+.shelf-group + .shelf-group { padding-top: 16px; border-top: 1px solid var(--line); }
+.shelf-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin: 0 0 8px; font-family: var(--serif); font-size: 15.5px; }
+.shelf-head small { font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--ink-3); }
+.shelf-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.shelf-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.shelf-item { flex: 1; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; min-height: 40px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); font: inherit; font-size: 14px; text-align: left; }
+button.shelf-item { cursor: pointer; }
+button.shelf-item:hover, .shelf-item[aria-current="true"] { border-color: var(--honey); background: var(--honey-glow); }
+.shelf-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shelf-meta { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--ink-3); }
+.shelf-meta svg { width: 12px; height: 12px; color: var(--leaf-deep); }
+.shelf-row.is-hidden .shelf-item { border-style: dashed; color: var(--ink-3); }
+.shelf-hidden { margin: 0; font-size: 13px; color: var(--ink-3); }
+
+.story-settings { display: grid; gap: 14px; margin-bottom: 14px; }
+.story-settings .eyebrow { margin: 0; }
+.story-setting { display: grid; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+.story-voice { max-width: 100%; height: 40px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--field); color: var(--ink); font: inherit; font-size: 14px; }
+.story-settings .fineprint { margin: 0; line-height: 1.7; }
+
 /* ---------- 窄屏 ---------- */
 
 @media (max-width: 1080px) {
@@ -1308,4 +1398,18 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
   .kick-row { grid-template-columns: minmax(0, 1fr) auto 4.5em 40px; }
   .ctx-table th:last-child, .ctx-table td:last-child { width: 44px; }
   .gl-cell { height: 44px; }
+}
+
+/* 手机上的故事页：正文留宽一点，朗读条停在底部菜单上面 */
+@media (max-width: 720px) {
+  .panel-story { margin-bottom: 14px; }
+  .story-title { font-size: 23px; }
+  .story-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .panel.story-text { padding: 22px 18px; font-size: 16.5px; }
+  .panel.story-text.is-big { font-size: 20px; }
+  .story-player { bottom: calc(78px + env(safe-area-inset-bottom)); }
+  .story-shelf > summary { padding: 16px 44px 16px 18px; }
+  .story-shelf > summary::after { right: 22px; }
+  .shelf-group { padding: 4px 18px 16px; }
+  .shelf-list { grid-template-columns: minmax(0, 1fr); }
 }

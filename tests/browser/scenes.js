@@ -1,6 +1,6 @@
 // 截图和对比度测试共用的示例数据：
 //   empty / main / fresh / checkup-day / late / bag-done / labor
-// 需要先加载 dates.js、content.js、model.js；empty 返回 null
+// 需要先加载 dates.js、content.js、stories.js、model.js；empty 返回 null
 function seedScene(name) {
   if (name === 'empty') return null;
   const M = Baby.model;

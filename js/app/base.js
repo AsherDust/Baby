@@ -18,7 +18,7 @@
     today: { name: '今天', subs: [''] },
     records: { name: '记录', subs: ['weight', 'bp', 'glucose', 'meds'] },
     checkups: { name: '产检', subs: ['schedule', 'ultrasound'] },
-    tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'bag', 'weeks'] },
+    tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'bag', 'weeks', 'story'] },
   };
   const SUB_NAMES = {
     weight: '体重',
@@ -32,6 +32,7 @@
     food: '能不能吃',
     bag: '待产包',
     weeks: '每周变化',
+    story: '睡前故事',
   };
 
   const WEIGHTS_SHOWN = 6;
@@ -71,7 +72,14 @@
     glucoseSlot: '',
     clearInputs: [],
     undo: null,
+    // 正在朗读：{ id, index（第几段）, total, playing }
+    reading: null,
+    storyShelf: false,
   };
+  // 故事正文按部下载后放这里：{ 部: { status: 'loading' | 'ready' | 'error', data } }
+  const storyTexts = {};
+  // 每次整页重绘后要做的事；后加载的模块往里放，免得前面的模块反过来依赖它们
+  const afterRender = [];
 
   function greeting(hour) {
     if (hour < 5) return '夜深了';
@@ -85,6 +93,6 @@
   Object.assign(app, {
     root, toastBox, settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, SECTIONS, SUB_NAMES,
     WEIGHTS_SHOWN, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, kg, kgDiff, clamp01, pad2, hhmm,
-    notifyPermission, isStandalone, isIOS, isWeChat, isMobile, isTouch, atRisk, ui, greeting
+    notifyPermission, isStandalone, isIOS, isWeChat, isMobile, isTouch, atRisk, ui, storyTexts, afterRender, greeting
   });
 })();

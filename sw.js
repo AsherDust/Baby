@@ -1,11 +1,14 @@
 // 先走网络拿最新的，没网或网太慢时用上次缓存的，这样装到主屏幕后离线也能打开
-const CACHE = 'pregnancy-desk-v2';
+// 故事正文（data/stories/*.json）不预先下载，打开过一次的会照常存进缓存
+const CACHE = 'pregnancy-desk-v3';
 const FILES = [
   './',
   'index.html',
   'css/style.css',
   'js/dates.js',
   'js/content.js',
+  'js/stories.js',
+  'data/stories/index.js',
   'js/model.js',
   'js/storage.js',
   'js/calendar.js',
@@ -14,11 +17,13 @@ const FILES = [
   'js/app/base.js',
   'js/app/records.js',
   'js/app/checkups.js',
+  'js/app/story.js',
   'js/app/tools.js',
   'js/app/today.js',
   'js/app/shell.js',
   'js/app/sheets.js',
   'js/app/services.js',
+  'js/app/reader.js',
   'js/app/actions.js',
   'js/app/main.js',
   'favicon.svg',

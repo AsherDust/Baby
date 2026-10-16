@@ -3,6 +3,7 @@
 </head><body>
 <script src="../../js/dates.js"></script>
 <script src="../../js/content.js"></script>
+<script src="../../js/stories.js"></script>
 <script src="../../js/model.js"></script>
 <script src="scenes.js"></script>
 <script>
@@ -14,6 +15,8 @@
 //   stage / scroll / click / open / paste  打开后点哪里、滚到哪里、往 B 超粘贴框里填什么
 //   errors 页面报错时写进标题
 //   ios    假装是 iPhone：safari / wechat / app（从主屏幕图标打开）
+//   hour   假装现在几点，例如 21 看晚上首页的故事卡片
+//   story / reading  今晚读哪篇（例如 prose-07）、假装朗读暂停在第几段（从 0 数）
 const p = new URLSearchParams(location.search);
 const scenario = p.get('s') || 'empty';
 const today = p.get('today') || '2026-10-12';
@@ -24,13 +27,20 @@ const w = p.get('w');
 document.write(`<iframe src="../../index.html?today=${today}#/${p.get('r') || ''}" style="width:${w ? `${w}px` : '100%'}"></iframe>`);
 document.querySelector('iframe').addEventListener('load', (e) => {
   const d = e.target.contentDocument;
+  const fw = e.target.contentWindow;
   if (p.get('ios')) {
-    const fw = e.target.contentWindow;
     const ua = `Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1${p.get('ios') === 'wechat' ? ' MicroMessenger/8.0.50' : ''}`;
     const props = { userAgent: ua, platform: 'iPhone', standalone: p.get('ios') === 'app' };
     for (const [k, v] of Object.entries(props)) Object.defineProperty(fw.navigator, k, { value: v, configurable: true });
     fw.dispatchEvent(new fw.StorageEvent('storage', { key: 'pregnancy-desk:v1' }));
   }
+  if (p.get('hour')) {
+    const [y, m, day] = today.split('-').map(Number);
+    const at = new Date(y, m - 1, day, Number(p.get('hour'))).getTime();
+    fw.Date.now = () => at;
+  }
+  if (p.get('story')) fw.Baby.stories.select(fw.Baby.storyIndex, fw.Baby.app.state.stories, today, p.get('story'));
+  if (p.get('hour') || p.get('story')) fw.Baby.app.render();
   if (p.get('stage')) d.querySelector(`[data-action="med-stage"][data-stage="${p.get('stage')}"]`).click();
   if (p.get('scroll')) d.querySelector(p.get('scroll')).scrollIntoView();
   if (p.get('click')) d.querySelector(p.get('click')).click();
@@ -40,7 +50,18 @@ document.querySelector('iframe').addEventListener('load', (e) => {
     t.value = p.get('paste');
     t.dispatchEvent(new e.target.contentWindow.InputEvent('input', { bubbles: true }));
   }
-  if (p.get('errors')) e.target.contentWindow.addEventListener('error', (ev) => { document.title = `ERR ${ev.message}`; });
+  if (p.get('errors')) fw.addEventListener('error', (ev) => { document.title = `ERR ${ev.message}`; });
+  if (p.get('reading')) {
+    const tick = setInterval(() => {
+      const paras = d.querySelectorAll('.story-p');
+      if (!paras.length) return;
+      clearInterval(tick);
+      const id = fw.Baby.stories.tonight(fw.Baby.storyIndex, fw.Baby.app.state.stories, today).id;
+      fw.Baby.app.ui.reading = { id, index: Number(p.get('reading')), total: paras.length, playing: false };
+      fw.Baby.app.render();
+      d.querySelector('.story-p.is-reading').scrollIntoView({ block: 'center' });
+    }, 50);
+  }
 });
 </script>
 </body></html>

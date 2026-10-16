@@ -4,7 +4,8 @@
   const { dates: D, model: M, storage: S, app } = globalThis.Baby;
   const {
     root, DIALOGS, ui, scrollToNow, viewFoodResults, paintClocks, render, currentRoute, drawCharts, syncWakeLock,
-    onDialogClose, closeDialog, fillFromReport, toast, persist, checkNotifications, forms, actions
+    onDialogClose, closeDialog, fillFromReport, toast, persist, checkNotifications, forms, actions, stopReading,
+    setStoryVoice
   } = app;
 
   document.addEventListener('click', (e) => {
@@ -24,11 +25,18 @@
 
   document.addEventListener('change', (e) => {
     if (e.target.name === 'slot' && e.target.closest('.gl-form')) ui.glucoseSlot = e.target.value;
+    if (e.target.classList.contains('story-voice')) setStoryVoice(e.target.dataset.lang, e.target.value);
   });
+
+  // 「全部故事」展开着的话，点了里面的按钮重绘后也保持展开
+  document.addEventListener('toggle', (e) => {
+    if (e.target.id === 'story-shelf') ui.storyShelf = e.target.open;
+  }, true);
 
   window.addEventListener('hashchange', () => {
     ui.bagAdding = null;
     ui.kickFeedback = '';
+    if (currentRoute().sub !== 'story') stopReading();
     render();
     if (!scrollToNow()) window.scrollTo(0, 0);
   });

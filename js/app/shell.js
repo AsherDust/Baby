@@ -3,9 +3,9 @@
   // 整页渲染、换页、顶栏和底栏、开始页、图表，以及计时时屏幕常亮
   const { dates: D, model: M, chart: Chart, art: A, app } = globalThis.Baby;
   const {
-    root, SECTIONS, SUB_NAMES, esc, kg, isStandalone, isIOS, ui, greeting, viewWeights, viewMeds, viewMom, viewWeeks,
-    viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
-    viewFoodTool, paintClocks, viewBag, viewSafety, viewBanner, viewWeek, viewBaby, viewToday
+    root, SECTIONS, SUB_NAMES, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds, viewMom,
+    viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
+    viewFoodTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby, viewToday
   } = app;
 
   // ---------- 渲染 ----------
@@ -30,6 +30,7 @@
     drawCharts();
     paintClocks(Date.now());
     syncWakeLock();
+    afterRender.forEach((fn) => fn());
 
     if (app.state) {
       const ga = D.gestation(app.state.profile.dueDate, ui.today);
@@ -125,6 +126,7 @@
     return `
       ${viewBanner(M.reminders(rows))}
       ${viewSafety(today)}
+      ${viewStoryCard(now)}
       <section class="hero">
         ${viewWeek(ga, app.state.profile.dueDate, today)}
         ${viewBaby(ga)}
@@ -161,6 +163,7 @@
       food: () => viewFoodTool(),
       bag: () => viewBag(ga),
       weeks: () => viewWeeks(ga),
+      story: () => viewStoryTool(now),
     };
     return `
       <header class="page-head">
@@ -238,15 +241,16 @@
     }
   }
 
-  // ---------- 计时时屏幕常亮 ----------
-  // 数胎动要一小时、宫缩几分钟来一次，屏幕自动锁上就得反复解锁。
+  // ---------- 计时、朗读时屏幕常亮 ----------
+  // 数胎动要一小时、宫缩几分钟来一次，屏幕自动锁上就得反复解锁；锁屏后朗读也会停。
   // 切到后台时浏览器会自动放掉，回到前台 tick() 会再要回来；不支持或被拒绝（比如低电量模式）就算了
 
   let wakeLock = null;
   let wakeBusy = false;
   async function syncWakeLock() {
     if (!('wakeLock' in navigator) || wakeBusy) return;
-    const want = Boolean(app.state) && !document.hidden && M.keepScreenOn(app.state, Date.now(), currentRoute().sub === 'contractions');
+    const busy = () => M.keepScreenOn(app.state, Date.now(), currentRoute().sub === 'contractions') || Boolean(ui.reading && ui.reading.playing);
+    const want = Boolean(app.state) && !document.hidden && busy();
     if (want === Boolean(wakeLock)) return;
     wakeBusy = true;
     try {

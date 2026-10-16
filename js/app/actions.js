@@ -5,7 +5,7 @@
   const {
     settingsDialog, checkupDialog, medDialog, sheetDialog, notifyPermission, ui, render, go, closeDialog,
     openGlucoseSheet, openUltrasoundSheet, openSettings, openCheckupDialog, openMedDialog, formError, toast, persist,
-    saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose, checkNotifications
+    saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose, checkNotifications, storyActions
   } = app;
 
   const forms = {
@@ -148,6 +148,8 @@
   };
 
   const actions = {
+    ...storyActions,
+
     'open-settings': openSettings,
 
     'close-dialog'(el) {

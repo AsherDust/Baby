@@ -1,6 +1,7 @@
 <!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
 <script src="../../js/dates.js"></script>
 <script src="../../js/content.js"></script>
+<script src="../../js/stories.js"></script>
 <script src="../../js/model.js"></script>
 <script src="scenes.js"></script>
 <script>
@@ -141,6 +142,29 @@ const SHEETS = [
     d.querySelector('[data-action="snooze-backup"]').click();
     await wait(600);
     bad = bad.concat(audit(d.getElementById('toast'), '提示条'));
+
+    // 睡前故事：晚上首页的卡片；故事页摆成读过、有收藏、有隐藏、朗读停在第二段的样子
+    const evening = new Date(2026, 9, 12, 21, 0).getTime();
+    await open('main', 'today');
+    w.Date.now = () => evening;
+    w.Baby.app.render();
+    log(Boolean(d.querySelector('.panel-story .story-bird')), '查到了晚上的故事卡片');
+    bad = bad.concat(audit(d.getElementById('app'), '晚上的首页'));
+    await open('main', 'tools/story');
+    w.Date.now = () => evening;
+    const { app, stories: St, storyIndex } = w.Baby;
+    const st = app.state.stories;
+    St.select(storyIndex, st, TODAY, 'prose-07');
+    St.markRead(st, TODAY, 'prose-07');
+    st.favorites = ['prose-01'];
+    st.blocked = ['aesop-02', 'andersen'];
+    app.ui.storyShelf = true;
+    app.render();
+    for (let i = 0; i < 100 && !d.querySelector('.story-sub'); i += 1) await wait(30);
+    app.ui.reading = { id: 'prose-07', index: 1, total: d.querySelectorAll('.story-p').length, playing: false };
+    app.render();
+    log(Boolean(d.querySelector('.story-p.is-reading') && d.querySelector('.story-player') && d.querySelector('.shelf-row.is-hidden')), '查到了故事页的正文、朗读条和目录');
+    bad = bad.concat(audit(d.getElementById('app'), '故事页'));
     for (const line of [...new Set(bad)]) log(false, line);
     log(bad.length === 0, `文字对比度都不低于 ${MIN_RATIO}:1`);
   } catch (err) {

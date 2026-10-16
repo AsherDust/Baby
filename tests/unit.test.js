@@ -1,7 +1,8 @@
 /* global load, print */
-['dates', 'content', 'model', 'storage', 'calendar', 'chart'].forEach((name) => load(`js/${name}.js`));
+['dates', 'content', 'stories', 'model', 'storage', 'calendar', 'chart'].forEach((name) => load(`js/${name}.js`));
+load('data/stories/index.js');
 
-const { dates: D, content: C, model: M, storage: S, calendar: Cal, chart: Chart } = globalThis.Baby;
+const { dates: D, content: C, stories: St, model: M, storage: S, calendar: Cal, chart: Chart } = globalThis.Baby;
 
 let passed = 0;
 const failures = [];
@@ -856,6 +857,198 @@ test('B 超识别：日期不晚于今天，没有关键词时取最近的一个
   eq(M.parseUltrasoundText('2026年9月25日 复查 2026.10.20', '2026-10-12').date, '2026-09-25', '以后的日期不要');
   eq(M.parseUltrasoundText('末次月经 2026-04-24  2026-10-09', '2026-10-12').date, '2026-10-09');
   eq(M.parseUltrasoundText('2026-02-30', '2026-10-12').date, null, '不存在的日期不要');
+});
+
+// ---------- 睡前故事 ----------
+
+// 小目录：中文连载 zs、中文散篇 zp、英文连载 es 和它的续集 es2、英文散篇 ep
+const story = (c, n, extra = {}) => ({ id: `${c}-0${n}`, c, n, title: `${c}${n}`, min: 5, ...extra });
+const IDX = {
+  collections: [
+    { id: 'zs', title: '中文连载', author: '甲', lang: 'zh', kind: 'serial', url: 'https://z/s' },
+    { id: 'zp', title: '中文散篇', author: '', lang: 'zh', kind: 'set', url: 'https://z/p' },
+    { id: 'es', title: 'Serial', author: 'A', lang: 'en', kind: 'serial', url: 'https://e/s' },
+    { id: 'es2', title: 'Sequel', author: 'A', lang: 'en', kind: 'serial', url: 'https://e/s2', after: 'es' },
+    { id: 'ep', title: 'Tales', author: 'B', lang: 'en', kind: 'set', url: 'https://e/p' },
+  ],
+  stories: [
+    story('zs', 1), story('zs', 2), story('zs', 3),
+    story('zp', 1), story('zp', 2, { author: '乙', url: 'https://z/p2' }), story('zp', 3), story('zp', 4),
+    story('es', 1), story('es', 2), story('es2', 1), story('es2', 2),
+    story('ep', 1), story('ep', 2), story('ep', 3),
+  ],
+  birds: ['一', '二', '三'],
+};
+const NIGHT = '2026-10-16';
+const nights = (n, from = NIGHT) => Array.from({ length: n }, (_, i) => D.addDays(from, i));
+
+test('故事记录：新建时是空的，老数据和乱数据都能整理好', () => {
+  eq(M.createState({ dueDate: DUE }).stories, St.empty());
+  const old = M.createState({ dueDate: DUE });
+  delete old.stories;
+  eq(M.normalize(old).stories, St.empty(), '没有这一项的老数据');
+  const st = St.normalize({
+    tonight: { date: NIGHT, id: 'zs-01', passed: ['zp-01', 'zp-01', '<x>', 3] },
+    done: { 'zs-01': NIGHT, 'zs-02': '昨天', 'Bad Id': NIGHT },
+    favorites: ['ep-01', 'ep-01', null],
+    blocked: 'zs',
+    lang: 'fr',
+    rate: 3,
+    voices: { zh: 'Tingting', en: 42 },
+    big: 'yes',
+  });
+  eq(st.tonight, { date: NIGHT, id: 'zs-01', passed: ['zp-01'] });
+  eq(st.done, { 'zs-01': NIGHT });
+  eq(st.favorites, ['ep-01']);
+  eq([st.blocked, st.lang, st.rate, st.voices, st.big], [[], 'all', 0.9, { zh: 'Tingting', en: '' }, false]);
+  eq(St.normalize({ tonight: { date: '2026-02-30', id: 'zs-01' } }).tonight, null, '日期不对');
+});
+
+test('故事：19 点起算晚上，凌晨 4 点前还算前一晚', () => {
+  eq([18, 19, 23, 0, 3, 4].map(St.isEvening), [false, true, true, true, true, false]);
+  eq(St.nightOf(NIGHT, 21), NIGHT);
+  eq(St.nightOf(NIGHT, 2), '2026-10-15');
+  eq(St.nightOf('2026-11-01', 1), '2026-10-31');
+});
+
+test('今晚的故事：同一天总是同一篇，不同的晚上中英文都会轮到，续集不会先出', () => {
+  const st = St.empty();
+  eq(St.tonight(IDX, st, NIGHT).id, St.tonight(IDX, St.empty(), NIGHT).id, '同一天');
+  const picked = nights(40).map((d) => St.tonight(IDX, st, d));
+  const langs = new Set(picked.map((s) => IDX.collections.find((c) => c.id === s.c).lang));
+  eq([...langs].sort(), ['en', 'zh']);
+  ok(new Set(picked.map((s) => s.c)).size >= 3, '各部都会轮到');
+  ok(picked.every((s) => s.c !== 'es2'), '续集要等前一部读完');
+  ok(picked.every((s) => s.c !== 'zs' && s.c !== 'es' ? true : s.n === 1), '连载从第一章开始');
+});
+
+test('今晚的故事：读到一半的连载第二天接着下一章，读完当晚还停在这篇', () => {
+  const st = St.empty();
+  St.select(IDX, st, NIGHT, 'zs-01');
+  eq(St.markRead(st, NIGHT, 'zs-01'), null, '之前没读过');
+  eq(St.tonight(IDX, st, NIGHT).id, 'zs-01', '读完当晚不跳走');
+  eq(St.tonight(IDX, st, '2026-10-17').id, 'zs-02', '第二天接着读');
+  St.markRead(st, '2026-10-17', 'zs-02');
+  St.select(IDX, st, '2026-10-18', 'es-01');
+  St.markRead(st, '2026-10-18', 'es-01');
+  eq(St.tonight(IDX, st, '2026-10-19').id, 'es-02', '两部都在读时，接着最近读的那部');
+  St.markRead(st, '2026-10-19', 'es-02');
+  eq(St.tonight(IDX, st, '2026-10-20').id, 'zs-03');
+  st.lang = 'en';
+  ok(St.tonight(IDX, st, '2026-10-20').c !== 'zs', '只听英文时不推中文连载');
+  st.blocked = ['ep'];
+  eq(St.tonight(IDX, st, '2026-10-20').id, 'es2-01', '前一部读完，续集出来了');
+});
+
+test('今晚的故事：散篇先挑没读过的，全读过也还有得挑', () => {
+  const st = St.empty();
+  st.lang = 'zh';
+  St.block(st, 'zs');
+  ['zp-01', 'zp-02', 'zp-04'].forEach((id) => St.markRead(st, '2026-10-01', id));
+  st.tonight = null;
+  ok(nights(10).every((d) => St.tonight(IDX, st, d).id === 'zp-03'), '只剩一篇没读');
+  St.markRead(st, '2026-10-02', 'zp-03');
+  st.tonight = null;
+  ok(nights(10).every((d) => St.tonight(IDX, st, d).c === 'zp'), '都读过了照样有');
+});
+
+test('换一个：今晚换掉的不再出现，全换过一轮再从头来', () => {
+  const st = St.empty();
+  const seen = [St.tonight(IDX, st, NIGHT).id];
+  for (let i = 0; i < 8; i += 1) seen.push(St.swap(IDX, st, NIGHT).id);
+  // 能出的一共 9 篇：两部连载的第一章 + 散篇 4 + 3
+  eq(new Set(seen).size, 9, seen.join());
+  ok(!seen.includes('es2-01'), '续集不出');
+  const last = seen[seen.length - 1];
+  const again = St.swap(IDX, st, NIGHT);
+  ok(again && again.id !== last, '一轮之后接着换');
+  eq(St.tonight(IDX, st, NIGHT).id, again.id, '换完就固定下来');
+  ok(St.tonight(IDX, st, '2026-10-17').id, '第二天重新挑');
+  eq(st.tonight.date, NIGHT);
+});
+
+test('换一个：只剩一篇时原样返回，全挡掉时没有故事', () => {
+  const st = St.empty();
+  ['zs', 'zp', 'es', 'es2'].forEach((c) => St.block(st, c));
+  ['ep-01', 'ep-02'].forEach((id) => St.block(st, id));
+  eq(St.tonight(IDX, st, NIGHT).id, 'ep-03');
+  eq(St.swap(IDX, st, NIGHT).id, 'ep-03');
+  St.block(st, 'ep-03');
+  eq(St.tonight(IDX, st, NIGHT), null);
+  eq(St.swap(IDX, st, NIGHT), null);
+  St.unblock(st, 'ep');
+  eq(St.tonight(IDX, st, NIGHT), null, '挡掉的单篇还挡着');
+  St.unblock(st, 'ep-02');
+  eq(St.tonight(IDX, st, NIGHT).id, 'ep-02');
+});
+
+test('不想再看到：挡掉今晚这篇就换一篇，挡掉整部就整部不出', () => {
+  const st = St.empty();
+  const first = St.tonight(IDX, st, NIGHT);
+  St.select(IDX, st, NIGHT, first.id);
+  St.block(st, first.id);
+  const next = St.tonight(IDX, st, NIGHT);
+  ok(next && next.id !== first.id, '换了一篇');
+  St.block(st, 'zp');
+  ok(nights(30).every((d) => St.tonight(IDX, st, d).c !== 'zp'), '整部不出');
+  St.select(IDX, st, NIGHT, 'zs-02');
+  St.block(st, 'zs-02');
+  St.markRead(st, NIGHT, 'zs-01');
+  st.tonight = null;
+  st.lang = 'zh';
+  eq(St.tonight(IDX, st, '2026-10-17').id, 'zs-03', '连载里挡掉的一章跳过');
+});
+
+test('换语言：今晚这篇对不上就重挑；自己从目录选的在同语言下不变', () => {
+  const st = St.empty();
+  St.select(IDX, st, NIGHT, 'zp-02');
+  St.setLang(IDX, st, NIGHT, 'zh');
+  eq(St.tonight(IDX, st, NIGHT).id, 'zp-02');
+  St.setLang(IDX, st, NIGHT, 'en');
+  eq(IDX.collections.find((c) => c.id === St.tonight(IDX, st, NIGHT).c).lang, 'en');
+  St.setLang(IDX, st, NIGHT, 'jp');
+  eq(st.lang, 'en', '不认识的语言不改');
+});
+
+test('收藏、取消读完、每晚一句、作者和章节', () => {
+  const st = St.empty();
+  eq([St.toggleFavorite(st, 'ep-01'), St.toggleFavorite(st, 'zp-01'), St.toggleFavorite(st, 'ep-01')], [true, true, false]);
+  eq(st.favorites, ['zp-01']);
+  St.markRead(st, '2026-10-01', 'zp-01');
+  const before = St.markRead(st, NIGHT, 'zp-01');
+  eq(before, '2026-10-01');
+  St.unmarkRead(st, 'zp-01', before);
+  eq(st.done['zp-01'], '2026-10-01', '撤销时恢复成上次读的日期');
+  St.unmarkRead(st, 'zp-01', null);
+  ok(!('zp-01' in st.done));
+  eq(['2026-01-01', '2026-01-02', '2026-01-04', '2025-12-31'].map((d) => St.birdOf(IDX, d)), ['一', '二', '一', '三']);
+  const a = St.info(IDX, St.find(IDX, 'zs-02'));
+  eq([a.author, a.url, a.position], ['甲', 'https://z/s', '第 2/3 章']);
+  const b = St.info(IDX, St.find(IDX, 'zp-02'));
+  eq([b.author, b.url, b.position], ['乙', 'https://z/p2', '']);
+  St.markRead(st, NIGHT, 'zs-01');
+  St.block(st, 'ep');
+  const cat = St.catalog(IDX, st);
+  eq(cat.map((x) => x.collection.id), ['zs', 'zp', 'es', 'es2', 'ep']);
+  eq([cat[0].next.id, cat[0].stories[0].read, cat[1].stories[0].favorite, cat[4].blocked], ['zs-02', true, true, true]);
+});
+
+test('故事库：编号唯一、都能存下，每部都有内容', () => {
+  const idx = globalThis.Baby.storyIndex;
+  const ids = idx.stories.map((s) => s.id);
+  eq(new Set(ids).size, ids.length, '编号重复');
+  eq(St.normalize({ favorites: ids }).favorites.length, ids.length, '有编号存不下');
+  for (const c of idx.collections) {
+    const list = idx.stories.filter((s) => s.c === c.id);
+    ok(list.length && list.length === c.count, `${c.id} 篇数不对`);
+    ok(['zh', 'en'].includes(c.lang) && ['serial', 'set'].includes(c.kind), `${c.id} 语言或类型不对`);
+    ok(!c.after || idx.collections.some((x) => x.id === c.after), `${c.id} 的前一部不存在`);
+    eq(list.map((s) => s.n), list.map((_, i) => i + 1), `${c.id} 序号不连续`);
+  }
+  ok(idx.stories.every((s) => s.title && s.min >= 1), '有篇没标题或时长');
+  ok(idx.birds.length >= 30 && idx.birds.every((b) => typeof b === 'string' && b.length > 4), '飞鸟集');
+  const st = St.empty();
+  ok(nights(60).every((d) => St.tonight(idx, st, d)), '每晚都有');
 });
 
 // ---------- chart ----------

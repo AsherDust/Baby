@@ -3,6 +3,7 @@
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
   const C = Baby.content;
+  const St = Baby.stories;
 
   const VERSION = 1;
   const KG_MIN = 25;
@@ -105,6 +106,7 @@
       bp: [],
       glucose: [],
       ultrasounds: [],
+      stories: St.empty(),
       notified: {},
     };
   }
@@ -305,6 +307,7 @@
       bp,
       glucose: [...glucose.values()].sort(byDateSlot),
       ultrasounds,
+      stories: St.normalize(raw.stories),
       notified,
     };
   }
