@@ -66,21 +66,41 @@ function cached(req) {
   return caches.match(req, { ignoreSearch: true }).then((hit) => hit || (req.mode === 'navigate' ? caches.match('index.html') : undefined));
 }
 
+// 网慢先用了缓存时，页面拿到的是旧文件；等这一批都下载完，有变化就告诉页面，让它提示「有新版本了」
+let pending = 0;
+let behind = false;
+
+async function settled() {
+  pending -= 1;
+  if (pending || !behind) return;
+  behind = false;
+  const pages = await self.clients.matchAll({ type: 'window' });
+  pages.forEach((page) => page.postMessage('update-ready'));
+}
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  let stale = null;
+  pending += 1;
   const network = fresh(req).then(async (res) => {
     if (res.ok) {
       const copy = res.clone();
+      if (stale && (await stale.text()) !== (await res.clone().text())) behind = true;
       await caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
     }
     return res;
   });
   // 先用了缓存时，网络晚到的新版照样存起来，下次打开就是新的
-  e.waitUntil(network.catch(() => {}));
+  e.waitUntil(network.catch(() => {}).finally(settled));
+  const fromCache = async () => {
+    const hit = await cached(req);
+    if (hit) stale = hit.clone();
+    return hit;
+  };
   e.respondWith((async () => {
     if (Date.now() < slowUntil) {
-      const hit = await cached(req);
+      const hit = await fromCache();
       if (hit) return hit;
     }
     const slow = new Promise((resolve) => setTimeout(resolve, SLOW_MS, 'slow'));
@@ -88,7 +108,7 @@ self.addEventListener('fetch', (e) => {
       const first = await Promise.race([network, slow]);
       if (first !== 'slow') return first;
       slowUntil = Date.now() + SLOW_SPELL_MS;
-      return (await cached(req)) || network;
+      return (await fromCache()) || network;
     } catch (err) {
       const hit = await cached(req);
       if (hit) return hit;

@@ -164,7 +164,7 @@ save(seed);
     server = 'v2';
     log(await w.Baby.app.checkForUpdate(later(6)) === true && /有新版本了/.test(toastText()) && $('#toast [data-action="reload-app"]'), '样式表变了，提示有新版本，带「更新」按钮', toastText());
     $('[data-action="open-settings"]').click();
-    log(/有新版本了/.test(text('#settings-dialog .settings-update')), '设置里也说有新版本');
+    log(/有新版本了/.test(text('#settings-dialog .settings-update')) && /当前版本：\d+月\d+日 \d\d:\d\d 发布/.test(text('#settings-dialog .settings-update')), '设置里也说有新版本，并写着当前版本的发布时间', text('#settings-dialog .settings-update'));
     await new Promise((r) => { iframe.onload = r; settings().querySelector('[data-action="reload-app"]').click(); });
     bind();
     log($('.hero') && !/新版本/.test(toastText()), '点「刷新页面」重新加载');

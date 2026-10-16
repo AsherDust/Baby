@@ -132,5 +132,11 @@
   // 通过网址打开时离线也能用；直接双击打开的本地文件不需要
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    // 网慢时这次打开用的是缓存里的旧文件，新的在后台下载完了
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      if (e.data !== 'update-ready') return;
+      ui.updateReady = true;
+      checkForUpdate();
+    });
   }
 })();

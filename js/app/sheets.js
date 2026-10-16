@@ -174,6 +174,14 @@
     ].join('');
   }
 
+  /** GitHub Pages 发布时每个文件的修改时间都是发布时间，页面的修改时间就是这一版什么时候发的 */
+  function versionText() {
+    const at = new Date(document.lastModified);
+    if (Number.isNaN(at.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `当前版本：${at.getMonth() + 1}月${at.getDate()}日 ${pad(at.getHours())}:${pad(at.getMinutes())} 发布。`;
+  }
+
   function openSettings() {
     settingsDialog.innerHTML = `
       <form class="dialog-body" data-form="settings" novalidate>
@@ -203,7 +211,7 @@
         </section>
         <section class="settings-data settings-update">
           <h3>版本</h3>
-          <p class="hint">${ui.updateReady ? '有新版本了，刷新一下就能用上。' : '从主屏幕图标打开时没有刷新按钮，想马上用上新版本，点这里刷新。'}</p>
+          <p class="hint">${versionText()}${ui.updateReady ? '有新版本了，刷新一下就能用上。' : '从主屏幕图标打开时没有刷新按钮，想马上用上新版本，点这里刷新。'}</p>
           <div class="btn-row">
             <button type="button" class="btn ${ui.updateReady ? '' : 'btn-ghost '}btn-sm" data-action="reload-app">刷新页面</button>
           </div>
