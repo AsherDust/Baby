@@ -152,6 +152,10 @@
 
     'open-settings': openSettings,
 
+    'reload-app'() {
+      location.reload();
+    },
+
     'close-dialog'(el) {
       closeDialog(el.closest('dialog'));
     },

@@ -4,7 +4,7 @@
 <script src="../../js/stories.js"></script>
 <script src="../../js/model.js"></script>
 <script>
-// 数据安全：备份提醒、导出（下载 / 分享面板）、iPhone 加到主屏幕提示、开始页导入、申请长期保存
+// 数据安全：备份提醒、导出（下载 / 分享面板）、iPhone 加到主屏幕提示、新版本提示、开始页导入、申请长期保存
 localStorage.clear();
 const out = [];
 const log = (ok, name, extra = '') => {
@@ -150,6 +150,24 @@ save(seed);
     log($('.remind-strip [data-action="export-ics"]') && !$('[data-action="enable-notify"]'), '安卓上也一样');
     w.location.hash = '#/';
     await new Promise((r) => w.addEventListener('hashchange', r, { once: true }));
+
+    // ---- 新版本提示 ----
+    // 缓存里是这次打开时用的文件，服务器上的变了就该提示；真的缓存和网络不好控制，换成假的
+    let server = 'v1';
+    let fetched = 0;
+    Object.defineProperty(w, 'caches', { value: { match: async () => new w.Response('v1') }, configurable: true });
+    w.fetch = async (url) => { fetched += 1; return new w.Response(/style\.css/.test(url) ? server : 'v1'); };
+    const later = (min) => Date.now() + min * 60 * 1000;
+    log(await w.Baby.app.checkForUpdate(later(3)) === false && fetched > 1 && !/新版本/.test(toastText()), '服务器上没变时不提示', `fetched=${fetched}`);
+    fetched = 0;
+    log(await w.Baby.app.checkForUpdate(later(4)) === false && fetched === 0, '刚查过的两分钟内不再查');
+    server = 'v2';
+    log(await w.Baby.app.checkForUpdate(later(6)) === true && /有新版本了/.test(toastText()) && $('#toast [data-action="reload-app"]'), '样式表变了，提示有新版本，带「更新」按钮', toastText());
+    $('[data-action="open-settings"]').click();
+    log(/有新版本了/.test(text('#settings-dialog .settings-update')), '设置里也说有新版本');
+    await new Promise((r) => { iframe.onload = r; settings().querySelector('[data-action="reload-app"]').click(); });
+    bind();
+    log($('.hero') && !/新版本/.test(toastText()), '点「刷新页面」重新加载');
 
     // ---- 开始页导入备份 ----
     localStorage.clear();

@@ -7,22 +7,53 @@
   // ---------- 提示条 ----------
 
   let toastTimer = 0;
-  function toast(message, undo) {
+  /** undo 给一个「撤销」按钮；button 换成别的按钮，例如 { label: '更新', action: 'reload-app' } */
+  function toast(message, undo, button) {
     // 打开的弹窗之外的内容点不到，提示条要放进最上面那个弹窗里，「撤销」才按得到
     const host = [...document.querySelectorAll('dialog[open]')].pop() || document.body;
     if (toastBox.parentNode !== host) host.appendChild(toastBox);
     ui.undo = undo || null;
+    const btn = button ? `<button type="button" class="toast-btn" data-action="${button.action}">${esc(button.label)}</button>`
+      : undo ? '<button type="button" class="toast-btn" data-action="undo">撤销</button>' : '';
     toastBox.innerHTML = `
       <div class="toast" role="status">
         <span>${esc(message)}</span>
-        ${undo ? '<button type="button" class="toast-btn" data-action="undo">撤销</button>' : ''}
+        ${btn}
       </div>`;
     toastBox.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
       toastBox.classList.remove('show');
       ui.undo = null;
-    }, undo ? 6000 : 3200);
+    }, button ? 10000 : undo ? 6000 : 3200);
+  }
+
+  // ---------- 新版本 ----------
+
+  // 从主屏幕图标打开时没有刷新按钮，切回前台多半也只是把后台的旧页面拿出来，不会重新加载。
+  // 切回来时把页面用到的文件和服务器上的比一比（缓存里存的就是这次打开用的），变了就提示更新
+  const UPDATE_GAP = 2 * 60 * 1000;
+  let updateCheckedAt = Date.now();
+  async function checkForUpdate(now = Date.now()) {
+    if (!ui.updateReady) {
+      if (now - updateCheckedAt < UPDATE_GAP || !window.caches || navigator.onLine === false) return false;
+      updateCheckedAt = now;
+      const files = [location.href.split('#')[0], ...[...document.querySelectorAll('script[src], link[rel="stylesheet"]')].map((el) => el.src || el.href)];
+      try {
+        const changed = await Promise.all(files.map(async (url) => {
+          const old = await window.caches.match(url, { ignoreSearch: true });
+          if (!old) return false;
+          const res = await window.fetch(url, { cache: 'no-cache' });
+          return res.ok && (await res.text()) !== (await old.text());
+        }));
+        if (!changed.includes(true)) return false;
+      } catch (e) {
+        return false;
+      }
+      ui.updateReady = true;
+    }
+    toast('有新版本了', null, { label: '更新', action: 'reload-app' });
+    return true;
   }
 
   function persist() {
@@ -143,6 +174,6 @@
   }
 
   Object.assign(app, {
-    toast, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose, checkNotifications
+    toast, checkForUpdate, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose, checkNotifications
   });
 })();

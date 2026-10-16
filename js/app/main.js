@@ -5,7 +5,7 @@
   const {
     root, DIALOGS, ui, scrollToNow, viewFoodResults, paintClocks, render, currentRoute, drawCharts, syncWakeLock,
     onDialogClose, closeDialog, fillFromReport, toast, persist, checkNotifications, forms, actions, stopReading,
-    setStoryVoice
+    setStoryVoice, checkForUpdate
   } = app;
 
   document.addEventListener('click', (e) => {
@@ -104,7 +104,9 @@
 
   setInterval(tick, 60 * 1000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) tick();
+    if (document.hidden) return;
+    tick();
+    checkForUpdate();
   });
 
   window.addEventListener('storage', (e) => {

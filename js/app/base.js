@@ -75,6 +75,8 @@
     // 正在朗读：{ id, index（第几段）, total, playing }
     reading: null,
     storyShelf: false,
+    // 服务器上有新版本了，刷新一下就能用上
+    updateReady: false,
   };
   // 故事正文按部下载后放这里：{ 部: { status: 'loading' | 'ready' | 'error', data } }
   const storyTexts = {};
