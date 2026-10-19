@@ -1,6 +1,7 @@
-/* global load, print */
-['dates', 'content', 'stories', 'journal', 'model', 'storage', 'calendar', 'chart'].forEach((name) => load(`js/${name}.js`));
-load('data/stories/index.js');
+/* global load, print, readFile */
+// 不碰页面的模块（js/core 和故事目录）按 index.html 里的顺序加载
+const PAGE = readFile('index.html');
+[...PAGE.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]).filter((src) => !src.startsWith('js/app/')).forEach((src) => load(src));
 
 const { dates: D, content: C, stories: St, model: M, storage: S, calendar: Cal, chart: Chart } = globalThis.Baby;
 
@@ -1148,6 +1149,16 @@ test('体重曲线：空数据不画，有数据时点数正确且没有 NaN', (
   ok(svg.includes('孕前 52.0') && svg.includes('今天'));
   const single = Chart.weight({ weights: weights.slice(0, 1), dueDate: DUE, preWeight: null, today: '2026-10-12', width: 300, height: 180 });
   ok(single.includes('<circle') && !single.includes('NaN'));
+});
+
+// ---------- 离线缓存 ----------
+
+test('离线缓存清单里有页面用到的每个文件，清单里的文件也都在', () => {
+  const files = readFile('sw.js').match(/const FILES = \[([^\]]*)\]/)[1].match(/'[^']+'/g).map((s) => s.slice(1, -1));
+  const assets = [...PAGE.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
+  const icons = JSON.parse(readFile('manifest.webmanifest')).icons.map((i) => i.src);
+  eq([...assets, ...icons].filter((f) => !files.includes(f)), [], '清单里缺了');
+  eq(files.filter((f) => f !== './' && !readFile(f, 'binary').length), [], '这些文件是空的');
 });
 
 print(`\n${passed} 通过，${failures.length} 失败`);

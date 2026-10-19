@@ -1,0 +1,157 @@
+/* 首页：提醒横幅、数据安全提示、首屏三块、妈妈的变化 */
+
+/* ---------- 到日子提醒横幅 ---------- */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 14px 20px;
+  border: 1px solid var(--banner-line);
+  border-radius: 18px;
+  background: linear-gradient(100deg, var(--banner-a) 0%, var(--banner-b) 100%);
+  box-shadow: var(--shadow);
+}
+.banner-bee { flex: none; width: 46px; animation: float 4s ease-in-out infinite; }
+.banner-list { flex: 1; display: grid; gap: 10px; }
+.banner-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.banner-title { margin: 0; font-size: 15.5px; font-weight: 700; color: var(--banner-ink); }
+.banner-text { margin: 2px 0 0; font-size: 13px; color: var(--banner-ink-2); }
+
+/* ---------- 数据安全提示（加到主屏幕 / 该备份了） ---------- */
+
+.safety {
+  margin-bottom: 18px;
+  padding: 16px 20px;
+  border: 1px dashed var(--honey);
+  border-radius: 18px;
+  background: var(--honey-glow);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.safety p { margin: 6px 0 0; }
+.safety-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15.5px; font-weight: 700; color: var(--honey-deep); }
+.safety-title svg { flex: none; width: 19px; height: 19px; }
+.safety-note { font-size: 12.5px; color: var(--ink-3); }
+
+/* ---------- 首屏三块 ---------- */
+
+.hero { display: grid; grid-template-columns: 1.05fr 1fr 1.15fr; gap: 18px; margin-bottom: 18px; }
+
+.panel-week { background: linear-gradient(165deg, var(--honey-wash) 0%, var(--cream) 52%, var(--card) 100%); }
+.panel-comb { position: absolute; top: -14px; right: -18px; width: 150px; opacity: var(--comb-opacity); pointer-events: none; }
+.week-big { position: relative; display: flex; align-items: baseline; gap: 2px; margin: 0; }
+.week-big .num { font-family: var(--num); font-size: 86px; line-height: 0.95; color: var(--honey-deep); letter-spacing: -0.02em; }
+.week-big .num-sm { font-size: 46px; }
+.week-big .unit { margin: 0 6px 0 4px; font-family: var(--serif); font-size: 20px; color: var(--ink-2); }
+.week-big .plus { margin: 0 2px; font-family: var(--num); font-size: 30px; color: var(--ink-3); }
+.week-sub { position: relative; margin: 10px 0 0; font-size: 14px; color: var(--ink-2); }
+.week-sub b { font-family: var(--num); font-size: 18px; font-weight: 400; color: var(--ink); }
+
+.journey { margin: 40px 0 0; }
+.journey-track { position: relative; display: flex; gap: 4px; height: 10px; }
+.journey-seg { position: relative; overflow: hidden; border-radius: 99px; background: var(--track); }
+.journey-seg i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: linear-gradient(90deg, #F4C664, var(--honey)); }
+.journey-balloon { position: absolute; bottom: 5px; left: 0; width: 22px; margin-left: -11px; transform-origin: 50% 100%; animation: sway 4.5s ease-in-out infinite; }
+.journey-balloon svg { width: 22px; height: 38px; }
+.journey-labels { display: flex; gap: 4px; margin-top: 8px; font-size: 11.5px; color: var(--ink-3); }
+.journey-labels span { text-align: center; }
+
+.due-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line-strong);
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.due-line b { font-weight: 600; color: var(--ink); }
+
+.baby-row { display: flex; align-items: center; gap: 22px; }
+.fruit-plate {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  margin: 8px 0 4px 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--plate) 0%, var(--honey-glow) 55%, var(--honey-soft) 100%);
+  box-shadow: inset 0 0 0 6px var(--plate-rim), 0 0 0 1px var(--line);
+}
+.fruit-plate::before { content: ""; position: absolute; inset: -8px; border: 1.5px dashed rgba(212, 145, 43, 0.38); border-radius: 50%; }
+.fruit { font-size: 58px; line-height: 1; filter: drop-shadow(0 5px 6px rgba(120, 86, 40, 0.2)); }
+.plate-bee { position: absolute; top: -14px; left: -16px; width: 34px; animation: float 5s ease-in-out infinite; }
+.plate-bee svg { transform: scaleX(-1); }
+.baby-text { min-width: 0; }
+.baby-like { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.baby-name { margin: 2px 0 10px; font-family: var(--serif); font-size: 36px; font-weight: 700; line-height: 1.15; letter-spacing: 0.06em; }
+.baby-stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.baby-stats span { padding: 3px 10px; border-radius: 99px; background: var(--paper-2); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.baby-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 20px 0 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--leaf-soft);
+  font-size: 13.5px;
+  color: var(--leaf-deep);
+}
+.baby-note svg { flex: none; width: 17px; height: 17px; margin-top: 2px; }
+
+.todo { margin: 0; padding: 0; list-style: none; }
+.todo-item { display: flex; gap: 12px; padding: 13px 0; border-top: 1px dashed var(--line); }
+.todo-item:first-child { padding-top: 0; border-top: 0; }
+.todo-item:last-child { padding-bottom: 0; }
+.todo-icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: var(--honey-glow); color: var(--honey-deep); }
+.todo-icon svg { width: 18px; height: 18px; }
+.todo-item.is-done .todo-icon,
+.todo-icon-leaf { background: var(--leaf-soft); color: var(--leaf); }
+.todo-icon-alert { background: var(--red-soft); color: var(--red); }
+.todo-body { flex: 1; min-width: 0; }
+.todo-title { margin: 0; font-size: 14.5px; font-weight: 600; }
+.todo-figure { margin: 0 2px 0 4px; font-family: var(--num); font-size: 19px; color: var(--honey-deep); }
+.todo-text { margin: 3px 0 0; font-size: 13px; color: var(--ink-2); }
+.todo-actions { margin-top: 8px; }
+.quick-form { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.quick-form input { width: 96px; height: 36px; padding: 0 10px; text-align: center; font-family: var(--num); font-size: 18px; }
+.unit-label { font-size: 13px; color: var(--ink-3); }
+
+.todo-clock { font-family: var(--num); font-size: 14px; font-weight: 400; color: var(--honey-deep); font-variant-numeric: tabular-nums; }
+
+/* ---------- 妈妈的变化 ---------- */
+
+.card-mom .card-title svg { color: var(--red); }
+.mom-body { margin: 0; font-size: 15px; line-height: 1.8; }
+
+.mom-care { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; padding: 10px 14px; border-radius: 14px; background: var(--leaf-soft); color: var(--leaf-deep); font-size: 13.5px; }
+
+.mom-care svg { flex: none; width: 16px; height: 16px; margin-top: 3px; }
+
+@media (max-width: 1080px) {
+  .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .panel-today { grid-column: 1 / -1; }
+}
+
+@media (max-width: 720px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-bottom: 14px; }
+  .week-big .num { font-size: 74px; }
+  .week-big .num-sm { font-size: 40px; }
+  .fruit-plate { width: 100px; height: 100px; }
+  .fruit { font-size: 50px; }
+  .baby-name { font-size: 32px; }
+  .banner { align-items: flex-start; padding: 12px 14px; }
+  .banner-bee { width: 36px; }
+  .banner-item { flex-direction: column; align-items: flex-start; gap: 8px; }
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .quick-form input { font-size: 20px; }
+}

@@ -35,9 +35,9 @@
 
     if (app.state) {
       const ga = D.gestation(app.state.profile.dueDate, ui.today);
-      document.title = `孕 ${ga.weeks} 周${ga.day ? ` + ${ga.day} 天` : ''} · 孕期工作台`;
+      document.title = `孕 ${ga.weeks} 周${ga.day ? ` + ${ga.day} 天` : ''} · 蜜罐`;
     } else {
-      document.title = '孕期工作台';
+      document.title = '蜜罐';
     }
   }
 
@@ -77,7 +77,7 @@
         <a class="brand" href="#/">
           <span class="brand-mark">${A.honeyPot}</span>
           <span class="brand-text">
-            <span class="brand-title">孕期工作台</span>
+            <span class="brand-title">蜜罐</span>
             <span class="brand-sub">慢慢来，一切都刚刚好</span>
           </span>
         </a>
@@ -181,7 +181,7 @@
       <main class="onboard">
         <div class="onboard-card">
           <div class="onboard-art">${A.scene}</div>
-          <h1 class="onboard-title">欢迎来到孕期工作台</h1>
+          <h1 class="onboard-title">欢迎来到蜜罐</h1>
           <p class="onboard-lead">先告诉我预产期，其它的都可以以后慢慢填。</p>
           <form class="onboard-form" data-form="onboard" novalidate>
             ${profileFields({})}
@@ -189,7 +189,7 @@
             <button class="btn btn-lg">开始记录</button>
           </form>
           <p class="onboard-import">
-            <span>${isIOS() && isStandalone() ? '之前在浏览器里记过？先在浏览器里打开工作台，到「设置 → 导出备份」，再回这里导入。' : '换了手机，或者有之前导出的备份？'}</span>
+            <span>${isIOS() && isStandalone() ? '之前在浏览器里记过？先在浏览器里打开蜜罐，到「设置 → 导出备份」，再回这里导入。' : '换了手机，或者有之前导出的备份？'}</span>
             <button type="button" class="btn btn-ghost btn-sm" data-action="import-backup">导入备份</button>
           </p>
           <p class="fineprint">所有记录只保存在这台设备的浏览器里，不会上传到任何地方。</p>

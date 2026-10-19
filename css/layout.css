@@ -1,0 +1,153 @@
+/* 页面框架：顶栏、主菜单、二级菜单、面板和卡片、页脚、开始页 */
+
+.shell { max-width: 1200px; margin: 0 auto; padding: 20px 24px 40px; }
+
+/* ---------- 顶栏 ---------- */
+
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 0 16px; }
+.brand { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+.brand-mark svg { width: 46px; height: 46px; }
+.brand-text { display: grid; }
+.brand-title { margin: 0; font-family: var(--serif); font-size: 23px; font-weight: 700; letter-spacing: 0.06em; line-height: 1.25; }
+.brand-sub { margin: 0; font-size: 12.5px; color: var(--ink-3); letter-spacing: 0.12em; }
+
+/* ---------- 菜单与页面 ---------- */
+
+.tabbar { display: flex; gap: 4px; width: fit-content; margin: 0 0 20px; padding: 5px; border-radius: 999px; background: var(--paper-2); }
+.tab { display: flex; align-items: center; gap: 7px; height: 40px; padding: 0 18px 0 14px; border-radius: 999px; color: var(--ink-2); font-size: 14.5px; font-weight: 500; text-decoration: none; transition: background-color 0.15s, color 0.15s; }
+.tab:hover { color: var(--honey-deep); }
+.tab[aria-current="page"] { background: var(--card); color: var(--honey-deep); font-weight: 600; box-shadow: 0 1px 0 rgba(120, 86, 40, 0.06), 0 4px 12px -6px rgba(120, 86, 40, 0.3); }
+.tab-icon { position: relative; display: grid; place-items: center; }
+.tab-icon svg { width: 19px; height: 19px; }
+.tab-dot { position: absolute; top: -2px; right: -4px; width: 8px; height: 8px; border: 1.5px solid var(--paper-2); border-radius: 50%; background: var(--red); box-sizing: content-box; }
+
+.page-records, .page-checkups, .page-tools { max-width: 980px; }
+
+.seg-tabs { display: flex; gap: 4px; width: fit-content; max-width: 100%; margin: 0 0 16px; padding: 4px; overflow-x: auto; border-radius: 16px; background: var(--paper-2); scrollbar-width: none; }
+.seg-tabs::-webkit-scrollbar { display: none; }
+.seg-tab { flex: none; display: grid; place-items: center; height: 38px; padding: 0 18px; border-radius: 12px; color: var(--ink-2); font-size: 14px; white-space: nowrap; text-decoration: none; }
+.seg-tab:hover { color: var(--honey-deep); }
+.seg-tab[aria-current="page"] { background: var(--card); color: var(--ink); font-weight: 600; box-shadow: 0 1px 0 rgba(120, 86, 40, 0.06), 0 4px 10px -6px rgba(120, 86, 40, 0.3); }
+
+.page-head { display: flex; align-items: center; gap: 6px; margin: -4px 0 14px; }
+.back { display: inline-flex; align-items: center; gap: 2px; height: 40px; margin-left: -8px; padding: 0 12px 0 6px; border-radius: 999px; color: var(--honey-deep); font-size: 14px; text-decoration: none; }
+.back:hover { background: var(--honey-glow); }
+.back svg { width: 20px; height: 20px; }
+.page-title { margin: 0; font-family: var(--serif); font-size: 22px; letter-spacing: 0.04em; }
+
+.live-bar { display: grid; gap: 8px; margin: 0 0 16px; }
+.live { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 14px; border-radius: 14px; background: var(--honey-soft); color: var(--warn-ink); font-size: 14px; text-decoration: none; }
+.live > svg { flex: none; width: 20px; height: 20px; }
+.live > svg:last-child { width: 16px; height: 16px; opacity: 0.7; }
+.live span { flex: 1; min-width: 0; }
+.live b { font-family: var(--num); font-size: 16px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.live-alert { background: var(--red-soft); color: var(--alert-ink); }
+.topbar-side { display: flex; align-items: center; gap: 12px; }
+.topbar-date { margin: 0; font-size: 14px; color: var(--ink-2); }
+.topbar-greet { margin-right: 10px; color: var(--honey-deep); font-weight: 600; }
+
+/* ---------- 面板 ---------- */
+
+.panel {
+  position: relative;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.eyebrow { position: relative; margin: 0 0 12px; font-size: 12.5px; font-weight: 600; letter-spacing: 0.16em; color: var(--honey-deep); }
+.eyebrow::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--honey); vertical-align: 2px; }
+
+/* ---------- 卡片 ---------- */
+
+.card {
+  margin-bottom: 18px;
+  padding: 22px 24px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.card-title { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--serif); font-size: 20px; font-weight: 700; letter-spacing: 0.04em; }
+.card-title svg { width: 21px; height: 21px; color: var(--honey-deep); }
+.card-meta { margin: 3px 0 0; font-size: 13px; color: var(--ink-3); }
+.card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+
+/* ---------- 页脚 ---------- */
+
+.foot { margin-top: 30px; text-align: center; font-size: 12px; color: var(--ink-3); }
+.foot p { margin: 2px 0; }
+.foot-bee { display: inline-block; width: 34px; margin-bottom: 6px; opacity: 0.9; animation: float 6s ease-in-out infinite; }
+
+/* ---------- 引导页 ---------- */
+
+.onboard { display: grid; place-items: center; min-height: calc(100vh - 60px); padding: 12px 0; }
+.onboard-card {
+  width: min(560px, 100%);
+  padding: 26px 34px 30px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.onboard-art svg { width: 100%; max-width: 380px; height: auto; margin: 0 auto; }
+.onboard-title { margin: 8px 0 6px; font-family: var(--serif); font-size: 27px; letter-spacing: 0.06em; }
+.onboard-lead { margin: 0 0 22px; color: var(--ink-2); }
+.onboard-form { display: grid; gap: 14px; text-align: left; }
+.onboard-form .btn-lg { width: 100%; margin-top: 6px; }
+.onboard-import { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; margin: 18px 0 0; font-size: 13px; color: var(--ink-2); }
+
+@media (max-width: 720px) {
+  .topbar-date { font-size: 13px; text-align: right; }
+  .topbar-greet { display: none; }
+  .panel, .card { padding: 18px 18px 20px; border-radius: 20px; }
+  .card { margin-bottom: 14px; }
+  .card-head { flex-direction: column; }
+  .card-actions { justify-content: flex-start; }
+  .onboard-card { padding: 20px 20px 24px; border-radius: 24px; }
+  .onboard-title { font-size: 23px; }
+
+  /* 手机：留出刘海和底部横条的安全区，主菜单固定在屏幕底部 */
+  .shell {
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+    padding-bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+  .topbar { padding-bottom: 12px; }
+  .brand-sub { display: none; }
+  .brand-mark svg { width: 36px; height: 36px; }
+  .brand-title { font-size: 19px; }
+  .tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    width: auto;
+    margin: 0;
+    padding: 6px max(8px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: var(--tabbar);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+  }
+  .tab { flex-direction: column; justify-content: center; gap: 3px; height: 54px; padding: 0; border-radius: 14px; font-size: 11.5px; color: var(--ink-3); }
+  .tab[aria-current="page"] { background: none; box-shadow: none; color: var(--honey-deep); }
+  .tab-icon { width: 52px; height: 30px; border-radius: 99px; transition: background-color 0.15s; }
+  .tab[aria-current="page"] .tab-icon { background: var(--honey-soft); }
+  .tab-icon svg { width: 21px; height: 21px; }
+  .tab-dot { top: 3px; right: 12px; border-color: var(--card); }
+  .seg-tabs { display: flex; width: 100%; margin-bottom: 14px; }
+  .seg-tab { flex: 1 0 auto; padding: 0 12px; height: 40px; }
+  .page-head { margin-top: -6px; }
+  .live-bar { margin-bottom: 14px; }
+}

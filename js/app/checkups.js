@@ -111,7 +111,7 @@
     if (isMobile()) {
       return `
         <div class="remind-strip">
-          <p>${A.icon.bell}<span>到日子会在页面顶部提醒。想关着工作台也准时收到？导入手机日历，会在<b>前一晚 8 点</b>和<b>当天</b>提醒你。</span></p>
+          <p>${A.icon.bell}<span>到日子会在页面顶部提醒。不打开蜜罐也想准时收到？导入手机日历，会在<b>前一晚 8 点</b>和<b>当天</b>提醒你。</span></p>
           <button type="button" class="pill pill-btn" data-action="export-ics">${A.icon.calendarPlus}导入日历</button>
         </div>`;
     }

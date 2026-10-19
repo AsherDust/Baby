@@ -1,0 +1,120 @@
+/* 浮在页面上面的：弹窗、提示条、庆祝时冒出来的小东西 */
+
+/* ---------- 弹窗 ---------- */
+
+dialog {
+  width: min(540px, calc(100vw - 28px));
+  max-height: calc(100vh - 40px);
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 30px 80px -20px rgba(74, 56, 40, 0.5);
+}
+dialog[open] { animation: pop 0.18s ease-out; }
+dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
+.dialog-body { display: grid; gap: 14px; padding: 22px 24px 24px; }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; }
+.dialog-head h2 { margin: 0; font-family: var(--serif); font-size: 21px; letter-spacing: 0.04em; }
+.dialog-head .icon-btn { width: 34px; height: 34px; border-color: transparent; }
+
+.dialog-sub { margin: 3px 0 0; font-size: 13px; color: var(--ink-3); }
+
+.dialog-actions { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.spacer { flex: 1; }
+.settings-data { margin-top: 8px; padding-top: 18px; border-top: 1px dashed var(--line-strong); }
+.settings-data h3 { margin: 0 0 4px; font-size: 14px; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* ---------- 提示条 ---------- */
+
+.toast-box {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 50;
+  transform: translate(-50%, 16px) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.35s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.toast-box.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px 7px 12px;
+  border: 1.5px solid var(--toast-line);
+  border-radius: 999px;
+  background: var(--toast-bg);
+  color: var(--toast-ink);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 14px 30px -14px rgba(120, 80, 20, 0.55);
+}
+.toast-bee { flex: none; width: 36px; height: 27px; animation: bee-in 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both, bee-bob 1.8s ease-in-out 0.6s infinite; }
+.toast-bee svg { width: 100%; height: 100%; }
+.toast-oops { border-color: var(--red-line); }
+.toast-oops .toast-bee { animation: bee-in 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both, bee-shake 0.45s ease-in-out 0.5s 2; }
+.toast-msg { padding: 4px 12px 4px 0; }
+.toast-btn { flex: none; margin-left: -4px; padding: 6px 14px; border: 0; border-radius: 99px; background: var(--honey); color: #3D2A12; font-size: 13px; font-weight: 600; cursor: pointer; }
+.toast-btn:hover { background: var(--honey-2); }
+
+@keyframes bee-in {
+  0% { opacity: 0; transform: translate(-14px, 10px) rotate(-25deg) scale(0.5); }
+  60% { opacity: 1; transform: translate(2px, -5px) rotate(10deg) scale(1.08); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes bee-bob {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-2.5px) rotate(-5deg); }
+}
+@keyframes bee-shake {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-12deg); }
+  75% { transform: rotate(10deg); }
+}
+
+/* 做完要紧事时冒出来的爱心和蜂蜜 */
+.burst { position: fixed; z-index: 60; width: 0; height: 0; pointer-events: none; }
+.burst i { position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; opacity: 0; animation: burst-fly 1s cubic-bezier(0.15, 0.7, 0.3, 1) var(--d) forwards; }
+.burst svg { width: 100%; height: 100%; }
+@keyframes burst-fly {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.3); }
+  12% { opacity: 1; }
+  65% { opacity: 1; transform: translate(var(--x), var(--y)) scale(1.15) rotate(var(--r)); }
+  100% { opacity: 0; transform: translate(var(--x), calc(var(--y) + 16px)) scale(0.8) rotate(var(--r)); }
+}
+
+@media (max-width: 720px) {
+  .dialog-body { padding: 18px 18px 20px; }
+  .toast { white-space: normal; border-radius: 18px; }
+  .toast-box { bottom: calc(80px + env(safe-area-inset-bottom)); width: calc(100vw - 28px); display: flex; justify-content: center; }
+
+  /* 弹窗改成从底部滑出的面板，按钮放在拇指够得到的地方 */
+  dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 32px - env(safe-area-inset-top));
+    margin: auto 0 0;
+    border-radius: 24px 24px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  dialog[open] { animation: sheet-up 0.26s cubic-bezier(0.2, 0.8, 0.3, 1); }
+  .dialog-actions { position: sticky; bottom: 0; z-index: 1; margin: 0 -18px -20px; padding: 10px 18px 14px; background: var(--card); }
+  .dialog-actions .btn { height: 46px; }
+  .dialog-actions .btn:not(.btn-quiet) { flex: 1; }
+  .dialog-actions .spacer { display: none; }
+  .settings-data .btn-row .btn { flex: 1 1 calc(50% - 8px); }
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(40%); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .dialog-head .icon-btn { width: 44px; height: 44px; margin-right: -8px; }
+}

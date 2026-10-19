@@ -91,7 +91,7 @@
 
   /** 产检 → 日历事件：前一晚 8 点提醒；全天事件当天早上 8 点再提醒，有时间的提前 1 小时提醒 */
   function checkupEvent(ck, status) {
-    const lines = [`孕 ${D.formatGA(status.ga)} 周${status.booked ? '' : ' · 按孕周推算的建议日期，约好后记得在工作台改成医院给的日子'}`];
+    const lines = [`孕 ${D.formatGA(status.ga)} 周${status.booked ? '' : ' · 按孕周推算的建议日期，约好后记得在蜜罐里改成医院给的日子'}`];
     if (ck.items.length) lines.push(`检查：${ck.items.join('、')}`);
     if (ck.prep) lines.push(`准备：${ck.prep}`);
     if (ck.tip) lines.push(ck.tip);

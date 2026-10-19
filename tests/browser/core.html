@@ -47,7 +47,7 @@ iframe.onload = async () => {
     f.elements.preWeight.value = '52';
     f.elements.nickname.value = '豆<img src=x>';
     f.requestSubmit();
-    log(/24/.test($('.week-big')?.textContent || ''), '提交后进入工作台，显示孕 24 周');
+    log(/24/.test($('.week-big')?.textContent || ''), '提交后进入首页，显示孕 24 周');
     log($('.baby-like').textContent.includes('豆<img src=x>') && !$('.baby-like img'), '小名被转义，不会被当成 HTML');
 
     const q = $('form[data-form="quick-weight"]');

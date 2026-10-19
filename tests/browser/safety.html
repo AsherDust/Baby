@@ -1,9 +1,5 @@
 <!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
-<script src="../../js/dates.js"></script>
-<script src="../../js/content.js"></script>
-<script src="../../js/stories.js"></script>
-<script src="../../js/journal.js"></script>
-<script src="../../js/model.js"></script>
+<script src="load-core.js"></script>
 <script>
 // 数据安全：备份提醒、导出（下载 / 分享面板）、iPhone 加到主屏幕提示、新版本提示、开始页导入、申请长期保存
 localStorage.clear();
@@ -104,7 +100,7 @@ save(seed);
     $('[data-action="open-settings"]').click();
     settings().querySelector('[data-action="export-backup"]').click();
     await wait(0);
-    log(shared.length === 1 && shared[0].name === '孕期工作台备份-2026-10-12.json' && blobs.length === downloads, '手机上弹分享面板，不再下载', `${shared.length} ${shared[0] && shared[0].name} ${blobs.length - downloads}`);
+    log(shared.length === 1 && shared[0].name === '蜜罐备份-2026-10-12.json' && blobs.length === downloads, '手机上弹分享面板，不再下载', `${shared.length} ${shared[0] && shared[0].name} ${blobs.length - downloads}`);
     log(JSON.parse(await shared[0].text()).prefs.lastBackup === TODAY && state().prefs.lastBackup === TODAY && /存好了/.test(text('#settings-dialog .backup-state')), '分享完记下备份日期');
     await closeSettings();
 
@@ -157,7 +153,7 @@ save(seed);
     let server = 'v1';
     let fetched = 0;
     Object.defineProperty(w, 'caches', { value: { match: async () => new w.Response('v1') }, configurable: true });
-    w.fetch = async (url) => { fetched += 1; return new w.Response(/style\.css/.test(url) ? server : 'v1'); };
+    w.fetch = async (url) => { fetched += 1; return new w.Response(/css\/base\.css/.test(url) ? server : 'v1'); };
     const later = (min) => Date.now() + min * 60 * 1000;
     log(await w.Baby.app.checkForUpdate(later(30)) === false && fetched === 0, '打开后一小时内不查');
     log(await w.Baby.app.checkForUpdate(later(61)) === false && fetched > 1 && !/新版本/.test(toastText()), '服务器上没变时不提示', `fetched=${fetched}`);

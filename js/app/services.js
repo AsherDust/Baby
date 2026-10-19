@@ -205,7 +205,7 @@
     if (!list.length) return;
     for (const n of list) {
       try {
-        new Notification(n.title, { body: n.body, tag: n.key, icon: 'favicon.svg' });
+        new Notification(n.title, { body: n.body, tag: n.key, icon: 'icons/favicon.svg' });
       } catch (e) {
         // 安卓 Chrome 只允许 Service Worker 发通知，这里静默跳过，页面横幅照常显示
       }

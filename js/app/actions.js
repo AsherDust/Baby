@@ -481,7 +481,7 @@
 
     async 'export-backup'(el) {
       const backedUp = { ...app.state, prefs: { ...app.state.prefs, lastBackup: ui.today, backupNudged: null } };
-      const how = await saveFile(S.backupText(backedUp, new Date()), `孕期工作台备份-${ui.today}.json`, 'application/json');
+      const how = await saveFile(S.backupText(backedUp, new Date()), `蜜罐备份-${ui.today}.json`, 'application/json');
       if (how === 'cancelled') return;
       cheer(el);
       M.markBackedUp(app.state, ui.today);

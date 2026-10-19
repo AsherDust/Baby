@@ -55,7 +55,7 @@
       throw new Error('这个文件打不开，不是有效的备份');
     }
     const state = Baby.model.normalize(raw);
-    if (!state) throw new Error('备份里没找到预产期，可能不是这个工作台导出的');
+    if (!state) throw new Error('备份里没找到预产期，可能不是蜜罐导出的');
     return state;
   }
 

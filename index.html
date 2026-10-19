@@ -9,12 +9,21 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="孕期工作台">
-  <title>孕期工作台</title>
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta name="apple-mobile-web-app-title" content="蜜罐">
+  <title>蜜罐</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.css">
+  <!-- 后面的文件会覆盖前面的同级规则，base、layout 要放最前 -->
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/overlays.css">
+  <link rel="stylesheet" href="css/today.css">
+  <link rel="stylesheet" href="css/records.css">
+  <link rel="stylesheet" href="css/checkups.css">
+  <link rel="stylesheet" href="css/tools.css">
+  <link rel="stylesheet" href="css/mood.css">
+  <link rel="stylesheet" href="css/story.css">
 </head>
 <body>
   <div id="app" class="shell"></div>
@@ -25,18 +34,18 @@
   <dialog id="sheet-dialog" aria-label="记录"></dialog>
   <div id="toast" class="toast-box" aria-live="polite"></div>
 
-  <noscript><p class="noscript">这个工作台需要开启 JavaScript 才能使用。</p></noscript>
+  <noscript><p class="noscript">蜜罐需要开启 JavaScript 才能使用。</p></noscript>
 
-  <script src="js/dates.js"></script>
-  <script src="js/content.js"></script>
-  <script src="js/stories.js"></script>
+  <script src="js/core/dates.js"></script>
+  <script src="js/core/content.js"></script>
+  <script src="js/core/stories.js"></script>
   <script src="data/stories/index.js"></script>
-  <script src="js/journal.js"></script>
-  <script src="js/model.js"></script>
-  <script src="js/storage.js"></script>
-  <script src="js/calendar.js"></script>
-  <script src="js/chart.js"></script>
-  <script src="js/art.js"></script>
+  <script src="js/core/journal.js"></script>
+  <script src="js/core/model.js"></script>
+  <script src="js/core/storage.js"></script>
+  <script src="js/core/calendar.js"></script>
+  <script src="js/core/chart.js"></script>
+  <script src="js/app/art.js"></script>
   <script src="js/app/base.js"></script>
   <script src="js/app/records.js"></script>
   <script src="js/app/checkups.js"></script>
