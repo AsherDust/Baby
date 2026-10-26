@@ -129,6 +129,7 @@
     feet: icon('<ellipse cx="8" cy="16.6" rx="2.6" ry="3.9" transform="rotate(-8 8 16.6)"/><path d="M5.7 10.8h0M7.4 10.1h0M9.1 10.2h0M10.5 11.1h0"/><ellipse cx="16" cy="9.4" rx="2.6" ry="3.9" transform="rotate(8 16 9.4)"/><path d="M13.6 3.9h0M15.2 3.1h0M16.9 3.2h0M18.4 4h0"/>'),
     timer: icon('<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.6M10 2.8h4M12 2.8V6M18.4 6.6l1.4-1.4"/>'),
     bowl: icon('<path d="M3.5 11.5h17a8.5 7 0 0 1-17 0z"/><path d="M9 20.5h6M9.2 8.2c0-1.6 1.6-1.6 1.6-3.2M13.4 8.2c0-1.6 1.6-1.6 1.6-3.2"/>'),
+    pot: icon('<path d="M3.5 10h17M10 7.6a2 2 0 0 1 4 0"/><path d="M5.5 10v6a4 4 0 0 0 4 4h5a4 4 0 0 0 4-4v-6M5.5 13h-2M18.5 13h2"/>'),
     alert: icon('<path d="M12 4.2l9 15.6H3z"/><path d="M12 10v4.4M12 17.2h0"/>'),
     home: icon('<path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.6v9.9h12V9.6"/><path d="M12 17.2l-2-1.9a1.25 1.25 0 0 1 2-1.5 1.25 1.25 0 0 1 2 1.5z"/>'),
     notes: icon('<rect x="5" y="3.5" width="14" height="17" rx="3"/><path d="M8.8 8.5h6.4M8.8 12h6.4M8.8 15.5h3.6"/>'),

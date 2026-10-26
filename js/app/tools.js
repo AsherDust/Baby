@@ -1,8 +1,8 @@
 (function () {
   'use strict';
-  // 「工具」页：工具目录、数胎动、宫缩计时、能不能吃、待产包
+  // 「工具」页：工具目录、数胎动、宫缩计时、能不能吃、待产包（孕期食谱在 recipes.js）
   const { dates: D, content: C, model: M, art: A, app } = globalThis.Baby;
-  const { SUB_NAMES, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, pad2, hhmm, ui, storyStatus } = app;
+  const { SUB_NAMES, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, pad2, hhmm, ui, storyStatus, recipeStatus } = app;
 
   /** 今天（按真实时钟）数完的几次，新的在前 */
   function todayKicks(now) {
@@ -31,6 +31,7 @@
         ${tile('kicks', A.icon.feet, kickStatus(ga, now))}
         ${tile('contractions', A.icon.timer, contractionStatus(ga, now))}
         ${tile('food', A.icon.bowl, { text: `${C.FOODS.length} 种常见食物，搜一下就知道` })}
+        ${tile('recipes', A.icon.pot, recipeStatus(now))}
         ${tile('bag', A.icon.suitcase, { text: bag.total ? `已备好 ${bag.done}/${bag.total}` : '清单空了，去加几样' })}
         ${tile('weeks', A.icon.book, { text: `现在是第 ${Math.max(ga.weeks, 0)} 周，看看宝宝和妈妈的变化` })}
         ${tile('story', A.icon.moon, storyStatus(now))}

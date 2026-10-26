@@ -1,0 +1,230 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script src="load-core.js"></script>
+<script src="scenes.js"></script>
+<script>
+// 孕期食谱：今日菜单、换一道、收藏、忌口、明天、做法面板、全部食谱、放进菜单、买菜清单、发给家人、首页那一条
+const out = [];
+const log = (ok, name, extra = '') => out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+const TODAY = '2026-10-12';
+const TOMORROW = '2026-10-13';
+const KEY = 'pregnancy-desk:v1';
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:390px;height:844px';
+document.body.appendChild(iframe);
+
+let w, d;
+const errors = [];
+function bind() {
+  w = iframe.contentWindow;
+  d = iframe.contentDocument;
+  w.addEventListener('error', (e) => errors.push(e.message));
+}
+const open = (scene, route) => {
+  localStorage.clear();
+  const s = typeof scene === 'string' ? seedScene(scene) : scene;
+  if (s) localStorage.setItem(KEY, JSON.stringify(s));
+  return new Promise((r) => {
+    iframe.onload = r;
+    iframe.src = `../../index.html?today=${TODAY}&n=${Math.random()}#/${route}`;
+  }).then(bind);
+};
+const $ = (s) => d.querySelector(s);
+const $$ = (s) => [...d.querySelectorAll(s)];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const nav = async (hash) => {
+  await wait(40);
+  if (w.location.hash === hash) return;
+  await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
+};
+const state = () => JSON.parse(w.localStorage.getItem(KEY));
+const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
+const sheet = () => d.getElementById('sheet-dialog');
+const text = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
+const dishName = (key) => text($(`#dish-${key} .dish-name`)).replace(/^(主菜|蔬菜|汤)\s*/, '');
+const menuIds = () => $$('.dish-open').map((b) => b.dataset.id);
+
+(async () => {
+  try {
+    await open('main', 'tools');
+    const { recipes: R, recipeBook: BOOK } = w.Baby;
+    const byId = (id) => R.find(BOOK, id);
+    log(/孕期食谱/.test(text($('[data-tool="recipes"]'))) && /(早餐|午餐|加餐|晚餐)：/.test(text($('[data-tool="recipes"] .tool-status'))), '工具页有「孕期食谱」，写着下一顿吃什么', text($('[data-tool="recipes"]')));
+    $('[data-tool="recipes"]').click();
+    await wait(80);
+
+    // ---- 今日菜单 ----
+    log(w.location.hash === '#/tools/recipes' && $$('.seg-tab').length === 3 && $('.seg-tab[aria-current="page"]').textContent === '今日菜单', '三个分页，先看今日菜单');
+    log($$('.meal').length === 4 && $$('.dish-open').length === 7 && new Set(menuIds()).size === 7, '四顿七道菜，不重样');
+    log(/孕中期 · 24 周/.test(text($('.recipe-intro .eyebrow'))) && /300–500 克/.test(text($('.recipe-tip'))), '按孕中期给吃饭的重点');
+    log(/最近 7 天有 2 次血糖偏高/.test(text($('.recipe-sugar'))) && menuIds().every((id) => byId(id).gdm), '最近血糖偏高：提示一句，菜都换成控糖的', text($('.recipe-sugar')));
+    log($$('.meal-name small').length === 2 && /主食：/.test(text($$('.meal-name small')[0])), '午饭晚饭写了配什么主食');
+
+    const lunch = $('#dish-lunch-main').dataset.id;
+    $('#swap-lunch-main').click();
+    await wait(30);
+    const swapped = $('#dish-lunch-main').dataset.id;
+    log(swapped !== lunch && byId(swapped).kind === 'main' && state().meals.days[TODAY]['lunch-main'] === swapped, '换一道：换成另一道主菜并记下来', `${lunch} → ${swapped}`);
+    log(toastText().includes(byId(swapped).name) && $('#toast [data-action="undo"]'), '提示换成了什么，可以撤销', toastText());
+    log(d.activeElement && d.activeElement.id === 'swap-lunch-main', '重绘后焦点还在「换一道」上');
+    $('#toast [data-action="undo"]').click();
+    await wait(30);
+    log($('#dish-lunch-main').dataset.id === lunch && !state().meals.days[TODAY], '撤销后换回原来那道');
+
+    const breakfast = $('#dish-breakfast').dataset.id;
+    $(`#fav-${breakfast}`).click();
+    await wait(30);
+    log($(`#fav-${breakfast}`).getAttribute('aria-pressed') === 'true' && state().meals.favorites.includes(breakfast) && /收藏/.test(toastText()), '点小爱心收藏');
+
+    // ---- 做法面板 ----
+    $('#dish-breakfast').click();
+    await wait(60);
+    const r0 = byId(breakfast);
+    log(sheet().open && text(sheet().querySelector('.dialog-head h2')) === r0.name, '点菜名打开做法', text(sheet().querySelector('h2')));
+    log(sheet().querySelectorAll('.recipe-items li').length === r0.items.length && sheet().querySelectorAll('.recipe-steps li').length === r0.steps.length && /2 人份/.test(text(sheet().querySelector('.dialog-sub'))), '面板里有用料、做法和几人份');
+    log(sheet().querySelector('.recipe-fav-btn').getAttribute('aria-pressed') === 'true' && /已收藏/.test(text(sheet().querySelector('.recipe-fav-btn'))), '面板里也显示已收藏');
+    sheet().querySelector('[data-action="recipe-swap"]').click();
+    await wait(60);
+    const b1 = $('#dish-breakfast').dataset.id;
+    log(b1 !== breakfast && text(sheet().querySelector('.dialog-head h2')) === byId(b1).name && sheet().open, '面板里换一道：面板和菜单一起换成新的');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(60);
+
+    // ---- 忌口 ----
+    $('#recipe-avoid summary').click();
+    await wait(30);
+    $('#avoid-seafood').click();
+    await wait(30);
+    const seafree = menuIds().every((id) => !R.avoidsOf(BOOK, byId(id)).has('seafood'));
+    log(state().meals.avoid.join() === 'seafood' && seafree && $('#recipe-avoid').open && /忌口：鱼虾/.test(text($('#recipe-avoid summary'))), '忌口鱼虾：菜单里没有了，忌口那栏还展开着', menuIds().join());
+
+    // ---- 明天 ----
+    const todayIds = menuIds().join();
+    $('#recipe-day-1').click();
+    await wait(30);
+    log($('#recipe-day-1').getAttribute('aria-pressed') === 'true' && menuIds().join() !== todayIds && $('.recipe-menu').getAttribute('aria-label') === '明天的菜单', '切到明天的菜单');
+
+    // ---- 全部食谱 ----
+    await nav('#/tools/recipes/all');
+    const all = R.library(BOOK, w.Baby.app.state.meals, 'mid');
+    log($$('.recipe-library .dish').length === all.list.length && /还有 \d+ 道碰到你的忌口/.test(text($('.recipe-hidden'))), '全部食谱：忌口的藏起来，说一声藏了几道', `${$$('.recipe-library .dish').length} / ${all.list.length}`);
+    const q = $('#recipe-q');
+    q.value = '豆腐';
+    q.dispatchEvent(new w.InputEvent('input', { bubbles: true }));
+    const tofu = $$('#recipe-results .dish-open').map((b) => byId(b.dataset.id));
+    log(tofu.length >= 3 && tofu.every((r) => r.name.includes('豆腐') || r.items.some((i) => i[0] === '豆腐')), '搜「豆腐」按菜名和用料找', tofu.map((r) => r.name).join());
+    q.value = '';
+    q.dispatchEvent(new w.InputEvent('input', { bubbles: true }));
+    $('#recipe-kind-soup').click();
+    await wait(30);
+    log($$('.recipe-group').length === 1 && $$('.recipe-library .dish-open').every((b) => byId(b.dataset.id).kind === 'soup'), '按类别只看汤');
+    $('#recipe-kind-all').click();
+    $('#recipe-only-favorites').click();
+    await wait(30);
+    log($$('.recipe-library .dish-open').map((b) => b.dataset.id).join() === breakfast, '只看收藏');
+    $('#recipe-only-favorites').click();
+    $('#recipe-tag-iron').click();
+    await wait(30);
+    log($$('.recipe-library .dish-open').every((b) => byId(b.dataset.id).good.includes('iron')) && d.activeElement.id === 'recipe-tag-iron', '只看补铁的，焦点还在按钮上');
+    $('#recipe-tag-iron').click();
+    await wait(30);
+
+    const tomorrowIds = R.menu(BOOK, w.Baby.app.state.meals, TOMORROW, w.Baby.app.recipeContext(TOMORROW)).flatMap((m) => m.dishes.map((x) => x.recipe.id));
+    const soup = $$('.recipe-library .dish-open').map((b) => b.dataset.id).find((id) => byId(id).kind === 'soup' && !tomorrowIds.includes(id));
+    $(`#dish-${soup}`).click();
+    await wait(60);
+    log(sheet().querySelectorAll('[data-action="recipe-place"]').length === 1 && /放进明天晚餐/.test(text(sheet().querySelector('[data-action="recipe-place"]'))), '从全部食谱打开：可以放进明天的晚餐');
+    sheet().querySelector('[data-action="recipe-place"]').click();
+    await wait(60);
+    log(state().meals.days[TOMORROW]['dinner-soup'] === soup && /放进明天晚餐了/.test(toastText()) && /已在明天晚餐/.test(text(sheet().querySelector('.recipe-in'))), '放进去了，面板里写着已在明天晚餐', toastText());
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(60);
+
+    // ---- 买菜清单 ----
+    await nav('#/tools/recipes/shop');
+    const date = TOMORROW;
+    const list = () => R.shopping(BOOK, R.menu(BOOK, w.Baby.app.state.meals, date, w.Baby.app.recipeContext(date)), w.Baby.app.state.meals, date);
+    log(/明天的买菜清单/.test(text($('.recipe-shop .card-title'))) && $$('.recipe-shop .bag-item').length === list().total && text($('.recipe-shop')).includes(byId(soup).name), '买菜清单按明天的菜单算，有刚放进去的汤');
+    log($$('.recipe-shop .bag-item').every((li) => li.querySelector('.bag-note').textContent) && /调料和葱姜蒜/.test(text($('.recipe-season'))), '每样写着哪道菜用，调料单列');
+    const first = $('.recipe-shop input[type="checkbox"]');
+    const firstId = first.id;
+    first.click();
+    await wait(30);
+    log(state().meals.bought[TOMORROW].length === 1 && $(`#${CSS.escape(firstId)}`).checked && d.activeElement.id === firstId, '打勾记下来，焦点还在');
+
+    let copied = '';
+    Object.defineProperty(w.navigator, 'clipboard', { value: { writeText: async (t) => { copied = t; } }, configurable: true });
+    $('[data-action="share-shopping"]').click();
+    await wait(60);
+    log(copied.startsWith('买菜清单 · 10月13日（2 人份）') && !copied.includes(first.dataset.name + ' ') && /复制好了/.test(toastText()), '电脑上「发给家人」复制没买的那些', copied.slice(0, 60));
+    let shared = null;
+    const realMatch = w.matchMedia.bind(w);
+    w.matchMedia = (q) => (q === '(pointer: coarse)' ? { matches: true } : realMatch(q));
+    Object.defineProperty(w.navigator, 'share', { value: async (data) => { shared = data; }, configurable: true });
+    $('[data-action="share-shopping"]').click();
+    await wait(60);
+    log(shared && shared.text.startsWith('买菜清单'), '手机上弹系统分享');
+    w.matchMedia = realMatch;
+
+    const bursts = d.querySelectorAll('.burst').length;
+    for (const box of $$('.recipe-shop input[type="checkbox"]:not(:checked)')) {
+      $(`#${CSS.escape(box.id)}`).click();
+      await wait(10);
+    }
+    await wait(40);
+    log(/买齐/.test(toastText()) && $('.recipe-shop .bag-ready') && d.querySelectorAll('.burst').length > bursts, '全勾完：提示买齐了，冒爱心', toastText());
+    $('[data-action="clear-shopping"]').click();
+    await wait(30);
+    log(!state().meals.bought[TOMORROW] && $$('.recipe-shop input:checked').length === 0, '清空勾选');
+    $('#toast [data-action="undo"]').click();
+    await wait(30);
+    log(state().meals.bought[TOMORROW].length === list().total, '清空也能撤销');
+
+    // ---- 重新打开都还在 ----
+    await new Promise((r) => { iframe.onload = r; w.location.reload(); });
+    bind();
+    await wait(40);
+    const st = w.Baby.app.state.meals;
+    log(st.favorites.includes(breakfast) && st.avoid.join() === 'seafood' && st.days[TODAY].breakfast === b1 && st.days[TOMORROW]['dinner-soup'] === soup, '收藏、忌口、换过的菜重新打开都还在');
+
+    // ---- 首页「今天吃什么」 ----
+    await nav('#/');
+    const at = (hour) => { const t = new Date(2026, 9, 12, hour).getTime(); w.Date.now = () => t; w.Baby.app.render(); };
+    at(11);
+    const todo = () => $$('.panel-today .todo-item').find((li) => /吃什么/.test(li.textContent));
+    log(todo() && /午餐吃什么/.test(text(todo())) && $('.panel-today a[href="#/tools/recipes"]'), '11 点首页写着午餐吃什么', text(todo()));
+    const titles = $$('.panel-today .todo-title').map((p) => p.textContent);
+    const at$ = (re) => titles.findIndex((t) => re.test(t));
+    log(at$(/心情/) === 0 && at$(/吃什么/) === 1 && at$(/吃什么/) < at$(/称个体重/) && at$(/称个体重/) < at$(/产检/), '首页顺序：心情、吃什么、称体重、产检', titles.join(' / '));
+    log($$('.panel-today .meal-chip .dish-dot').length === 2 && $('.panel-today .todo-head #quick-kg'), '下一顿的菜带小圆点；称体重的输入框和标题在一行');
+    at(22);
+    const b2 = byId(R.menu(BOOK, w.Baby.app.state.meals, TOMORROW, w.Baby.app.recipeContext(TOMORROW))[0].dishes[0].recipe.id).name;
+    log(/明天早餐吃什么/.test(text(todo())) && text(todo()).includes(b2), '晚上 10 点以后写明天早餐', text(todo()));
+    w.Baby.app.ui.recipeDay = 0;
+    $('#meal-breakfast').click();
+    await wait(60);
+    log(sheet().open && text(sheet().querySelector('h2')) === b2 && w.Baby.app.ui.recipeDay === 1, '首页点菜名直接看做法，按明天算');
+    sheet().querySelector('[data-action="recipe-swap"]').click();
+    await wait(60);
+    const b3 = state().meals.days[TOMORROW].breakfast;
+    log(b3 && byId(b3).name !== b2 && text($('#meal-breakfast')).includes(byId(b3).name) && text(sheet().querySelector('h2')) === byId(b3).name, '在面板里换一道，首页跟着换', `${b2} → ${b3}`);
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(60);
+
+    // ---- 没有血糖偏高、孕早期 ----
+    const calm = seedScene('fresh');
+    calm.glucose = [];
+    await open(calm, 'tools/recipes');
+    log(!$('.recipe-sugar') && /孕中期/.test(text($('.recipe-intro .eyebrow'))), '没有血糖偏高时不提控糖');
+    calm.profile.dueDate = '2027-05-20';
+    await open(calm, 'tools/recipes/all');
+    log(!$('#dish-liver-spinach') && /还有 1 道/.test(text($('.recipe-hidden'))), '孕早期先不推荐猪肝，说一声藏了 1 道');
+    await nav('#/tools/recipes');
+    log(/孕早期/.test(text($('.recipe-intro .eyebrow'))) && /叶酸片接着吃/.test(text($('.recipe-tip'))), '孕早期的吃饭重点');
+
+    log(errors.length === 0, '没有报错', errors.join(' | '));
+  } catch (err) {
+    log(false, `出错：${err.message}`, err.stack);
+  }
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+})();
+</script>

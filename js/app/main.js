@@ -3,7 +3,7 @@
   // 事件绑定、每秒刷新、启动
   const { dates: D, model: M, storage: S, app } = globalThis.Baby;
   const {
-    root, toastBox, DIALOGS, ui, scrollToNow, viewFoodResults, paintClocks, render, currentRoute, drawCharts,
+    root, toastBox, DIALOGS, ui, scrollToNow, viewFoodResults, viewLibraryResults, paintClocks, render, currentRoute, drawCharts,
     syncWakeLock, onDialogClose, closeDialog, fillFromReport, toast, say, cheer, persist, checkNotifications, forms,
     actions, stopReading, setStoryVoice, checkForUpdate
   } = app;
@@ -29,9 +29,10 @@
     if (e.target.classList.contains('story-voice')) setStoryVoice(e.target.dataset.lang, e.target.value);
   });
 
-  // 「全部故事」展开着的话，点了里面的按钮重绘后也保持展开
+  // 「全部故事」「忌口」展开着的话，点了里面的按钮重绘后也保持展开
   document.addEventListener('toggle', (e) => {
     if (e.target.id === 'story-shelf') ui.storyShelf = e.target.open;
+    if (e.target.id === 'recipe-avoid') ui.avoidOpen = e.target.open;
   }, true);
 
   window.addEventListener('hashchange', () => {
@@ -62,6 +63,11 @@
     if (e.target.closest('form[data-form="ultrasound"]')) {
       e.target.dataset.manual = '1';
       e.target.classList.remove('is-filled');
+    }
+    if (e.target.id === 'recipe-q') {
+      ui.recipeQuery = e.target.value;
+      document.getElementById('recipe-results').innerHTML = viewLibraryResults();
+      return;
     }
     if (e.target.id !== 'food-q') return;
     ui.foodQuery = e.target.value;

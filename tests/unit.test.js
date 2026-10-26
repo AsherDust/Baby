@@ -1138,6 +1138,239 @@ test('normalize：首页故事卡片关掉的那一晚', () => {
   eq(M.normalize(raw).prefs.storyCardHidden, null);
 });
 
+// ---------- 孕期食谱 ----------
+
+const R = globalThis.Baby.recipes;
+const BOOK = globalThis.Baby.recipeBook;
+const MID = { stage: 'mid', sugar: false };
+const dishIds = (meals) => meals.flatMap((m) => m.dishes.map((x) => (x.recipe ? x.recipe.id : null)));
+const fixedMenu = (st, day) => {
+  [['breakfast', 'corn-egg-soymilk'], ['lunch-main', 'tomato-egg'], ['lunch-veg', 'garlic-broccoli'], ['snack', 'fruit-plate'],
+    ['dinner-main', 'steamed-bass'], ['dinner-veg', 'snow-peas'], ['dinner-soup', 'tomato-egg-soup']]
+    .forEach(([key, id]) => R.place(BOOK, st, day, key, id));
+  return R.menu(BOOK, st, day, MID);
+};
+
+test('食谱库：编号唯一，类别、营养和每样用料都登记过，做法和说明齐全', () => {
+  const kinds = R.KINDS.map((k) => k.id);
+  const tags = R.TAGS.map((t) => t.id);
+  const groups = [...R.SHOP_GROUPS.map((g) => g.id), 'season'];
+  const avoids = R.AVOIDS.map((a) => a.id);
+  for (const [name, [group, ...rest]] of Object.entries(BOOK.pantry)) {
+    ok(groups.includes(group), `${name} 的分组 ${group}`);
+    rest.forEach((a) => ok(avoids.includes(a), `${name} 的忌口 ${a}`));
+  }
+  const seen = new Set();
+  for (const r of BOOK.recipes) {
+    ok(/^[a-z0-9-]{2,30}$/.test(r.id) && !seen.has(r.id), `编号 ${r.id}`);
+    seen.add(r.id);
+    ok(kinds.includes(r.kind), `${r.id} 的类别`);
+    ok(r.name && r.why && r.steps.length && r.minutes > 0, `${r.id} 缺内容`);
+    ok(r.good.length && r.good.every((g) => tags.includes(g)), `${r.id} 的营养`);
+    ok(typeof r.gdm === 'boolean' && typeof r.light === 'boolean' && typeof r.tip === 'string', `${r.id} 的控糖、清淡、提示`);
+    ok(!r.stages || r.stages.every((s) => ['early', 'mid', 'late'].includes(s)), `${r.id} 的阶段`);
+    for (const [name, qty, unit] of r.items) {
+      ok(BOOK.pantry[name] && BOOK.pantry[name][0] !== 'season', `${r.id} 的「${name}」没登记，或者登记成了调料`);
+      ok(qty > 0 && unit, `${r.id} 的「${name}」没写多少`);
+    }
+    r.season.forEach((name) => ok(BOOK.pantry[name], `${r.id} 的调料「${name}」没登记`));
+  }
+  ok(BOOK.recipes.length >= 50, '食谱太少');
+  eq(BOOK.staples.filter((s) => s[2]).length >= 2, true);
+});
+
+test('菜名前的小圆点：每样用料都有颜色，指定的两样确实是这道菜里的，每道菜都拿得到两个颜色', () => {
+  const hex = /^#[0-9A-F]{6}$/;
+  Object.entries(BOOK.colors).forEach(([name, c]) => ok(BOOK.pantry[name] && hex.test(c), `${name} 的颜色 ${c}`));
+  for (const r of BOOK.recipes) {
+    r.items.forEach(([name]) => ok(BOOK.colors[name], `${r.id} 的「${name}」没有颜色`));
+    if (r.dot) {
+      ok(r.dot.length === 2 && r.dot.every((n) => BOOK.colors[n] && [...r.items.map((i) => i[0]), ...r.season].includes(n)), `${r.id} 的 dot`);
+    }
+    const [a, b] = R.dotOf(BOOK, r);
+    ok(hex.test(a) && hex.test(b), `${r.id} 的小圆点 ${a} ${b}`);
+  }
+  eq(R.dotOf(BOOK, R.find(BOOK, 'tomato-egg')), [BOOK.colors['鸡蛋'], BOOK.colors['番茄']]);
+  eq(R.dotOf(BOOK, R.find(BOOK, 'steamed-bass')), [BOOK.colors['鲈鱼'], BOOK.colors['葱']]);
+  eq(R.dotOf(BOOK, R.find(BOOK, 'kungpao-chicken')), [BOOK.colors['鸡胸肉'], BOOK.colors['干辣椒']]);
+  eq(R.dotOf(BOOK, R.find(BOOK, 'edamame')), [BOOK.colors['毛豆'], BOOK.colors['毛豆']]);
+});
+
+test('食谱里没有「能不能吃」标着别吃的，不放料酒；猪肝只在孕中晚期推荐，写明每周上限', () => {
+  const banned = C.FOODS.filter((f) => f.level === 'no').flatMap((f) => f.name.split('、')).concat(['料酒', '醪糟', '米酒', '刺身', '温泉蛋']);
+  for (const r of BOOK.recipes) {
+    const names = [...r.items.map((i) => i[0]), ...r.season];
+    names.forEach((n) => ok(!banned.some((b) => n.includes(b)), `${r.name} 用了「${n}」`));
+    ok(!r.steps.join('').includes('料酒'), `${r.name} 的做法里有料酒`);
+    if (names.some((n) => n.includes('肝'))) {
+      ok(r.stages && !r.stages.includes('early'), `${r.name} 孕早期也推荐了`);
+      ok(/每周/.test(r.tip), `${r.name} 没写每周吃几次`);
+    }
+  }
+});
+
+test('食谱够用：每个阶段只忌一样、或者血糖偏高时，每一类都还有三道以上，菜单没有空格', () => {
+  for (const stage of ['early', 'mid', 'late']) {
+    for (const avoid of [[], ...R.AVOIDS.map((a) => [a.id])]) {
+      for (const sugar of [false, true]) {
+        const st = { ...R.empty(), avoid };
+        ok(dishIds(R.menu(BOOK, st, '2026-10-12', { stage, sugar })).every(Boolean), `${stage} 忌${avoid} 有空格`);
+        for (const k of R.KINDS) {
+          const n = BOOK.recipes.filter((r) => r.kind === k.id && R.fits(BOOK, r, st, stage) && (!sugar || r.gdm)).length;
+          ok(n >= 3, `${stage} 忌${avoid}${sugar ? ' 控糖' : ''}：${k.name}只有 ${n} 道`);
+        }
+      }
+    }
+  }
+});
+
+test('今日菜单：同一天总是同一份、不重样，连着三个月没有哪道菜第二天又出现', () => {
+  const st = R.empty();
+  const a = R.menu(BOOK, st, '2026-10-12', MID);
+  eq(dishIds(a), dishIds(R.menu(BOOK, st, '2026-10-12', MID)));
+  eq(a.map((m) => [m.meal, m.dishes.length, Boolean(m.staple)]), [['breakfast', 1, false], ['lunch', 2, true], ['snack', 1, false], ['dinner', 3, true]]);
+  let prev = [];
+  for (let i = 0; i < 90; i += 1) {
+    const day = D.addDays('2026-10-01', i);
+    const list = dishIds(R.menu(BOOK, st, day, MID));
+    ok(new Set(list).size === list.length, `${day} 有重样`);
+    ok(!list.some((id) => prev.includes(id)), `${day} 和前一天有一样的菜`);
+    prev = list;
+  }
+  const breakfasts = Array.from({ length: 30 }, (_, i) => dishIds(R.menu(BOOK, st, D.addDays('2026-10-01', i), MID))[0]);
+  eq(new Set(breakfasts).size, BOOK.recipes.filter((r) => r.kind === 'breakfast').length);
+});
+
+test('今日菜单：按阶段和忌口挑，血糖偏高时只出控糖的，主食也跟着换', () => {
+  const recipesOf = (st, ctx) => Array.from({ length: 40 }, (_, i) => R.menu(BOOK, st, D.addDays('2026-10-01', i), ctx))
+    .flatMap((meals) => meals.flatMap((m) => m.dishes.map((x) => x.recipe)));
+  ok(!recipesOf(R.empty(), { stage: 'early', sugar: false }).some((r) => r.id === 'liver-spinach'), '孕早期出了猪肝');
+  ok(recipesOf(R.empty(), MID).some((r) => r.id === 'liver-spinach'), '孕中期也该轮到猪肝');
+  const st = { ...R.empty(), avoid: ['seafood', 'spicy'] };
+  ok(recipesOf(st, MID).every((r) => !R.avoidsOf(BOOK, r).has('seafood') && !R.avoidsOf(BOOK, r).has('spicy')), '出了忌口的菜');
+  ok(recipesOf(R.empty(), { stage: 'mid', sugar: true }).every((r) => r.gdm), '血糖偏高时出了不控糖的');
+  const staples = Array.from({ length: 10 }, (_, i) => R.menu(BOOK, R.empty(), D.addDays('2026-10-01', i), { stage: 'mid', sugar: true })[1].staple.name);
+  ok(staples.every((name) => BOOK.staples.find((s) => s[0] === name)[2]), '血糖偏高时配了不控糖的主食');
+});
+
+test('换一道：换成同一类的另一道，别的格子不动，换过的记住；一直换会轮回来', () => {
+  const st = R.empty();
+  const day = '2026-10-12';
+  const before = dishIds(R.menu(BOOK, st, day, MID));
+  const next = R.swap(BOOK, st, day, 'lunch-main', MID);
+  const after = dishIds(R.menu(BOOK, st, day, MID));
+  ok(next && next.kind === 'main' && next.id !== before[1], '没换成另一道主菜');
+  eq(after, before.map((id, i) => (i === 1 ? next.id : id)));
+  eq(st.days, { [day]: { 'lunch-main': next.id } });
+  const n = BOOK.recipes.filter((r) => r.kind === 'main' && R.fits(BOOK, r, st, 'mid')).length;
+  const seen = new Set([before[1], next.id]);
+  for (let i = 0; i < n - 3; i += 1) seen.add(R.swap(BOOK, st, day, 'lunch-main', MID).id);
+  eq([seen.size, seen.has(after[4])], [n - 1, false]);
+  eq(R.swap(BOOK, st, day, 'lunch-main', MID).id, before[1]);
+  eq(dishIds(R.menu(BOOK, st, '2026-10-13', MID)), dishIds(R.menu(BOOK, R.empty(), '2026-10-13', MID)));
+  eq(R.swap(BOOK, st, day, 'nope', MID), null);
+});
+
+test('忌口很多时：主菜用豆腐这类顶上，没得换时换一道返回 null', () => {
+  const st = { ...R.empty(), avoid: ['seafood', 'poultry', 'pork', 'beef-lamb', 'organ', 'egg'] };
+  const meals = R.menu(BOOK, st, '2026-10-12', MID);
+  const mains = [meals[1].dishes[0].recipe, meals[3].dishes[0].recipe];
+  ok(mains.every((r) => r && r.good.includes('protein')), '主菜没有蛋白质');
+  eq(R.swap(BOOK, st, '2026-10-12', 'lunch-main', MID), null);
+});
+
+test('从全部食谱放进菜单：只能放进同一类的格子，别的格子里放过的让出来；后来忌口了就重新轮', () => {
+  const st = R.empty();
+  const day = '2026-10-12';
+  eq(R.place(BOOK, st, day, 'lunch-main', 'garlic-broccoli'), null);
+  eq(R.place(BOOK, st, day, 'dinner-main', 'steamed-bass').id, 'steamed-bass');
+  R.place(BOOK, st, day, 'lunch-main', 'steamed-bass');
+  eq(st.days[day], { 'lunch-main': 'steamed-bass' });
+  const list = dishIds(R.menu(BOOK, st, day, MID));
+  ok(list[1] === 'steamed-bass' && list[4] && list[4] !== 'steamed-bass', '放进去的不对');
+  eq(R.slotsFor('main').map((s) => s.key), ['lunch-main', 'dinner-main']);
+  eq(R.toggleAvoid(st, 'seafood'), true);
+  ok(dishIds(R.menu(BOOK, st, day, MID))[1] !== 'steamed-bass', '忌口了还在');
+  eq([R.toggleAvoid(st, 'spicy'), R.toggleAvoid(st, 'seafood'), R.toggleAvoid(st, 'chocolate'), st.avoid], [true, false, false, ['spicy']]);
+});
+
+test('买菜清单：用料按名字合起来、分好组，调料单列；勾过的按天记住，发给家人的只列没买的', () => {
+  const st = R.empty();
+  const day = '2026-10-12';
+  const meals = fixedMenu(st, day);
+  const list = R.shopping(BOOK, meals, st, day);
+  const item = (l, name) => l.groups.flatMap((g) => g.items).find((i) => i.name === name);
+  eq(item(list, '鸡蛋').amount, '7 个');
+  eq(item(list, '鸡蛋').dishes, ['蒸玉米配鸡蛋豆浆', '番茄炒蛋', '番茄蛋花汤']);
+  eq(item(list, '番茄').amount, '4 个');
+  eq(item(list, '鲈鱼').amount, '1 条（约 500 克）');
+  eq(item(list, '胡萝卜').amount, '半根');
+  eq(list.groups.map((g) => g.id), ['veg', 'fruit', 'fish', 'dairy']);
+  ok(list.season.includes('葱') && !item(list, '盐'), '调料没单列');
+  eq([list.total, list.done], [list.groups.flatMap((g) => g.items).length, 0]);
+  eq(R.toggleBought(st, day, '鸡蛋'), true);
+  const ticked = R.shopping(BOOK, meals, st, day);
+  eq([ticked.done, item(ticked, '鸡蛋').bought, st.bought], [1, true, { [day]: ['鸡蛋'] }]);
+  eq(R.shopping(BOOK, meals, st, '2026-10-13').done, 0);
+  const text = R.shoppingText(ticked, '买菜清单');
+  ok(text.startsWith('买菜清单\n') && text.includes('番茄 4 个') && !text.includes('鸡蛋') && text.includes('调料（家里没有的再买）'), text);
+  R.toggleBought(st, day, '鸡蛋');
+  eq(st.bought, {});
+  eq(R.coverage(meals).map((t) => t.id), ['protein', 'folate', 'dha', 'fiber']);
+});
+
+test('全部食谱：按类别、营养、收藏、控糖和关键词筛，忌口的和这个阶段先不吃的藏起来并数出来', () => {
+  const st = R.empty();
+  eq([R.library(BOOK, st, 'mid').list.length, R.library(BOOK, st, 'mid').hidden], [BOOK.recipes.length, 0]);
+  eq(R.library(BOOK, st, 'early').hidden, 1);
+  ok(R.library(BOOK, st, 'mid', { kind: 'soup' }).list.every((r) => r.kind === 'soup'), '类别');
+  ok(R.library(BOOK, st, 'mid', { tag: 'iron' }).list.every((r) => r.good.includes('iron')), '营养');
+  ok(R.library(BOOK, st, 'mid', { only: 'gdm' }).list.every((r) => r.gdm), '控糖');
+  const tomato = R.library(BOOK, st, 'mid', { query: '番茄' }).list.map((r) => r.id);
+  ok(tomato.includes('tomato-beef') && tomato.includes('egg-sandwich'), '按用料搜');
+  eq(R.toggleFavorite(st, 'tomato-egg'), true);
+  eq(R.library(BOOK, st, 'mid', { only: 'favorites' }).list.map((r) => r.id), ['tomato-egg']);
+  st.avoid = ['seafood'];
+  const sea = R.library(BOOK, st, 'mid');
+  ok(sea.hidden > 0 && sea.list.every((r) => !R.avoidsOf(BOOK, r).has('seafood')), '忌口');
+});
+
+test('孕期阶段、现在看哪一顿、用料的写法', () => {
+  eq([0, 97, 98, 195, 196, 300].map(R.stageOf), ['early', 'early', 'mid', 'mid', 'late', 'late']);
+  eq([2, 9, 10, 13, 16, 20, 21, 23].map((h) => R.nextMeal(h)), [
+    { meal: 'breakfast', tomorrow: false }, { meal: 'breakfast', tomorrow: false }, { meal: 'lunch', tomorrow: false },
+    { meal: 'lunch', tomorrow: false }, { meal: 'snack', tomorrow: false }, { meal: 'dinner', tomorrow: false },
+    { meal: 'breakfast', tomorrow: true }, { meal: 'breakfast', tomorrow: true },
+  ]);
+  eq([R.itemText(['鲈鱼', 1, '条', '约 500 克']), R.itemText(['胡萝卜', 0.5, '根']), R.itemText(['牛奶', 400, '毫升'])],
+    ['1 条（约 500 克）', '半根', '400 毫升']);
+});
+
+test('normalize：食谱的记录，老数据没有这一项时为空，乱数据清理掉，只留最近 14 天', () => {
+  const old = M.createState({ dueDate: DUE });
+  eq(old.meals, R.empty());
+  delete old.meals;
+  eq(M.normalize(old).meals, R.empty());
+  const raw = M.createState({ dueDate: DUE });
+  raw.meals = {
+    days: { '2026-10-12': { 'lunch-main': 'tomato-egg', nope: 'oat-milk', snack: 'BAD ID' }, oops: { breakfast: 'oat-milk' }, '2026-10-13': {} },
+    favorites: ['tomato-egg', 'tomato-egg', 42, 'steamed-bass'],
+    avoid: ['spicy', 'seafood', 'chocolate'],
+    bought: { '2026-10-12': ['鸡蛋', '鸡蛋', '', 7], '2026-02-30': ['番茄'] },
+  };
+  eq(M.normalize(raw).meals, {
+    days: { '2026-10-12': { 'lunch-main': 'tomato-egg' } },
+    favorites: ['tomato-egg', 'steamed-bass'],
+    avoid: ['seafood', 'spicy'],
+    bought: { '2026-10-12': ['鸡蛋'] },
+  });
+  raw.meals = { days: Object.fromEntries(Array.from({ length: 20 }, (_, i) => [D.addDays('2026-10-01', i), { breakfast: 'oat-milk' }])) };
+  const days = Object.keys(M.normalize(raw).meals.days);
+  eq([days.length, days.includes('2026-10-20'), days.includes('2026-10-06')], [14, true, false]);
+  raw.meals = 'oops';
+  eq(M.normalize(raw).meals, R.empty());
+});
+
 // ---------- chart ----------
 
 test('体重曲线：空数据不画，有数据时点数正确且没有 NaN', () => {

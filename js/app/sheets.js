@@ -375,7 +375,7 @@
   }
 
   Object.assign(app, {
-    onDialogClose, closeDialog, openGlucoseSheet, openUltrasoundSheet, openJournalSheet, fillFromReport, openSettings,
+    showDialog, dialogHead, onDialogClose, closeDialog, openGlucoseSheet, openUltrasoundSheet, openJournalSheet, fillFromReport, openSettings,
     openCheckupDialog, openMedDialog, formError
   });
 })();

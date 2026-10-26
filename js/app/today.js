@@ -4,7 +4,7 @@
   const { dates: D, content: C, model: M, art: A, app } = globalThis.Baby;
   const {
     BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, esc, kg, kgDiff, clamp01, isWeChat, atRisk, todayKicks, kickResult,
-    bagTiming, todoMood
+    bagTiming, todoMood, todoMeal
   } = app;
 
   /** 首页的数据安全提示，一次只出一个：iPhone 浏览器里先劝加到主屏幕，否则到时候提醒备份 */
@@ -115,9 +115,10 @@
       <article class="panel panel-today">
         <p class="eyebrow">今天该记</p>
         <ul class="todo">
-          ${todoWeight(M.weightSummary(app.state, today))}
           ${todoMood(today)}
+          ${todoMeal(now)}
           ${todoKicks(ga, now)}
+          ${todoWeight(M.weightSummary(app.state, today))}
           ${todoCheckup(M.nextCheckup(rows))}
           ${todoBag(ga)}
           <li class="todo-item">
@@ -151,12 +152,14 @@
       <li class="todo-item">
         <span class="todo-icon">${A.icon.scale}</span>
         <div class="todo-body">
-          <p class="todo-title">称个体重</p>
-          <form class="quick-form" data-form="quick-weight" novalidate>
-            <input id="quick-kg" name="kg" inputmode="decimal" autocomplete="off" placeholder="${ws.latest ? kg(ws.latest.kg) : '56.2'}" aria-label="今天的体重（千克）" data-keep>
-            <span class="unit-label">kg</span>
-            <button class="btn btn-sm">记下</button>
-          </form>
+          <div class="todo-head">
+            <p class="todo-title">称个体重</p>
+            <form class="quick-form" data-form="quick-weight" novalidate>
+              <input id="quick-kg" name="kg" inputmode="decimal" autocomplete="off" placeholder="${ws.latest ? kg(ws.latest.kg) : '56.2'}" aria-label="今天的体重（千克）" data-keep>
+              <span class="unit-label">kg</span>
+              <button class="btn btn-sm">记下</button>
+            </form>
+          </div>
           <p class="todo-text">${hint}</p>
         </div>
       </li>`;

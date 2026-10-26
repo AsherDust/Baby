@@ -3,10 +3,10 @@
   // 整页渲染、换页、顶栏和底栏、开始页、图表，以及计时时屏幕常亮
   const { dates: D, model: M, chart: Chart, art: A, app } = globalThis.Baby;
   const {
-    root, SECTIONS, SUB_NAMES, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds, viewMom,
+    root, SECTIONS, SUB_VIEWS, SUB_NAMES, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds, viewMom,
     viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
-    viewFoodTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby, viewToday,
-    viewJournalPage
+    viewFoodTool, viewRecipesTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby,
+    viewToday, viewJournalPage
   } = app;
 
   // ---------- 渲染 ----------
@@ -42,10 +42,11 @@
   }
 
   function currentRoute() {
-    const [section, sub = ''] = location.hash.replace(/^#\/?/, '').split('/');
+    const [section, sub = '', view = ''] = location.hash.replace(/^#\/?/, '').split('/');
     const id = SECTIONS[section] ? section : 'today';
     const subs = SECTIONS[id].subs;
-    return { section: id, sub: subs.includes(sub) ? sub : subs[0] };
+    const page = subs.includes(sub) ? sub : subs[0];
+    return { section: id, sub: page, view: (SUB_VIEWS[page] || []).includes(view) ? view : '' };
   }
 
   /** 换页；已经在这一页就直接重绘 */
@@ -164,6 +165,7 @@
       kicks: () => viewKicksTool(now),
       contractions: () => viewContractionsTool(now),
       food: () => viewFoodTool(),
+      recipes: () => viewRecipesTool(route),
       bag: () => viewBag(ga),
       weeks: () => viewWeeks(ga),
       story: () => viewStoryTool(now),

@@ -101,6 +101,7 @@ const PAGES = [
   ['late', 'today'], ['late', 'tools/kicks'], ['late', 'tools/bag'], ['bag-done', 'tools/bag'], ['checkup-day', 'today'],
   ['labor', 'today'], ['labor', 'tools/kicks'], ['labor', 'tools/contractions'], ['fresh', 'today'], ['empty', ''],
   ['main', 'journal'], ['fresh', 'journal'],
+  ['main', 'tools/recipes'], ['main', 'tools/recipes/all'], ['main', 'tools/recipes/shop'],
 ];
 const SHEETS = [
   ['main', 'today', '[data-action="open-settings"]'],
@@ -108,6 +109,8 @@ const SHEETS = [
   ['main', 'records/meds', '[data-action="add-med"]'],
   ['main', 'checkups/schedule', '[data-action="add-checkup"]'],
   ['main', 'checkups/ultrasound', '[data-action="add-us"]', '检查日期：2026-10-09\n双顶径约6.2cm 股骨长约4.5cm\n胎盘位于后壁，成熟度Ⅰ级'],
+  ['main', 'tools/recipes', '#dish-lunch-main'],
+  ['main', 'tools/recipes/all', '#dish-liver-spinach'],
 ];
 
 (async () => {
@@ -176,6 +179,23 @@ const SHEETS = [
     app.render();
     log(Boolean(d.querySelector('.story-p.is-reading') && d.querySelector('.story-player') && d.querySelector('.shelf-row.is-hidden')), '查到了故事页的正文、朗读条和目录');
     bad = bad.concat(audit(d.getElementById('app'), '故事页'));
+
+    // 孕期食谱：有收藏、有忌口、忌口展开着；买菜清单勾了一半
+    await open('main', 'tools/recipes');
+    const kitchen = w.Baby.app;
+    const meals = kitchen.state.meals;
+    meals.favorites = [d.querySelector('#dish-breakfast').dataset.id];
+    meals.avoid = ['seafood', 'spicy'];
+    kitchen.ui.avoidOpen = true;
+    kitchen.render();
+    log(Boolean(d.querySelector('.dish-fav[aria-pressed="true"]') && d.querySelector('#recipe-avoid[open]')), '查到了收藏和忌口');
+    bad = bad.concat(audit(d.getElementById('app'), '有收藏和忌口的菜单'));
+    w.location.hash = '#/tools/recipes/shop';
+    for (let i = 0; i < 100 && !d.querySelector('.recipe-shop'); i += 1) await wait(30);
+    meals.bought[TODAY] = [...d.querySelectorAll('.recipe-shop input[type="checkbox"]')].filter((_, i) => i % 2 === 0).map((box) => box.dataset.name);
+    kitchen.render();
+    log(Boolean(d.querySelector('.recipe-shop .bag-item.is-done')), '查到了勾过的买菜清单');
+    bad = bad.concat(audit(d.getElementById('app'), '勾过一半的买菜清单'));
     for (const line of [...new Set(bad)]) log(false, line);
     log(bad.length === 0, `文字对比度都不低于 ${MIN_RATIO}:1`);
   } catch (err) {

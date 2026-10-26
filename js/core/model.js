@@ -5,6 +5,7 @@
   const C = Baby.content;
   const St = Baby.stories;
   const J = Baby.journal;
+  const R = Baby.recipes;
 
   const VERSION = 1;
   const KG_MIN = 25;
@@ -109,6 +110,7 @@
       ultrasounds: [],
       stories: St.empty(),
       journal: [],
+      meals: R.empty(),
       notified: {},
     };
   }
@@ -312,6 +314,7 @@
       ultrasounds,
       stories: St.normalize(raw.stories),
       journal: J.normalize(raw.journal),
+      meals: R.normalize(raw.meals),
       notified,
     };
   }

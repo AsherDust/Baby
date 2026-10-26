@@ -120,8 +120,13 @@
 .todo-figure { margin: 0 2px 0 4px; font-family: var(--num); font-size: 19px; color: var(--honey-deep); }
 .todo-text { margin: 3px 0 0; font-size: 13px; color: var(--ink-2); }
 .todo-actions { margin-top: 8px; }
+/* 标题和右边的小表单、链接放一行，省地方 */
+.todo-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.todo-head .link { flex: none; }
 .quick-form { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.todo-head .quick-form { margin-top: 0; }
 .quick-form input { width: 96px; height: 36px; padding: 0 10px; text-align: center; font-family: var(--num); font-size: 18px; }
+.todo-head .quick-form input { width: 76px; }
 .unit-label { font-size: 13px; color: var(--ink-3); }
 
 .todo-clock { font-family: var(--num); font-size: 14px; font-weight: 400; color: var(--honey-deep); font-variant-numeric: tabular-nums; }

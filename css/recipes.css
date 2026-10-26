@@ -1,0 +1,97 @@
+/* 孕期食谱：今日菜单、全部食谱、买菜清单（打勾沿用待产包的样式）、做法面板 */
+
+/* ---------- 今日菜单 ---------- */
+
+.recipe-intro-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+.recipe-intro-top .eyebrow { margin: 0; }
+.recipe-days { display: flex; flex-wrap: wrap; gap: 6px; }
+.recipe-tip { margin: 12px 0 0; font-size: 14px; line-height: 1.75; color: var(--ink-2); }
+.recipe-sugar { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; padding: 10px 14px; border-radius: 14px; background: var(--honey-glow); color: var(--warn-ink); font-size: 13.5px; }
+.recipe-sugar svg { flex: none; width: 17px; height: 17px; margin-top: 2px; }
+
+.recipe-avoid { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line-strong); }
+.recipe-avoid summary { display: inline-flex; align-items: center; min-height: 32px; font-size: 13.5px; color: var(--honey-deep); cursor: pointer; list-style: none; }
+.recipe-avoid summary::-webkit-details-marker { display: none; }
+.recipe-avoid summary::before { content: "▸"; display: inline-block; margin-right: 6px; transition: transform 0.15s; }
+.recipe-avoid[open] summary::before { transform: rotate(90deg); }
+.recipe-avoid .hint { margin-top: 6px; }
+.recipe-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.recipe-avoid .recipe-chips { margin-top: 8px; }
+.recipe-chips .chip[aria-pressed="true"] svg { fill: currentColor; }
+
+.meal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; }
+.meal-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin: 0 0 4px; font-family: var(--serif); font-size: 17px; letter-spacing: 0.04em; }
+.meal-name small { font-family: var(--sans); font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--ink-3); }
+.dish-list { margin: 0; padding: 0; list-style: none; }
+.dish { display: flex; align-items: center; gap: 2px; padding: 2px 0; border-top: 1px dashed var(--line); }
+/* 小圆点：左右两半是两样主要食材的颜色，--a 左、--b 右 */
+.dish-dot { flex: none; display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(90deg, var(--a) 50%, var(--b) 50%); box-shadow: 0 0 0 1px var(--dot-ring); }
+.dish-open { flex: 1; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 1px 10px; min-width: 0; padding: 8px 6px; border: 0; border-radius: 12px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color 0.15s; }
+.dish-open:hover { background: var(--honey-glow); }
+.dish-open .dish-dot { grid-row: span 2; }
+.dish-name { font-size: 15px; font-weight: 600; }
+.dish-meta { font-size: 12.5px; color: var(--ink-3); }
+.dish .icon-btn-sm { flex: none; color: var(--ink-3); }
+.dish .icon-btn-sm:hover { color: var(--honey-deep); background: var(--honey-glow); }
+.dish-fav[aria-pressed="true"], .dish-fav[aria-pressed="true"]:hover { color: var(--red); }
+.dish-fav[aria-pressed="true"] svg { fill: currentColor; }
+.dish.is-empty { padding: 10px 6px; font-size: 13px; color: var(--ink-3); }
+.recipe-cover { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 20px 0 0; padding-top: 14px; border-top: 1px dashed var(--line-strong); font-size: 13px; color: var(--ink-2); }
+.recipe-cover span:first-child { margin-left: 4px; }
+
+/* 首页「晚餐吃什么」：下一顿的几道菜，点了看做法 */
+.meal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.meal-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 4px 13px 4px 10px; border: 1px solid var(--line-strong); border-radius: 99px; background: var(--card); color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; transition: border-color 0.15s, background-color 0.15s; }
+.meal-chip:hover { border-color: var(--honey); background: var(--honey-glow); }
+.meal-chip .dish-dot { width: 12px; height: 12px; }
+
+/* ---------- 全部食谱 ---------- */
+
+.recipe-library { display: grid; gap: 12px; }
+.recipe-group h3 { display: flex; align-items: baseline; gap: 8px; margin: 8px 0 2px; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; color: var(--ink-3); }
+.recipe-group h3 small { font-weight: 400; letter-spacing: 0; }
+.recipe-hidden { margin: 0; font-size: 12.5px; color: var(--ink-3); }
+
+/* ---------- 买菜清单 ---------- */
+
+.recipe-shop .card-head { align-items: center; }
+.recipe-season { margin: 2px 0 0; padding: 12px 14px; border-radius: 14px; background: var(--paper-2); font-size: 13.5px; color: var(--ink-2); }
+.recipe-season b { margin-right: 8px; color: var(--ink); }
+.recipe-season span { display: block; margin-top: 2px; font-size: 12px; color: var(--ink-3); }
+.recipe-shop .btn-row { margin-top: 14px; }
+
+/* ---------- 做法面板 ---------- */
+
+.dialog-head h2 .dish-dot { width: 18px; height: 18px; margin-right: 10px; vertical-align: 1px; }
+.recipe-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.tag-good { background: var(--honey-soft); color: var(--warn-ink); }
+.recipe-why { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--leaf-soft); color: var(--leaf-deep); font-size: 13.5px; }
+.recipe-why svg { flex: none; width: 17px; height: 17px; margin-top: 2px; }
+.recipe-part h3 { margin: 0 0 6px; font-size: 14px; }
+.recipe-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; margin: 0; padding: 0; list-style: none; }
+.recipe-items li { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+.recipe-items b { font-weight: 500; color: var(--ink-2); text-align: right; }
+.recipe-season-line { margin: 8px 0 0; font-size: 13px; color: var(--ink-3); }
+.recipe-steps { display: grid; gap: 8px; margin: 0; padding-left: 22px; font-size: 14.5px; line-height: 1.75; }
+.recipe-steps li::marker { color: var(--honey-deep); font-family: var(--num); font-weight: 700; }
+.recipe-note { margin: 0; padding: 10px 14px; border-radius: 14px; background: var(--honey-glow); color: var(--warn-ink); font-size: 13.5px; }
+.recipe-note b { margin-right: 8px; }
+.recipe-sheet .dialog-actions { flex-wrap: wrap; }
+.recipe-fav-btn[aria-pressed="true"] { border-color: var(--red-line); color: var(--red); }
+.recipe-fav-btn[aria-pressed="true"] svg { fill: currentColor; }
+.recipe-in { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; font-size: 13px; color: var(--leaf-deep); }
+.recipe-in svg { width: 15px; height: 15px; }
+
+@media (max-width: 720px) {
+  .meal-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  /* 手机上筛选的小按钮一排一行，左右滑着看，别占半屏 */
+  .recipe-library .recipe-chips { flex-wrap: nowrap; margin: 0 -18px; padding: 0 18px 2px; overflow-x: auto; scrollbar-width: none; }
+  .recipe-library .recipe-chips::-webkit-scrollbar { display: none; }
+  .recipe-library .chip { flex: none; }
+  .recipe-items { grid-template-columns: minmax(0, 1fr); }
+  .recipe-shop .card-head { align-items: flex-start; }
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .meal-chip { min-height: 38px; }
+}

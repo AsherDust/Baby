@@ -64,6 +64,7 @@
   --toast-line: #EDCB7E;
   --toast-ink: #4A3828;
   --comb-opacity: 0.75;
+  --dot-ring: rgba(74, 56, 40, 0.2);
   --radius: 22px;
   --shadow: 0 1px 0 rgba(120, 86, 40, 0.05), 0 12px 32px -16px rgba(120, 86, 40, 0.22);
   --serif: "Songti SC", "Noto Serif SC", "Source Han Serif SC", "STSong", "SimSun", serif;
@@ -133,6 +134,7 @@
     --toast-line: #6E5530;
     --toast-ink: #F7EBD6;
     --comb-opacity: 0.4;
+    --dot-ring: rgba(255, 245, 230, 0.25);
   }
   .art-sun { fill: #F3E2B4; opacity: 0.8; }
   .art-hill { fill: #2F3727; }

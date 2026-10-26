@@ -6,7 +6,7 @@
     settingsDialog, checkupDialog, medDialog, sheetDialog, notifyPermission, JOURNAL_SHOWN, ui, render, go, closeDialog,
     openGlucoseSheet, openUltrasoundSheet, openJournalSheet, openSettings, openCheckupDialog, openMedDialog, formError,
     toast, oops, say, cheer, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose,
-    checkNotifications, storyActions
+    checkNotifications, storyActions, recipeActions
   } = app;
 
   const submitButton = (form) => form.querySelector('button:not([type="button"])');
@@ -182,6 +182,7 @@
 
   const actions = {
     ...storyActions,
+    ...recipeActions,
 
     'open-settings': openSettings,
 
