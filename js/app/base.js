@@ -30,11 +30,11 @@
     meds: '用药',
     schedule: '产检日程',
     ultrasound: 'B 超单',
-    kicks: '数胎动',
+    kicks: '数数胎动',
     contractions: '宫缩计时',
     food: '能不能吃',
     recipes: '孕期食谱',
-    bag: '待产包',
+    bag: '待产包包',
     weeks: '每周变化',
     story: '睡前故事',
   };

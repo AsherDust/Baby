@@ -44,7 +44,7 @@ iframe.onload = async () => {
     log(/待产包还差 35 样/.test($('.panel-today').textContent), '33 周时首屏提醒待产包');
     $('.panel-today a[href="#/tools/bag"]').click();
     await nav('#/tools/bag');
-    log($('.page-head .page-title').textContent === '待产包' && $('.back[href="#/tools"]'), '点「去打勾」进入待产包页，有返回'); 
+    log($('.page-head .page-title').textContent === '待产包包' && $('.back[href="#/tools"]'), '点「去打勾」进入待产包页，有返回'); 
     log(total === 35 && $$('.bag-item').length === 35, '新用户自带 35 样默认清单', `${total}`);
     log(/已备好 0\/35/.test($('.card-bag .card-meta').textContent), '卡片显示已备好 0/35');
 
