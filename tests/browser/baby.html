@@ -1,0 +1,260 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script src="load-core.js"></script>
+<script src="scenes.js"></script>
+<script>
+// 宝宝成长：出生、底部菜单换成「宝宝」、一键记、补记修改、成长档案、里程碑、疫苗、体温用药、辅食、产检收进记录、清除
+const out = [];
+const log = (ok, name, extra = '') => out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+const TODAY = '2026-10-12';
+const KEY = 'pregnancy-desk:v1';
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:390px;height:844px';
+document.body.appendChild(iframe);
+
+let w, d;
+const errors = [];
+const blobs = [];
+let fakeNow = new Date(2026, 9, 12, 9, 0).getTime();
+function bind() {
+  w = iframe.contentWindow;
+  d = iframe.contentDocument;
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.confirm = () => true;
+  w.Date.now = () => fakeNow;
+  w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
+  w.URL.revokeObjectURL = () => {};
+  w.HTMLAnchorElement.prototype.click = function () {};
+}
+const open = (scene, route = '') => {
+  localStorage.clear();
+  const s = seedScene(scene);
+  if (s) localStorage.setItem(KEY, JSON.stringify(s));
+  return new Promise((r) => {
+    iframe.onload = r;
+    iframe.src = `../../index.html?today=${TODAY}&n=${Math.random()}#/${route}`;
+  }).then(() => { bind(); w.Baby.app.render(); });
+};
+const $ = (s) => d.querySelector(s);
+const $$ = (s) => [...d.querySelectorAll(s)];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const nav = async (hash) => {
+  await wait(40);
+  if (w.location.hash === hash) return;
+  await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
+};
+const state = () => JSON.parse(w.localStorage.getItem(KEY));
+const baby = () => state().baby;
+const text = (el) => (el ? el.textContent.replace(/\s+/g, ' ').trim() : '');
+const toastText = () => text(d.getElementById('toast'));
+const sheet = () => d.getElementById('sheet-dialog');
+const tabs = () => $$('.tabbar .tab-name').map((t) => t.textContent).join(',');
+const later = (min) => { fakeNow += min * 60000; };
+const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找不到 ${sel}`); el.click(); await wait(30); };
+
+(async () => {
+  try {
+    // ---- 孕晚期：宝宝出生了 ----
+    await open('labor');
+    log($('.born-card') && tabs() === '今天,记录,心情,产检,工具', '孕晚期首页问「宝宝出生了吗」，底部还是产检');
+    await click('.born-card [data-action="baby-birth-open"]');
+    const f = sheet().querySelector('form[data-form="baby-birth"]');
+    log(sheet().open && f.elements.name.value === '豆豆', '打开出生面板，小名先填好了');
+    f.requestSubmit();
+    await wait(30);
+    log(/选一下是男宝还是女宝/.test(text(f.querySelector('.form-error'))), '没选性别不让存');
+    f.querySelector('input[name="sex"][value="girl"]').checked = true;
+    f.elements.name.value = '小米';
+    f.elements.birthDate.value = '2026-10-10';
+    f.elements.weight.value = '6.8斤';
+    f.elements.length.value = '50';
+    f.requestSubmit();
+    await wait(40);
+    const b0 = baby();
+    log(b0 && b0.name === '小米' && b0.sex === 'girl' && b0.growth[0].weight === 3.4 && state().profile.nickname === '小米', '宝宝出生记下了，出生体重按斤换成千克');
+    log(tabs() === '今天,记录,心情,宝宝,工具' && $('.hero-baby') && /第\s*3\s*天/.test(text($('.panel-baby-age'))) && /欢迎小米|小米的第一天/.test(toastText()), '底部换成「宝宝」，首页换成宝宝的一天', `${tabs()} ${toastText()}`);
+    log(!$('.born-card') && /小米 2 天 · 蜜罐/.test(d.title), '不再问出生了，网页标题写着宝宝几天', d.title);
+
+    // ---- 首页一键记 ----
+    await click('#breast-left');
+    log($('.qt.is-live') && /亲喂中 · 左边/.test(text($('.qt.is-live'))), '点「左边」开始计时');
+    later(6);
+    await click('#breast-right');
+    later(4);
+    await click('#breast-stop');
+    const feed = baby().logs.find((l) => l.type === 'breast');
+    log(feed && feed.left === 360 && feed.right === 240 && feed.end === fakeNow, '换边接着计，喂完了左 6 分右 4 分', JSON.stringify(feed));
+    log(/亲喂记好了：左 6 分 · 右 4 分/.test(toastText()), '提示喂了多久', toastText());
+    await click('#sleep-toggle');
+    log(/睡着了/.test(text($('.qt.is-sleep'))) && baby().logs.some((l) => l.type === 'sleep' && l.end === null), '点「睡着了」开始计时');
+    await nav('#/records');
+    log($('.live-bar .live-sleep') && /睡着了/.test(text($('.live-bar'))), '换到别的页面挂着「睡着了」的计时条');
+    await nav('#/');
+    log(!$('.live-bar'), '首页自己有计时，不挂计时条');
+    later(50);
+    await click('#sleep-toggle');
+    log(/睡了 50 分钟，醒啦/.test(toastText()), '醒了：提示睡了多久', toastText());
+    await click('#diaper-poo');
+    log(baby().logs.some((l) => l.type === 'diaper' && l.poo && !l.pee) && $('#toast [data-action="undo"]'), '点「便」马上记一笔，可以撤销');
+    await click('#toast [data-action="undo"]');
+    log(!baby().logs.some((l) => l.type === 'diaper'), '撤销了');
+    await click('#diaper-both');
+    await click('#log-bottle');
+    const bf = sheet().querySelector('form[data-form="baby-log"]');
+    log(sheet().open && bf.dataset.type === 'bottle', '「记一瓶」打开瓶喂面板');
+    sheet().querySelector('[data-action="baby-ml"][data-ml="90"]').click();
+    log(d.getElementById('sheet-ml').value === '90', '点 90 填好毫升');
+    bf.requestSubmit();
+    await wait(40);
+    const s1 = w.Baby.baby.daySummary(w.Baby.app.state.baby, TODAY, fakeNow);
+    log(s1.feeds === 2 && s1.bottleMl === 90 && s1.sleepMin === 50 && s1.diapers === 1 && /瓶喂 90 毫升/.test(text($('.bsum'))), '今天的小结：喂奶 2 次、瓶喂 90 毫升、睡 50 分钟、尿布 1 次', text($('.bsum')));
+    await click('#vitd-done');
+    log($$('.panel-today .todo-item.is-done').some((li) => /维生素 D 喂过了/.test(li.textContent)), '维生素 D 点「喂过了」就勾上');
+
+    // ---- 宝宝页：日常 ----
+    await nav('#/baby');
+    log($$('.seg-tab').map((t) => t.textContent).join() === '日常,成长,疫苗,健康,辅食' && $$('.blog').length === 5, '宝宝页五个分页，今天的记录 5 条', `${$$('.blog').length}`);
+    const diaper = baby().logs.find((l) => l.type === 'diaper');
+    await click(`#edit-${diaper.id}`);
+    const ef = sheet().querySelector('form[data-form="baby-log"]');
+    ef.querySelector('input[name="color"][value="white"]').checked = true;
+    ef.requestSubmit();
+    await wait(40);
+    log(baby().logs.find((l) => l.id === diaper.id).color === 'white' && /胆道/.test(text($('.blog.is-warn'))), '改成灰白色的便：记录里提醒尽快去医院');
+    const bottle = baby().logs.find((l) => l.type === 'bottle');
+    await click(`#edit-${bottle.id}`);
+    await click('#sheet-dialog [data-action="baby-delete"]');
+    log(!baby().logs.some((l) => l.type === 'bottle') && /删掉了这条瓶喂/.test(toastText()), '删掉一条');
+    await click('#toast [data-action="undo"]');
+    log(baby().logs.some((l) => l.id === bottle.id), '删了也能撤销');
+    await click('#baby-prev');
+    log(/昨天/.test(text($('.day-title'))) && !$('.quick-tiles'), '看昨天：没有一键记的按钮');
+    await click('#baby-prev');
+    log($('#baby-prev').disabled && /10月10日/.test(text($('.day-title'))), '翻到出生那天就不能再往前了');
+    await click('#log-more');
+    const pf = sheet().querySelector('form[data-form="baby-log"]');
+    log(pf.elements.date.value === '2026-10-10', '在那天补一条，日期就是那天');
+    sheet().querySelector('[data-action="baby-log-type"][data-type="sleep"]').click();
+    await wait(20);
+    const sf = sheet().querySelector('form[data-form="baby-log"]');
+    sf.elements.time.value = '22:00';
+    sf.elements.endTime.value = '01:30';
+    sf.requestSubmit();
+    await wait(40);
+    const night = baby().logs.find((l) => l.type === 'sleep' && l.start === new Date(2026, 9, 10, 22, 0).getTime());
+    log(night && night.end === new Date(2026, 9, 11, 1, 30).getTime(), '补记一觉：睡到第二天凌晨也对');
+    await click('#baby-next');
+    await click('#baby-next');
+    log(/今天/.test(text($('.day-title'))) && $('#baby-next').disabled, '回到今天');
+
+    // ---- 成长档案 ----
+    await nav('#/baby/growth');
+    log($('#growth-chart svg') && $$('#growth-chart .c-pline').length === 5 && $$('#growth-chart circle').length === 1, '生长曲线：5 条百分位线和出生时的点');
+    const gf = $('form[data-form="baby-growth"]');
+    d.getElementById('g-weight').value = '3.3';
+    gf.requestSubmit();
+    await wait(40);
+    log(baby().growth.length === 2 && $$('.gr-item').length === 2 && $$('#growth-chart circle').length === 2, '记一次体重，曲线上多一个点');
+    await click('#metric-length');
+    log(/身长生长曲线/.test($('#growth-chart svg').getAttribute('aria-label')) && d.activeElement.id === 'metric-length', '切到身长');
+    await click('.gr-item [data-action="growth-delete"]');
+    log(baby().growth.length === 1, '删掉一次');
+    await click('#toast [data-action="undo"]');
+    log(baby().growth.length === 2, '删了能撤销');
+    await click('#ms-smile');
+    sheet().querySelector('form[data-form="milestone"]').requestSubmit();
+    await wait(40);
+    log(baby().milestones.smile === TODAY && /「会对人笑」记下了/.test(toastText()) && $('.ms-smile, .ms.ms-done'), '里程碑记下了', toastText());
+    await click('#ms-smile');
+    await click('#sheet-dialog [data-action="milestone-clear"]');
+    log(!baby().milestones.smile, '改回还没会');
+    d.getElementById('mo-name').value = '第一次洗澡';
+    $('form[data-form="baby-moment"]').requestSubmit();
+    await wait(40);
+    log(baby().moments.length === 1 && /第一次洗澡/.test(text($('.ms-moments'))), '记一件「第一次」');
+
+    // ---- 疫苗 ----
+    await nav('#/baby/vaccines');
+    log(/下一针：乙肝疫苗第 1 剂/.test(text($('.remind-strip'))), '下一针是乙肝第 1 剂', text($('.remind-strip')));
+    await click('#vx-done-hepb-1');
+    log(baby().vaccines['hepb-1'].done === TODAY && /已经打完 1 针/.test(text($('#vx-done summary'))), '点「打完了」，收进已经打完的');
+    await click('#vx-open-bcg');
+    const vf = sheet().querySelector('form[data-form="vaccine"]');
+    vf.elements.booked.value = '2026-10-13';
+    vf.requestSubmit();
+    await wait(40);
+    log(baby().vaccines.bcg.booked === '2026-10-13' && /约在 10月13日/.test(text($('.remind-strip'))), '约好卡介苗明天打');
+    blobs.length = 0;
+    await click('[data-action="vaccine-ics"]');
+    const ics = blobs.length ? await blobs[0].text() : '';
+    log(/X-WR-CALNAME:疫苗接种/.test(ics) && (ics.match(/BEGIN:VEVENT/g) || []).length >= 10 && /DTSTART;VALUE=DATE:20261013/.test(ics), '导出疫苗日历，约好的按约的日子', ics.slice(0, 80));
+    d.getElementById('xv-name').value = '乙肝免疫球蛋白';
+    $('form[data-form="extra-vaccine"]').requestSubmit();
+    await wait(40);
+    log(baby().extraVaccines.length === 1 && baby().extraVaccines[0].done, '自费疫苗自己加');
+    await nav('#/');
+    log(/明天打疫苗：卡介苗第 1 剂/.test(text($('.banner'))) && $('.tab-dot'), '首页提醒明天打疫苗，底部「宝宝」有红点');
+
+    // ---- 体温、用药 ----
+    await nav('#/baby/health');
+    d.getElementById('bt-value').value = '38.4';
+    $('form[data-form="baby-temp"]').requestSubmit();
+    await wait(40);
+    log(/有点发热/.test(toastText()) && /3 个月以下的宝宝发热，尽快去医院/.test(text($('.rec-alert'))) && /中等发热/.test(text($('.temp-now'))), '发热：3 个月以下提醒尽快去医院', text($('.temp-now')));
+    await click('[data-action="baby-med-fill"]');
+    log(d.getElementById('bm-name').value === '维生素 D', '点「维生素 D」填好药名');
+    $('form[data-form="baby-med"]').requestSubmit();
+    await wait(40);
+    log(baby().logs.filter((l) => l.type === 'med').length === 2, '记下用药');
+
+    // ---- 辅食（还不到 6 个月） ----
+    await nav('#/baby/food');
+    log(/还不到 6 个月/.test(text($('.baby-food-stage'))) && !$('.baby-food-today') && $$('.baby-food-all .dish').length > 25, '不到 6 个月：先看看，不推荐今天做什么');
+    await click('#food-iron-cereal');
+    log(sheet().open && !sheet().querySelector('[data-action="baby-food-log"]'), '还不能记吃了');
+    await click('#sheet-dialog [data-action="close-dialog"]');
+
+    // ---- 产检收进记录，工具收起孕期的 ----
+    await nav('#/records/weight');
+    log($$('.seg-tab').some((t) => t.getAttribute('href') === '#/checkups/schedule'), '「记录」里能看产检');
+    await nav('#/checkups/schedule');
+    log(text($('.tab[aria-current="page"]')) === '记录' && $('.seg-tab[aria-current="page"]').getAttribute('href') === '#/checkups/schedule', '产检页亮的是「记录」');
+    await nav('#/tools');
+    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,story', '工具页收起数胎动、宫缩、待产包、每周变化');
+
+    // ---- 刷新、清除 ----
+    await new Promise((r) => { iframe.onload = r; w.location.reload(); });
+    bind();
+    await wait(40);
+    log(w.Baby.app.state.baby.name === '小米' && w.Baby.app.state.baby.logs.length >= 7, '刷新后都还在');
+    await click('[data-action="open-settings"]');
+    log(/小米 · 女宝/.test(text(d.getElementById('settings-dialog'))), '设置里有宝宝信息');
+    await click('#settings-dialog [data-action="baby-birth-open"]');
+    await wait(60);
+    await click('#sheet-dialog [data-action="baby-clear"]');
+    await wait(40);
+    log(!state().baby && tabs() === '今天,记录,心情,产检,工具' && /宝宝的信息清掉了/.test(toastText()), '清除宝宝信息，回到孕期');
+    await click('#toast [data-action="undo"]');
+    log(state().baby && state().baby.name === '小米', '清除也能撤销');
+
+    // ---- 7 个月：辅食 ----
+    fakeNow = new Date(2026, 9, 12, 19, 0).getTime();
+    await open('baby-7m', 'baby/food');
+    const picks = $$('.baby-food-today .dish-open');
+    log(/7～9 个月/.test(text($('.baby-food-stage .eyebrow'))) && $('.food-amounts') && picks.length === 3, '7 个月：阶段、每天吃多少、今天推荐 3 道');
+    log(picks.filter((b) => b.querySelector('.tag-next')).length <= 1, '今天最多一道带新食材');
+    await click('#food-liver-puree');
+    log(/第一次/.test(text(sheet().querySelector('.recipe-items'))), '做法里标出第一次吃的食材');
+    await click('#sheet-dialog [data-action="baby-food-log"]');
+    log(/第一次吃猪肝/.test(toastText()) && baby().tried['猪肝'] === TODAY && baby().logs.some((l) => l.type === 'food' && l.recipe === 'liver-puree'), '记一笔：记进辅食，猪肝算吃过了', toastText());
+    $('#food-tried summary').click();
+    await wait(20);
+    await click('#tried-香蕉');
+    log(baby().tried['香蕉'] === TODAY && $('#food-tried').open, '自己勾上吃过的食材，面板保持展开');
+
+    log(errors.length === 0, '没有报错', errors.join(' | '));
+  } catch (err) {
+    log(false, `出错：${err.message}`, err.stack);
+  }
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+})();
+</script>

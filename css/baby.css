@@ -1,0 +1,199 @@
+/* 宝宝：首页的几块、记一笔的按钮、当天的记录、成长档案、里程碑、疫苗、体温用药、辅食 */
+
+/* ---------- 记一笔 ---------- */
+
+.quick-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.qt { display: grid; align-content: start; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--field); }
+.qt-name { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+.qt-name svg { flex: none; width: 17px; height: 17px; color: var(--honey-deep); }
+.qt-row { display: flex; gap: 6px; }
+.qt-btn { flex: 1; min-width: 0; height: 40px; padding: 0 2px; white-space: nowrap; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: border-color 0.15s, background-color 0.15s; }
+.qt-btn:hover { border-color: var(--honey); background: var(--honey-glow); }
+.qt-btn.is-main { border-color: var(--honey); background: var(--honey); color: #3D2A14; }
+.qt-btn.is-main:hover { background: #F0B54F; }
+.qt.is-live { border-color: var(--honey); background: var(--honey-glow); }
+.qt.is-sleep { border-color: var(--sky-line); background: var(--sky-soft); }
+.qt.is-sleep .qt-name svg { color: var(--sky-deep); }
+.qt-clock { display: grid; margin: 0; }
+.qt-clock b { font-family: var(--num); font-size: 28px; font-weight: 400; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.qt-clock small { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.qt-more { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+.bsum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.bsum li { display: grid; gap: 1px; padding: 10px 12px; border-radius: 14px; background: var(--paper-2); }
+.bsum-name { font-size: 12px; color: var(--ink-2); }
+.bsum b { font-family: var(--num); font-size: 24px; font-weight: 400; line-height: 1.15; color: var(--honey-deep); }
+.bsum b small { margin: 0 3px 0 2px; font-family: var(--sans); font-size: 12px; color: var(--ink-2); }
+.bsum-sub { font-size: 11.5px; line-height: 1.4; color: var(--ink-3); }
+.last-feed { margin: 10px 0 0; font-size: 13.5px; color: var(--ink-2); }
+.last-feed b { color: var(--honey-deep); }
+
+/* ---------- 当天的记录 ---------- */
+
+.day-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.day-nav .icon-btn:disabled { opacity: 0.35; pointer-events: none; }
+.day-title { display: grid; justify-items: center; margin: 0; font-family: var(--serif); font-size: 20px; letter-spacing: 0.04em; text-align: center; }
+.day-title small { font-family: var(--sans); font-size: 12.5px; font-weight: 400; letter-spacing: 0; color: var(--ink-3); }
+.baby-tl .card-head { align-items: center; flex-direction: row; }
+.blog-list { margin: 0; padding: 0; list-style: none; }
+.blog { display: grid; grid-template-columns: 5.4em 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 2px; border-top: 1px dashed var(--line); }
+.blog:first-child { border-top: 0; }
+.blog-time { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.blog-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: var(--honey-glow); color: var(--honey-deep); }
+.blog-icon svg { width: 16px; height: 16px; }
+.blog-body { min-width: 0; }
+.blog-title { margin: 0; font-size: 14px; color: var(--ink-2); }
+.blog-title b { margin-right: 8px; color: var(--ink); }
+.blog-note { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.blog-alert { margin: 4px 0 0; font-size: 12.5px; font-weight: 600; color: var(--alert-ink); }
+.blog.is-warn .blog-icon { background: var(--red-soft); color: var(--red); }
+.blog-live { font-size: 12px; font-weight: 600; color: var(--honey-deep); }
+
+/* ---------- 成长档案 ---------- */
+
+.profile-row { display: flex; align-items: center; gap: 16px; }
+.profile-art { flex: none; width: 64px; }
+.profile-art svg { width: 100%; height: auto; }
+.profile-text { flex: 1; min-width: 0; }
+.profile-name { display: flex; align-items: baseline; gap: 8px; margin: 0; font-family: var(--serif); font-size: 22px; letter-spacing: 0.04em; }
+.profile-name small { font-family: var(--sans); font-size: 13px; font-weight: 400; letter-spacing: 0; color: var(--ink-3); }
+.profile-age { margin: 2px 0 0; font-size: 14px; color: var(--honey-deep); font-weight: 600; }
+.profile-birth { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.baby-growth .recipe-chips { margin-bottom: 8px; }
+.growth-chart { min-height: 240px; }
+.growth-now { margin: 6px 0 0; font-size: 14px; color: var(--ink-2); }
+.growth-now b { color: var(--honey-deep); font-family: var(--num); font-size: 17px; font-weight: 400; }
+.growth-form { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr)) auto; gap: 10px; align-items: end; margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--cream); }
+.growth-form .btn { height: 42px; }
+.growth-form .form-error { grid-column: 1 / -1; }
+.gr-list { margin: 14px 0 0; padding: 0; list-style: none; }
+.gr-item { display: grid; grid-template-columns: 7em minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 2px; border-top: 1px dashed var(--line); }
+.gr-when { display: grid; font-size: 14px; }
+.gr-when small { font-size: 12px; color: var(--ink-3); }
+.gr-vals { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; color: var(--ink-2); }
+.gr-vals b { font-family: var(--num); font-size: 16px; font-weight: 400; color: var(--ink); }
+.gr-vals small { margin-left: 4px; font-size: 11.5px; color: var(--ink-3); }
+.c-band { fill: var(--leaf-soft); opacity: 0.7; }
+.c-band-mid { fill: var(--leaf); opacity: 0.14; }
+.c-pline { fill: none; stroke: var(--leaf); stroke-width: 1; opacity: 0.55; }
+.c-pline-mid { stroke-width: 1.6; opacity: 0.9; }
+.c-plabel { font-family: var(--sans); font-size: 10px; fill: var(--leaf-deep); }
+
+.ms-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.ms { display: flex; align-items: center; gap: 4px; border-top: 1px dashed var(--line); }
+.ms:first-child { border-top: 0; }
+.ms-open { flex: 1; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 2px 10px; min-width: 0; padding: 9px 4px; border: 0; border-radius: 12px; background: none; color: inherit; font: inherit; text-align: left; }
+button.ms-open { cursor: pointer; }
+button.ms-open:hover { background: var(--honey-glow); }
+.ms-dot { grid-row: span 2; display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid var(--line-strong); border-radius: 50%; color: #FFFFFF; }
+.ms-dot svg { width: 12px; height: 12px; }
+.ms-name { font-size: 14.5px; font-weight: 600; }
+.ms-when { grid-column: 2; font-size: 12.5px; color: var(--ink-3); }
+.ms .tag { grid-column: 3; grid-row: 1 / span 2; }
+.ms-done .ms-dot { border-color: var(--leaf); background: var(--leaf); }
+.ms-now .ms-dot { border-color: var(--honey); }
+.ms-past .ms-name, .ms-soon .ms-name { font-weight: 500; color: var(--ink-2); }
+.ms-moments { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line-strong); }
+.ms-moments h3 { margin: 0 0 6px; font-size: 13.5px; color: var(--ink-2); }
+.moment-form, .extra-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.moment-form input, .extra-form input:not([type="checkbox"]) { min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--field); font-size: 14px; }
+.moment-form input[name="name"], .extra-form input[name="name"] { flex: 1 1 200px; }
+.moment-form input:focus, .extra-form input:focus { outline: none; border-color: var(--honey); box-shadow: 0 0 0 4px rgba(233, 169, 60, 0.18); }
+.moment-form .form-error, .extra-form .form-error { flex-basis: 100%; }
+.extra-done { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+
+/* ---------- 疫苗 ---------- */
+
+.vx-group + .vx-group { margin-top: 16px; }
+.vx-list { margin: 0; padding: 0; list-style: none; }
+.vx { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 10px 2px; border-top: 1px dashed var(--line); }
+.vx:first-child { border-top: 0; }
+.vx-dot { display: grid; place-items: center; width: 20px; height: 20px; margin-top: 2px; border: 2px solid var(--line-strong); border-radius: 50%; color: #FFFFFF; }
+.vx-dot svg { width: 11px; height: 11px; }
+.vx-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; font-size: 15px; font-weight: 600; }
+.vx-when { margin: 3px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.vx-status { margin: 3px 0 0; font-size: 13px; font-weight: 600; color: var(--honey-deep); }
+.vx-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.vx-done .vx-dot { border-color: var(--leaf); background: var(--leaf); }
+.vx-done .vx-name { font-weight: 500; color: var(--ink-2); }
+.vx-done .vx-status { color: var(--leaf-deep); font-weight: 400; }
+.vx-due .vx-dot, .vx-soon .vx-dot { border-color: var(--honey); }
+.vx-late .vx-dot { border-color: var(--red); }
+.vx-late .vx-status { color: var(--alert-ink); }
+.vx-done-list { margin-bottom: 14px; padding-bottom: 6px; border-bottom: 1px dashed var(--line-strong); }
+.vx-done-list summary, .food-rules summary, .food-tried summary { list-style: none; }
+.vx-done-list summary::-webkit-details-marker, .food-rules summary::-webkit-details-marker, .food-tried summary::-webkit-details-marker { display: none; }
+.vx-done-list summary::before, .food-rules summary::before, .food-tried summary::before { content: "▸"; display: inline-block; margin-right: 6px; transition: transform 0.15s; }
+.vx-done-list[open] summary::before, .food-rules[open] summary::before, .food-tried[open] summary::before { transform: rotate(90deg); }
+.vx-done-list summary { display: inline-flex; align-items: center; min-height: 32px; font-size: 13.5px; color: var(--leaf-deep); cursor: pointer; }
+.vx-done-list .vx-list { margin-top: 4px; }
+.vx-compact { grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; padding: 6px 2px; }
+.vx-compact .vx-dot { margin-top: 0; }
+.vx-compact .link { font-size: 13px; }
+
+/* ---------- 体温、用药 ---------- */
+
+.temp-now { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 0 12px; }
+.temp-now b { font-family: var(--num); font-size: 34px; font-weight: 400; line-height: 1; }
+.temp-now span { font-size: 13.5px; color: var(--ink-2); }
+.temp-low b, .temp-mid b, .temp-high b { color: var(--red); }
+.temp-cool b { color: var(--sky-deep); }
+.temp-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; }
+.baby-temp .blog-list, .baby-meds .blog-list { margin-top: 12px; }
+
+/* ---------- 辅食 ---------- */
+
+.food-amounts { width: 100%; margin-top: 14px; border-collapse: collapse; font-size: 13.5px; }
+.food-amounts caption { margin-bottom: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); text-align: left; }
+.food-amounts th, .food-amounts td { padding: 6px 4px; border-top: 1px dashed var(--line); text-align: left; }
+.food-amounts th { width: 5em; font-weight: 500; color: var(--ink-2); }
+.food-rules, .food-tried { margin-top: 14px; }
+.food-rules summary, .food-tried summary { display: inline-flex; align-items: baseline; gap: 8px; min-height: 32px; font-size: 13.5px; color: var(--honey-deep); cursor: pointer; }
+.food-tried summary small { font-size: 12px; color: var(--ink-3); }
+.food-rules ul { display: grid; gap: 6px; margin: 8px 0 0; padding-left: 20px; font-size: 13.5px; color: var(--ink-2); }
+.food-tried .recipe-chips { margin-top: 8px; }
+.food-tried { margin-top: 0; }
+.recipe-group.is-later h3, .recipe-group.is-later .dish-name { color: var(--ink-3); }
+.dish-open.no-dot { grid-template-columns: minmax(0, 1fr); }
+.dish-name .tag { margin-left: 8px; vertical-align: 1px; }
+
+/* ---------- 首页 ---------- */
+
+.hero-baby .week-big .unit:first-child { margin-left: 0; }
+.panel-baby-now .eyebrow { margin-bottom: 10px; }
+.hero-baby .due-line .link { margin-left: auto; }
+
+/* ---------- 面板里 ---------- */
+
+.field-row-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pick-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick-poo.pick-red input:checked + span, .pick-poo.pick-white input:checked + span, .pick-poo.pick-black input:checked + span { border-color: var(--red); background: var(--red); color: #FFF6E3; }
+.live-sleep { background: var(--sky-soft); color: var(--sky-deep); }
+
+@media (max-width: 1080px) {
+  .hero-baby .panel-today { grid-column: auto; }
+}
+
+@media (max-width: 720px) {
+  .bsum { gap: 6px; }
+  .bsum li { padding: 8px 10px; }
+  .bsum b { font-size: 21px; }
+  .growth-form { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 12px; }
+  .growth-form .field:first-child { grid-column: 1 / -1; }
+  .growth-form .btn { grid-column: 1 / -1; }
+  .gr-item { grid-template-columns: 6em minmax(0, 1fr) auto; }
+  .blog { grid-template-columns: 4.8em 28px minmax(0, 1fr) auto; gap: 8px; }
+  .profile-art { width: 52px; }
+  .profile-row { flex-wrap: wrap; }
+  .vx { grid-template-columns: 22px minmax(0, 1fr); }
+  .vx-actions { grid-column: 2; justify-content: flex-start; }
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .qt-btn { height: 44px; }
+  .moment-form input, .extra-form input:not([type="checkbox"]) { height: 44px; font-size: 16px; }
+}
+
+@media (min-width: 1081px) {
+  .hero-baby { grid-template-columns: 0.9fr 1.25fr 1fr; }
+}

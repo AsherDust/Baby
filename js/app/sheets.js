@@ -209,6 +209,21 @@
     return `当前版本：${at.getMonth() + 1}月${at.getDate()}日 ${pad(at.getHours())}:${pad(at.getMinutes())} 发布。`;
   }
 
+  function viewBabySettings() {
+    const b = app.state.baby;
+    const B = globalThis.Baby.baby;
+    return `
+      <section class="settings-data">
+        <h3>宝宝</h3>
+        <p class="hint">${b
+          ? `${esc(b.name || '宝宝')} · ${b.sex === 'boy' ? '男宝' : '女宝'} · ${D.formatDate(b.birthDate, { year: true })}出生，${B.ageText(B.ageOf(b.birthDate, ui.today))}。`
+          : '宝宝出生后记下来，就能开始记喂奶、睡觉、换尿布；底部的「产检」会换成「宝宝」，产检记录收进「记录」里。'}</p>
+        <div class="btn-row">
+          <button type="button" class="btn ${b ? 'btn-ghost ' : ''}btn-sm" data-action="baby-birth-open">${b ? '改宝宝信息' : '宝宝出生了'}</button>
+        </div>
+      </section>`;
+  }
+
   function openSettings() {
     settingsDialog.innerHTML = `
       <form class="dialog-body" data-form="settings" novalidate>
@@ -223,6 +238,7 @@
           <button type="button" class="btn btn-ghost" data-action="close-dialog">取消</button>
           <button class="btn">保存</button>
         </div>
+        ${viewBabySettings()}
         <section class="settings-data">
           <h3>数据</h3>
           <p class="hint">记录只存在这台设备的这个浏览器里。换浏览器、清理浏览器数据之前，先导出一份备份。</p>

@@ -1371,6 +1371,254 @@ test('normalize：食谱的记录，老数据没有这一项时为空，乱数�
   eq(M.normalize(raw).meals, R.empty());
 });
 
+// ---------- 宝宝成长 ----------
+
+const Bb = globalThis.Baby.baby;
+const BOOKB = globalThis.Baby.babyBook;
+const FOOD = globalThis.Baby.babyFood;
+const STD = globalThis.Baby.growthStandard;
+const tAt = (date, time) => Bb.msAt(date, time);
+const MINUTE = 60000;
+const newborn = (birthDate = '2026-08-15', sex = 'girl') => Bb.born({ name: '豆豆', sex, birthDate, birthTime: '06:30', weight: '3.2', length: '50', head: '' });
+
+test('宝宝年龄：满月按日子算，月底出生的按月底算', () => {
+  eq([Bb.addMonths('2026-01-31', 1), Bb.addMonths('2026-03-31', -1), Bb.addMonths('2026-11-15', 3)], ['2026-02-28', '2026-02-28', '2027-02-15']);
+  eq(Bb.ageOf('2026-08-15', '2026-08-15'), { days: 0, months: 0, rest: 0 });
+  eq(Bb.ageOf('2026-08-15', '2026-10-12'), { days: 58, months: 1, rest: 27 });
+  eq(Bb.ageOf('2026-01-31', '2026-02-28'), { days: 28, months: 1, rest: 0 });
+  eq(Bb.ageOf('2025-07-01', '2026-10-12').months, 15);
+  eq(['2026-10-12', '2026-11-20', '2027-10-15'].map((d) => Bb.ageText(Bb.ageOf('2026-10-02', d))), ['10 天', '1 个月 18 天', '1 岁']);
+  eq([0, 2, 18, 24, 48, 72].map(Bb.monthsText), ['出生', '2 月龄', '18 月龄', '2 岁', '4 岁', '6 岁']);
+});
+
+test('宝宝出生：表单校验，出生那天量的数记进成长档案，体重可以写斤', () => {
+  const f = { name: '豆豆', sex: 'boy', birthDate: '2026-10-10', birthTime: '', weight: '6.6斤', length: '50', head: '34' };
+  eq(Bb.birthError({ ...f, sex: '' }, '2026-10-12', DUE), '选一下是男宝还是女宝');
+  eq(Bb.birthError({ ...f, birthDate: '2026-10-13' }, '2026-10-12', DUE), '出生日期不能晚于今天');
+  eq(Bb.birthError({ ...f, birthDate: '2026-01-01' }, '2026-10-12', DUE), '出生日期离预产期太远了，再确认一下？');
+  eq(Bb.birthError({ ...f, weight: '30' }, '2026-10-12', DUE), '出生体重填 0.5–6.5 kg 之间的数');
+  eq(Bb.birthError({ ...f, head: '60' }, '2026-10-12', DUE), '出生头围填 20–45 cm 之间的数');
+  eq(Bb.birthError(f, '2026-10-12', DUE), null);
+  const b = Bb.born(f);
+  eq([b.name, b.sex, b.growth], ['豆豆', 'boy', [{ date: '2026-10-10', weight: 3.3, length: 50, head: 34 }]]);
+  Bb.updateBirth(b, { ...f, birthDate: '2026-10-09', weight: '3.4', head: '' });
+  eq(b.growth, [{ date: '2026-10-09', weight: 3.4, length: 50, head: null }]);
+});
+
+test('亲喂计时：左右分开记，换边接着算，喂完了收尾；正在喂时算上这一段', () => {
+  const b = newborn();
+  const t0 = tAt('2026-10-12', '08:00');
+  const e = Bb.startBreast(b, 'left', t0);
+  eq(Bb.breastSeconds(e, t0 + 3 * MINUTE), { left: 180, right: 0 });
+  eq(Bb.startBreast(b, 'right', t0 + 5 * MINUTE), e);
+  eq(Bb.breastSeconds(e, t0 + 7 * MINUTE), { left: 300, right: 120 });
+  eq(Bb.startBreast(b, 'right', t0 + 8 * MINUTE).side, 'right');
+  const done = Bb.stopBreast(b, t0 + 12 * MINUTE);
+  eq([done.left, done.right, done.end, done.side, Bb.running(b, 'breast')], [300, 420, t0 + 12 * MINUTE, null, null]);
+  eq(Bb.stopBreast(b, t0 + 13 * MINUTE), null);
+  eq(Bb.startBreast(b, 'middle', t0), null);
+});
+
+test('睡觉：开始和醒来，跨过半夜的分到两天；当天的小结', () => {
+  const b = newborn();
+  Bb.startSleep(b, tAt('2026-10-11', '23:00'));
+  eq(Bb.startSleep(b, tAt('2026-10-11', '23:30')).start, tAt('2026-10-11', '23:00'));
+  Bb.stopSleep(b, tAt('2026-10-12', '02:00'));
+  Bb.startBreast(b, 'left', tAt('2026-10-12', '06:00'));
+  Bb.stopBreast(b, tAt('2026-10-12', '06:20'));
+  Bb.addLog(b, Bb.readLog('bottle', { date: '2026-10-12', time: '09:00', ml: '90', milk: 'formula' }, tAt('2026-10-12', '12:00')));
+  Bb.quickDiaper(b, 'pee', tAt('2026-10-12', '07:00'));
+  Bb.quickDiaper(b, 'both', tAt('2026-10-12', '10:00'));
+  Bb.startSleep(b, tAt('2026-10-12', '11:00'));
+  const now = tAt('2026-10-12', '11:30');
+  const s = Bb.daySummary(b, '2026-10-12', now);
+  eq([s.feeds, s.breastMin, s.bottleMl, s.sleepMin, s.diapers, s.pee, s.poo, s.lastFeed], [2, 20, 90, 150, 2, 2, 1, tAt('2026-10-12', '09:00')]);
+  eq(Bb.daySummary(b, '2026-10-11', now).sleepMin, 60);
+  eq(s.logs.map((l) => l.type), ['sleep', 'diaper', 'bottle', 'diaper', 'breast']);
+});
+
+test('补记和修改：每种记录的校验，睡到第二天早上的按第二天算，改了重新排序', () => {
+  const now = tAt('2026-10-12', '12:00');
+  const r = (type, f) => Bb.readLog(type, { date: '2026-10-12', time: '08:00', ...f }, now);
+  eq(r('breast', { left: '', right: '' }).error, '两边一共喂了几分钟？填 1–120 之间的数');
+  eq([r('breast', { left: '8', right: '6' }).left, r('breast', { left: '8', right: '6' }).end], [480, tAt('2026-10-12', '08:14')]);
+  eq(r('bottle', { ml: '1000' }).error, '喝了多少毫升？填 5–400 之间的数');
+  eq(r('food', { text: ' ' }).error, '吃了什么？写一下');
+  eq(r('diaper', {}).error, '选一下是尿了还是便了');
+  eq(r('temp', { value: '45' }).error, '体温填 34–43 之间的数，例如 36.8');
+  eq(r('med', { name: '' }).error, '吃的什么药？写一下名字');
+  eq(Bb.readLog('sleep', { date: '2026-10-11', time: '22:00', endTime: '06:30' }, now).end, tAt('2026-10-12', '06:30'));
+  eq(Bb.readLog('sleep', { date: '2026-10-12', time: '11:00', endTime: '12:30' }, now).error, '醒来的时间不能晚于现在');
+  eq(r('bottle', { time: '13:00', ml: '60' }).error, '时间不能晚于现在');
+  eq(r('diaper', { poo: true, color: 'white' }).color, 'white');
+  const b = newborn();
+  const a = Bb.addLog(b, r('diaper', { pee: true }));
+  Bb.addLog(b, r('bottle', { time: '09:00', ml: '60' }));
+  Bb.updateLog(b, a.id, r('diaper', { time: '10:00', poo: true }));
+  eq(b.logs.map((l) => l.type), ['bottle', 'diaper']);
+  const gone = Bb.removeLog(b, a.id);
+  eq(b.logs.length, 1);
+  Bb.restoreLog(b, gone);
+  eq(b.logs.map((l) => l.id).includes(a.id), true);
+  const running = Bb.startSleep(b, tAt('2026-10-12', '11:00'));
+  Bb.updateLog(b, running.id, { note: '抱着睡的' });
+  eq([running.end, running.note], [null, '抱着睡的']);
+});
+
+test('normalize：宝宝的数据，老数据没有宝宝时是 null，乱数据清理掉，多出来的计时收尾', () => {
+  const old = M.createState({ dueDate: DUE });
+  eq(old.baby, null);
+  delete old.baby;
+  eq(M.normalize(old).baby, null);
+  const raw = M.createState({ dueDate: DUE });
+  raw.baby = {
+    ...newborn(),
+    sex: 'alien',
+    logs: [
+      { id: 'a-1', type: 'breast', start: tAt('2026-10-12', '08:00'), end: null, left: 60, right: 0, side: 'left', since: tAt('2026-10-12', '08:01') },
+      { id: 'a-2', type: 'breast', start: tAt('2026-10-12', '09:00'), end: null, left: 0, right: 0, side: 'right', since: tAt('2026-10-12', '09:00') },
+      { id: 'a-3', type: 'bottle', start: tAt('2026-10-12', '10:00'), ml: 9000 },
+      { id: 'a-4', type: 'diaper', start: tAt('2026-10-12', '10:30'), pee: false, poo: false },
+      { id: 'a-5', type: 'teleport', start: tAt('2026-10-12', '11:00') },
+      { id: 'a-6', type: 'temp', start: tAt('2026-10-12', '11:00'), value: '37.84', site: 'mouth' },
+      { id: 'a-6', type: 'med', start: tAt('2026-10-12', '11:10'), name: '重复的 id' },
+      null,
+    ],
+    growth: [{ date: '2026-09-15', weight: '4.1' }, { date: '2026-09-15', weight: '4.3' }, { date: 'nope', weight: 4 }, { date: '2026-10-01', weight: 99 }],
+    vaccines: { 'hepb-1': { done: '2026-08-15' }, 'BAD ID': { done: '2026-08-15' }, 'bcg': { booked: 'soon' } },
+    milestones: { smile: '2026-10-01', head: 'yesterday' },
+    tried: { 猪肉: '2026-10-01', '': '2026-10-01' },
+  };
+  const b = M.normalize(raw).baby;
+  eq(b.sex, 'boy');
+  eq(b.logs.map((l) => l.id), ['a-1', 'a-2', 'a-6']);
+  eq(b.logs.filter((l) => l.type === 'breast').map((l) => l.end == null), [false, true]);
+  eq([b.logs[0].end, b.logs[2].value, b.logs[2].site], [tAt('2026-10-12', '08:00') + 60000, 37.8, 'armpit']);
+  eq(b.growth.map((g) => [g.date, g.weight]), [['2026-09-15', 4.3]]);
+  eq([b.vaccines, b.milestones, b.tried], [{ 'hepb-1': { done: '2026-08-15', booked: null } }, { smile: '2026-10-01' }, { 猪肉: '2026-10-01' }]);
+  raw.baby = { name: '没有生日' };
+  eq(M.normalize(raw).baby, null);
+});
+
+test('生长曲线：WHO 的中位数对得上，在中位数上是第 50 百分位，偏高偏低按 P3 / P97 分', () => {
+  eq([STD.days[0], STD.days[STD.days.length - 1], STD.days.length], [0, 730, 106]);
+  ok(Math.abs(Bb.lmsAt(STD, 'weight', 'boy', 0)[1] - 3.3464) < 1e-9, '男宝出生体重中位数');
+  ok(Math.abs(Bb.valueAt(STD, 'weight', 'girl', 365, 0) - 8.95) < 0.1, '女宝一岁体重中位数约 8.9 kg');
+  ok(Math.abs(Bb.valueAt(STD, 'length', 'boy', 365, 0) - 75.7) < 0.2, '男宝一岁身长中位数约 75.7 cm');
+  const mid = Bb.valueAt(STD, 'head', 'girl', 100, 0);
+  ok(Math.abs(Bb.zScore(STD, 'head', 'girl', 100, mid)) < 1e-9, '中位数的 z 是 0');
+  eq([Bb.percentile(0), Bb.percentile(1.881), Bb.percentile(-1.881), Bb.percentile(5)], [50, 97, 3, 99]);
+  eq([Bb.growthLevel(-2), Bb.growthLevel(0.5), Bb.growthLevel(2.1)], ['low', 'ok', 'high']);
+  ok(Math.abs(Bb.normalCdf(1.96) - 0.975) < 1e-4, 'normalCdf');
+  eq([Bb.lmsAt(STD, 'weight', 'boy', -1), Bb.lmsAt(STD, 'weight', 'boy', 800), Bb.zScore(STD, 'weight', 'boy', 800, 12)], [null, null, null]);
+  const c = Bb.curves(STD, 'weight', 'boy', 100);
+  eq([c.map((x) => x.label), c[0].points[c[0].points.length - 1][0]], [['P3', 'P15', 'P50', 'P85', 'P97'], 100]);
+  ok(c[0].points.every((p, i) => p[1] < c[4].points[i][1]), 'P3 在 P97 下面');
+});
+
+test('成长档案：同一天只留一条，带上几天大和百分位；日期和数值的校验', () => {
+  const b = newborn('2026-08-15', 'boy');
+  eq(Bb.growthError(b, { date: '2026-08-01', weight: '4' }, '2026-10-12'), '日期不能早于出生那天');
+  eq(Bb.growthError(b, { date: '2026-10-12' }, '2026-10-12'), '体重、身长、头围至少填一样');
+  eq(Bb.growthError(b, { date: '2026-10-12', length: '300' }, '2026-10-12'), '身长填 30–130 cm 之间的数');
+  eq(Bb.setGrowth(b, { date: '2026-09-15', weight: '4.4', length: '55' }), null);
+  eq(Bb.setGrowth(b, { date: '2026-09-15', weight: '4.5', length: '55.5' }).weight, 4.4);
+  const rows = Bb.growthRows(b, STD);
+  eq([rows.length, rows[1].day, rows[1].weight], [2, 31, 4.5]);
+  ok(rows[1].z.weight > -1 && rows[1].z.weight < 1 && rows[1].z.head === null, '一个月 4.5 kg 在正常范围');
+  eq(Bb.removeGrowth(b, '2026-09-15').length, 55.5);
+});
+
+test('疫苗：按月龄算日子，到了可以打、两周内、过了建议时间；约好的日子提醒，打完的不再提醒', () => {
+  eq(BOOKB.vaccines.map((v) => v[0]).length, new Set(BOOKB.vaccines.map((v) => v[0])).size);
+  eq(BOOKB.vaccines.filter((v) => v[0].startsWith('dtap')).map((v) => v[3]), [2, 4, 6, 18, 72]);
+  const b = newborn('2026-01-15');
+  let rows = Bb.vaccineRows(b, BOOKB, '2026-03-20');
+  const row = (id) => rows.find((r) => r.id === id);
+  eq([row('hepb-1').status, row('ipv-1').due, row('ipv-1').status, row('ipv-2').status, row('bcg').deadline], ['due', '2026-03-15', 'due', 'later', '2026-04-15']);
+  eq([row('mmr-1').when, row('jel-2').when, row('dtap-5').when], ['8 月龄', '2 岁', '6 岁']);
+  rows = Bb.vaccineRows(b, BOOKB, '2026-04-05');
+  eq([row('ipv-2').status, row('bcg').status], ['soon', 'due']);
+  rows = Bb.vaccineRows(b, BOOKB, '2026-04-20');
+  eq(row('bcg').status, 'late');
+  Bb.setVaccine(b, 'hepb-1', { done: '2026-01-15' });
+  Bb.setVaccine(b, 'bcg', { done: '2026-01-16' });
+  Bb.setVaccine(b, 'hepb-2', { done: '2026-02-15' });
+  Bb.setVaccine(b, 'ipv-1', { booked: '2026-04-21' });
+  rows = Bb.vaccineRows(b, BOOKB, '2026-04-20');
+  eq([row('bcg').status, Bb.nextVaccine(rows).id], ['done', 'dtap-1']);
+  eq(Bb.vaccineReminders(rows, '2026-04-20').map((r) => r.id), ['ipv-1']);
+  Bb.setVaccine(b, 'ipv-1', { done: '2026-04-21', booked: null });
+  eq(b.vaccines['ipv-1'], { done: '2026-04-21', booked: null });
+  Bb.setVaccine(b, 'ipv-1', { done: null });
+  eq(b.vaccines['ipv-1'], undefined);
+  const extra = Bb.addExtraVaccine(b, { name: '13 价肺炎', date: '2026-03-15', done: true });
+  eq([b.extraVaccines.length, extra.done], [1, true]);
+  const ev = Cal.vaccineEvent({ ...row('ipv-2'), booked: null }, '豆豆');
+  ok(ev.title === '打疫苗 · 脊灰灭活疫苗第 2 剂' && ev.date === '2026-04-15' && /豆豆3 月龄可以打/.test(ev.description), JSON.stringify(ev));
+  ok(Cal.build([ev], new Date(Date.UTC(2026, 3, 1))).includes('X-WR-CALNAME:疫苗接种') === false, '默认名字');
+  ok(Cal.build([ev], new Date(Date.UTC(2026, 3, 1)), '疫苗接种').includes('X-WR-CALNAME:疫苗接种'), '日历名字');
+});
+
+test('里程碑：这阵子会的、还早的、一般已经会了的；记下的带上那时几个月大；自己加的', () => {
+  const b = newborn('2026-01-15');
+  let rows = Bb.milestoneRows(b, BOOKB, '2026-06-20');
+  const st = (id) => rows.find((r) => r.id === id).status;
+  eq([st('smile'), st('roll'), st('walk')], ['past', 'now', 'soon']);
+  b.milestones.roll = '2026-06-01';
+  rows = Bb.milestoneRows(b, BOOKB, '2026-06-20');
+  eq([st('roll'), rows.find((r) => r.id === 'roll').at.months], ['done', 4]);
+  const m = Bb.addMoment(b, '第一次去公园', '2026-05-01');
+  eq([b.moments.length, m.name], [1, '第一次去公园']);
+  ok(BOOKB.milestones.every(([id, name, from, to]) => id && name && from < to), '里程碑的月份');
+});
+
+test('体温：按部位分正常、低热、中等、高热，偏低单独提醒', () => {
+  eq([36.8, 37.6, 38.5, 39.2, 35.5].map((v) => Bb.tempLevel(BOOKB, v, 'armpit')), ['normal', 'low', 'mid', 'high', 'cool']);
+  eq([37.9, 38.2, 39.1].map((v) => Bb.tempLevel(BOOKB, v, 'ear')), ['normal', 'low', 'mid']);
+  eq([Bb.isFever('low'), Bb.isFever('normal'), Bb.isFever('cool')], [true, false, false]);
+});
+
+test('辅食：按月龄分阶段；推荐一次只加一样新食材，刚加过的 3 天里不加，刚开始先补铁', () => {
+  eq([5, 6, 8, 11, 15, 30].map((m) => (Bb.foodStage(BOOKB, m) || {}).name || null), [null, '6 个月', '7～9 个月', '10～12 个月', '1～2 岁', '1～2 岁']);
+  const b = newborn('2026-04-01');
+  let today = Bb.foodToday(FOOD, BOOKB, b, '2026-10-05');
+  eq([today.length, Bb.newFoods(FOOD, b, today[0]).length, today[0].good.includes('iron')], [1, 1, true]);
+  Bb.markTried(FOOD, b, FOOD.recipes.find((r) => r.id === 'iron-cereal'), '2026-10-01');
+  Bb.markTried(FOOD, b, FOOD.recipes.find((r) => r.id === 'pork-puree'), '2026-10-04');
+  eq(b.tried, { 强化铁米粉: '2026-10-01', 猪肉: '2026-10-04' });
+  today = Bb.foodToday(FOOD, BOOKB, b, '2026-10-05');
+  ok(today.length === 2 && today.every((r) => Bb.newFoods(FOOD, b, r).length === 0), '刚加过猪肉，今天不加新的');
+  today = Bb.foodToday(FOOD, BOOKB, b, '2026-10-08');
+  eq(today.filter((r) => Bb.newFoods(FOOD, b, r).length === 1).length, 1);
+  eq(Bb.toggleTried(b, '南瓜', '2026-10-08'), true);
+  eq(Bb.toggleTried(b, '南瓜', '2026-10-08'), false);
+  const older = newborn('2025-10-01');
+  ok(Bb.foodToday(FOOD, BOOKB, older, '2026-10-12').length <= 3, '一岁多也有推荐');
+  ok(Bb.foodList(FOOD).indexOf('强化铁米粉') < Bb.foodList(FOOD).indexOf('虾仁'), '食材按阶段排');
+});
+
+test('辅食食谱：编号唯一，阶段、营养、易过敏的都登记过；1 岁以内不放盐糖蜂蜜，不给整粒坚果', () => {
+  const tags = FOOD.tags.map((t) => t[0]);
+  const allergens = FOOD.allergens.map((a) => a[0]);
+  const seen = new Set();
+  for (const r of FOOD.recipes) {
+    ok(/^[a-z0-9-]{2,30}$/.test(r.id) && !seen.has(r.id), `编号 ${r.id}`);
+    seen.add(r.id);
+    ok([6, 7, 10, 13].includes(r.stage) && r.name && r.minutes > 0 && r.steps.length && r.items.length, `${r.id} 缺内容`);
+    ok(r.good.every((g) => tags.includes(g)) && r.allergens.every((a) => allergens.includes(a)), `${r.id} 的标签`);
+    const words = [...r.items.flat(), ...r.steps].join('');
+    ok(!/蜂蜜|整粒|整颗/.test(words), `${r.name} 有蜂蜜或整粒的东西`);
+    if (r.stage < 13) ok(!/盐|糖|酱油/.test(r.items.map((i) => i[0]).join('')) && !/加盐|放盐|加糖/.test(r.steps.join('')), `${r.name} 1 岁以内放了盐糖`);
+    if (r.items.some(([n]) => /鸡蛋/.test(n))) ok(r.allergens.includes('egg'), `${r.name} 有鸡蛋没标`);
+    if (r.items.some(([n]) => /鱼/.test(n))) ok(r.allergens.includes('fish'), `${r.name} 有鱼没标`);
+    if (r.items.some(([n]) => /虾/.test(n))) ok(r.allergens.includes('shrimp'), `${r.name} 有虾没标`);
+    if (r.items.some(([n]) => /面|皮/.test(n) && n !== '豆腐')) ok(r.allergens.includes('wheat'), `${r.name} 有小麦没标`);
+  }
+  for (const stage of [6, 7, 10, 13]) ok(FOOD.recipes.filter((r) => r.stage === stage).length >= 5, `${stage} 个月的太少`);
+  ok(FOOD.recipes.filter((r) => r.stage === 6 && r.good.includes('iron')).length >= 3, '6 个月要有好几样补铁的');
+});
+
 // ---------- chart ----------
 
 test('体重曲线：空数据不画，有数据时点数正确且没有 NaN', () => {
@@ -1382,6 +1630,16 @@ test('体重曲线：空数据不画，有数据时点数正确且没有 NaN', (
   ok(svg.includes('孕前 52.0') && svg.includes('今天'));
   const single = Chart.weight({ weights: weights.slice(0, 1), dueDate: DUE, preWeight: null, today: '2026-10-12', width: 300, height: 180 });
   ok(single.includes('<circle') && !single.includes('NaN'));
+});
+
+test('生长曲线：五条百分位线和两层底色，宝宝的点连成线，没有 NaN', () => {
+  const svg = Chart.growth({
+    curves: Bb.curves(STD, 'weight', 'girl', 200),
+    points: [{ day: 0, value: 3.2, date: '2026-08-15' }, { day: 31, value: 4.4, date: '2026-09-15' }, { day: 58, value: 5.3, date: '2026-10-12' }],
+    unit: 'kg', label: '体重曲线', width: 360, height: 240,
+  });
+  eq([(svg.match(/class="c-pline/g) || []).length, (svg.match(/class="c-band/g) || []).length, (svg.match(/<circle/g) || []).length], [5, 2, 3]);
+  ok(svg.includes('P97') && svg.includes('0月') && !svg.includes('NaN') && svg.includes('aria-label="体重曲线"'), '标签和数');
 });
 
 // ---------- 离线缓存 ----------

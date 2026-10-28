@@ -17,7 +17,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
   sleep 0.3
 done
 
-[ $# -eq 0 ] && set -- core bag meds tools records safety story journal recipes contrast contrast:dark
+[ $# -eq 0 ] && set -- core bag meds tools records safety story journal recipes baby contrast contrast:dark
 status=0
 for name in "$@"; do
   page=${name%:dark}
@@ -27,7 +27,7 @@ for name in "$@"; do
   out="$work/$slot.html"
   # 每次用全新的浏览器资料目录，本地存储和 Service Worker 都从空白开始
   "$CHROME" --headless=new --use-mock-keychain --no-first-run --user-data-dir="$work/profile-$slot" $dark \
-    --virtual-time-budget=15000 --dump-dom "http://127.0.0.1:$PORT/tests/browser/$page.html" >"$out" 2>/dev/null &
+    --virtual-time-budget=30000 --dump-dom "http://127.0.0.1:$PORT/tests/browser/$page.html" >"$out" 2>/dev/null &
   chrome=$!
   for _ in $(seq 1 40); do
     sleep 1

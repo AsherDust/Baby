@@ -102,6 +102,8 @@ const PAGES = [
   ['labor', 'today'], ['labor', 'tools/kicks'], ['labor', 'tools/contractions'], ['fresh', 'today'], ['empty', ''],
   ['main', 'journal'], ['fresh', 'journal'],
   ['main', 'tools/recipes'], ['main', 'tools/recipes/all'], ['main', 'tools/recipes/shop'],
+  ['baby', 'today'], ['baby', 'baby'], ['baby', 'baby/growth'], ['baby', 'baby/health'], ['baby-7m', 'baby/vaccines'],
+  ['baby-7m', 'baby/food'], ['baby', 'baby/food'], ['baby', 'records/weight'], ['baby', 'tools'],
 ];
 const SHEETS = [
   ['main', 'today', '[data-action="open-settings"]'],
@@ -111,6 +113,10 @@ const SHEETS = [
   ['main', 'checkups/ultrasound', '[data-action="add-us"]', '检查日期：2026-10-09\n双顶径约6.2cm 股骨长约4.5cm\n胎盘位于后壁，成熟度Ⅰ级'],
   ['main', 'tools/recipes', '#dish-lunch-main'],
   ['main', 'tools/recipes/all', '#dish-liver-spinach'],
+  ['baby', 'baby', '#log-bottle'],
+  ['baby', 'baby/growth', '[data-action="baby-birth-open"]'],
+  ['baby-7m', 'baby/food', '#food-liver-puree'],
+  ['baby-7m', 'baby/vaccines', '#vx-open-mpsva-1'],
 ];
 
 (async () => {
@@ -119,7 +125,7 @@ const SHEETS = [
     let bad = [];
     for (const [scene, route] of PAGES) {
       await open(scene, route);
-      await wait(300);
+      await wait(150);
       bad = bad.concat(audit(d.getElementById('app'), `${scene} #/${route}`));
     }
     for (const [scene, route, button, paste] of SHEETS) {
@@ -196,6 +202,17 @@ const SHEETS = [
     kitchen.render();
     log(Boolean(d.querySelector('.recipe-shop .bag-item.is-done')), '查到了勾过的买菜清单');
     bad = bad.concat(audit(d.getElementById('app'), '勾过一半的买菜清单'));
+
+    // 宝宝：正在喂奶、正在睡觉，换过尿布有提醒的记录；换到别的页面挂着计时条
+    await open('baby', 'baby');
+    d.getElementById('breast-left').click();
+    d.getElementById('sleep-toggle').click();
+    await wait(200);
+    log(Boolean(d.querySelector('.qt.is-live') && d.querySelector('.qt.is-sleep')), '查到了正在计时的喂奶和睡觉');
+    bad = bad.concat(audit(d.getElementById('app'), '正在计时的宝宝页'));
+    w.location.hash = '#/records/weight';
+    for (let i = 0; i < 100 && !d.querySelector('.live-sleep'); i += 1) await wait(30);
+    bad = bad.concat(audit(d.querySelector('.live-bar'), '宝宝的计时条'));
     for (const line of [...new Set(bad)]) log(false, line);
     log(bad.length === 0, `文字对比度都不低于 ${MIN_RATIO}:1`);
   } catch (err) {

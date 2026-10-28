@@ -3,11 +3,13 @@
   // 整页渲染、换页、顶栏和底栏、开始页、图表，以及计时时屏幕常亮
   const { dates: D, model: M, chart: Chart, art: A, app } = globalThis.Baby;
   const {
-    root, SECTIONS, SUB_VIEWS, SUB_NAMES, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds, viewMom,
-    viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
+    root, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds,
+    viewMom, viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
     viewFoodTool, viewRecipesTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby,
-    viewToday, viewJournalPage
+    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth
   } = app;
+  const Bb = globalThis.Baby.baby;
+  const BOOK = globalThis.Baby.babyBook;
 
   // ---------- 渲染 ----------
 
@@ -33,7 +35,10 @@
     syncWakeLock();
     afterRender.forEach((fn) => fn());
 
-    if (app.state) {
+    if (app.state && app.state.baby) {
+      const b = app.state.baby;
+      document.title = `${b.name || '宝宝'} ${Bb.ageText(Bb.ageOf(b.birthDate, ui.today))} · 蜜罐`;
+    } else if (app.state) {
       const ga = D.gestation(app.state.profile.dueDate, ui.today);
       document.title = `孕 ${ga.weeks} 周${ga.day ? ` + ${ga.day} 天` : ''} · 蜜罐`;
     } else {
@@ -60,7 +65,8 @@
     const route = currentRoute();
     const ctx = { today: ui.today, now: Date.now(), ga: D.gestation(app.state.profile.dueDate, ui.today) };
     const pages = {
-      today: viewTodayPage, records: viewRecordsPage, checkups: viewCheckupsPage, tools: viewToolsPage, journal: viewJournalPage
+      today: viewTodayPage, records: viewRecordsPage, checkups: viewCheckupsPage, tools: viewToolsPage, journal: viewJournalPage,
+      baby: viewBabyPage,
     };
     return `
       ${viewHeader(route)}
@@ -89,16 +95,22 @@
       </header>`;
   }
 
-  /** 手机上固定在底部、电脑上在顶部的主菜单 */
+  /** 手机上固定在底部、电脑上在顶部的主菜单；宝宝出生后「产检」换成「宝宝」，产检收进「记录」 */
   function viewTabbar(route) {
-    const icons = { today: A.icon.home, records: A.icon.notes, checkups: A.icon.calendarHeart, tools: A.icon.grid, journal: A.icon.smile };
-    const dot = M.reminders(M.scheduleRows(app.state, ui.today)).length ? 'checkups' : '';
+    const icons = { today: A.icon.home, records: A.icon.notes, checkups: A.icon.calendarHeart, tools: A.icon.grid, journal: A.icon.smile, baby: A.icon.bottle };
+    const b = app.state.baby;
+    let dot = M.reminders(M.scheduleRows(app.state, ui.today)).length ? 'checkups' : '';
+    if (b) {
+      const rows = Bb.vaccineRows(b, BOOK, ui.today);
+      dot = Bb.vaccineReminders(rows, ui.today).length || rows.some((r) => r.status === 'late') ? 'baby' : '';
+    }
+    const current = b && route.section === 'checkups' ? 'records' : route.section;
     return `
       <nav class="tabbar" aria-label="主菜单">
-        ${Object.entries(SECTIONS).map(([id, s]) => `
-          <a href="#/${id === 'today' ? '' : id}" class="tab"${route.section === id ? ' aria-current="page"' : ''}>
+        ${TABS[b ? 'baby' : 'pregnant'].map((id) => `
+          <a href="#/${id === 'today' ? '' : id}" class="tab"${current === id ? ' aria-current="page"' : ''}>
             <span class="tab-icon">${icons[id]}${dot === id ? '<i class="tab-dot" aria-label="有提醒"></i>' : ''}</span>
-            <span class="tab-name">${s.name}</span>
+            <span class="tab-name">${SECTIONS[id].name}</span>
           </a>`).join('')}
       </nav>`;
   }
@@ -107,29 +119,48 @@
   function viewLive(route, now) {
     if (route.section === 'tools' && !route.sub) return '';
     const items = [];
-    const kicks = M.activeKicks(app.state, now);
+    // 宝宝出生后，孕期的数胎动、宫缩计时不再挂出来
+    const born = Boolean(app.state.baby);
+    const kicks = born ? null : M.activeKicks(app.state, now);
     if (kicks && route.sub !== 'kicks') {
       items.push(`<a class="live" href="#/tools/kicks">${A.icon.feet}<span>正在数胎动 · 还剩 <b data-until="${kicks.start + M.KICK_WINDOW}"></b> · ${M.countedKicks(kicks.taps).length} 次</span>${A.icon.chevronRight}</a>`);
     }
-    const contraction = M.activeContraction(app.state);
+    const contraction = born ? null : M.activeContraction(app.state);
     if (contraction && route.sub !== 'contractions') {
       items.push(`<a class="live live-alert" href="#/tools/contractions">${A.icon.timer}<span>宫缩计时中 · <b data-since="${contraction.start}"></b></span>${A.icon.chevronRight}</a>`);
     }
+    items.push(...babyLive(route));
     return items.length ? `<div class="live-bar">${items.join('')}</div>` : '';
   }
 
   function segTabs(section, current) {
+    const links = SECTIONS[section].subs.map((s) => [`#/${section}/${s}`, s]);
+    // 宝宝出生后，产检和 B 超单放在「记录」里翻看
+    if (section === 'records' && app.state.baby) links.push(...SECTIONS.checkups.subs.map((s) => [`#/checkups/${s}`, s]));
     return `
       <nav class="seg-tabs" aria-label="${SECTIONS[section].name}">
-        ${SECTIONS[section].subs.map((s) => `<a href="#/${section}/${s}" class="seg-tab"${s === current ? ' aria-current="page"' : ''}>${SUB_NAMES[s]}</a>`).join('')}
+        ${links.map(([href, s]) => `<a href="${href}" class="seg-tab"${s === current ? ' aria-current="page"' : ''}>${SUB_NAMES[s]}</a>`).join('')}
       </nav>`;
   }
 
   function viewTodayPage(route, { today, now, ga }) {
+    if (app.state.baby) {
+      return `
+        ${viewBabyBanner()}
+        ${viewSafety(today)}
+        ${viewStoryCard(now)}
+        ${viewBabyHero(now)}
+        <footer class="foot">
+          <span class="foot-bee">${A.bee}</span>
+          <p>记录只保存在这台设备的浏览器里，偶尔在设置里导出一份备份更安心。</p>
+          <p>生长曲线是参考，疫苗以接种门诊的安排为准；宝宝不舒服时听医生的。</p>
+        </footer>`;
+    }
     const rows = M.scheduleRows(app.state, today);
     return `
       ${viewBanner(M.reminders(rows))}
       ${viewSafety(today)}
+      ${viewBornCard(ga)}
       ${viewStoryCard(now)}
       <section class="hero">
         ${viewWeek(ga, app.state.profile.dueDate, today)}
@@ -156,7 +187,7 @@
 
   function viewCheckupsPage(route, { today }) {
     const body = route.sub === 'ultrasound' ? viewUltrasounds(today) : viewCheckups(M.scheduleRows(app.state, today), today);
-    return `${segTabs('checkups', route.sub)}${body}`;
+    return `${segTabs(app.state.baby ? 'records' : 'checkups', route.sub)}${body}`;
   }
 
   function viewToolsPage(route, { now, ga }) {
@@ -244,6 +275,7 @@
       const width = Math.max(260, Math.round(bpBox.clientWidth));
       bpBox.innerHTML = Chart.bp({ records: app.state.bp, width, height: width < 420 ? 180 : 220 });
     }
+    drawGrowth();
   }
 
   // ---------- 计时、朗读时屏幕常亮 ----------
@@ -254,7 +286,7 @@
   let wakeBusy = false;
   async function syncWakeLock() {
     if (!('wakeLock' in navigator) || wakeBusy) return;
-    const busy = () => M.keepScreenOn(app.state, Date.now(), currentRoute().sub === 'contractions') || Boolean(ui.reading && ui.reading.playing);
+    const busy = () => (!app.state.baby && M.keepScreenOn(app.state, Date.now(), currentRoute().sub === 'contractions')) || Boolean(ui.reading && ui.reading.playing);
     const want = Boolean(app.state) && !document.hidden && busy();
     if (want === Boolean(wakeLock)) return;
     wakeBusy = true;

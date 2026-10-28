@@ -200,7 +200,8 @@
   }
 
   function checkNotifications() {
-    if (!app.state || notifyPermission() !== 'granted') return;
+    // 宝宝出生后不再提醒孕期产检
+    if (!app.state || app.state.baby || notifyPermission() !== 'granted') return;
     const list = M.pendingNotifications(app.state, ui.today, new Date().getHours());
     if (!list.length) return;
     for (const n of list) {
@@ -215,7 +216,7 @@
   }
 
   Object.assign(app, {
-    toast, oops, say, cheer, checkForUpdate, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose,
+    toast, oops, say, cheer, checkForUpdate, persist, saveFile, download, downloadCalendar, readProfile, saveWeight, saveGlucose,
     checkNotifications
   });
 })();

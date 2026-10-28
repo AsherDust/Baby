@@ -19,8 +19,11 @@
     records: { name: '记录', subs: ['weight', 'bp', 'glucose', 'meds'] },
     journal: { name: '心情', subs: [''] },
     checkups: { name: '产检', subs: ['schedule', 'ultrasound'] },
+    // 宝宝出生后底部的「产检」换成「宝宝」，产检收进「记录」里
+    baby: { name: '宝宝', subs: ['', 'growth', 'vaccines', 'health', 'food'] },
     tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'recipes', 'bag', 'weeks', 'story'] },
   };
+  const TABS = { pregnant: ['today', 'records', 'journal', 'checkups', 'tools'], baby: ['today', 'records', 'journal', 'baby', 'tools'] };
   // 有的页面里还分几页，地址里多一段，例如 #/tools/recipes/shop
   const SUB_VIEWS = { recipes: ['', 'all', 'shop'] };
   const SUB_NAMES = {
@@ -82,6 +85,11 @@
     recipeOnly: '',
     recipeQuery: '',
     avoidOpen: false,
+    // 宝宝页：日常看哪天（0 是今天，-1 是昨天），成长曲线看哪一项
+    babyDay: 0,
+    growthMetric: 'weight',
+    triedOpen: false,
+    vaccinesDoneOpen: false,
     glucoseSlot: '',
     // 心情页上选好、还没记下的心情；首页点小脸进来时也先放这里
     journalMood: '',
@@ -109,7 +117,7 @@
   }
 
   Object.assign(app, {
-    root, toastBox, settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, SECTIONS, SUB_VIEWS, SUB_NAMES,
+    root, toastBox, settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES,
     WEIGHTS_SHOWN, JOURNAL_SHOWN, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, kg, kgDiff, clamp01, pad2, hhmm,
     notifyPermission, isStandalone, isIOS, isWeChat, isMobile, isTouch, atRisk, ui, storyTexts, afterRender, greeting
   });

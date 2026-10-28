@@ -58,14 +58,14 @@
    * alarm.before 是相对开始时间提前的分钟数，负数表示开始之后；全天事件以当天 0 点为开始。
    * 有具体时间的事件用"浮动时间"（不带时区），按设备当地时间显示。
    */
-  function build(events, now) {
+  function build(events, now, name = '产检日程') {
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
       'PRODID:-//Pregnancy Desk//ZH-CN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
-      'X-WR-CALNAME:产检日程',
+      `X-WR-CALNAME:${escapeText(name)}`,
     ];
     for (const ev of events) {
       lines.push('BEGIN:VEVENT', `UID:${ev.uid}`, `DTSTAMP:${stamp(now)}`);
@@ -120,5 +120,24 @@
     };
   }
 
-  Baby.calendar = { build, checkupEvent, fold, escapeText, duration };
+  /** 疫苗 → 日历事件（全天）：前一晚 8 点和当天早上 8 点提醒；约好了按约的日子，没约就按最早可以打的日子 */
+  function vaccineEvent(row, babyName) {
+    const title = `${row.name}第 ${row.dose} 剂`;
+    const who = babyName || '宝宝';
+    const lines = [row.booked ? `${who}约好打${title}` : `${who}${row.when}可以打${title}了，具体日子按接种门诊的预约`];
+    if (row.note) lines.push(row.note);
+    lines.push('带上预防接种证；打完在接种门诊留观 30 分钟。');
+    return {
+      uid: `${row.id}@pregnancy-desk-baby`,
+      title: `打疫苗 · ${title}`,
+      description: lines.join('\n'),
+      date: row.booked || row.due,
+      alarms: [
+        { before: 240, text: `明天打疫苗：${title}` },
+        { before: -480, text: `今天打疫苗：${title}` },
+      ],
+    };
+  }
+
+  Baby.calendar = { build, checkupEvent, vaccineEvent, fold, escapeText, duration };
 })();

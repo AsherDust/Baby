@@ -33,6 +33,8 @@
   document.addEventListener('toggle', (e) => {
     if (e.target.id === 'story-shelf') ui.storyShelf = e.target.open;
     if (e.target.id === 'recipe-avoid') ui.avoidOpen = e.target.open;
+    if (e.target.id === 'food-tried') ui.triedOpen = e.target.open;
+    if (e.target.id === 'vx-done') ui.vaccinesDoneOpen = e.target.open;
   }, true);
 
   window.addEventListener('hashchange', () => {

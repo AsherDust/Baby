@@ -26,14 +26,16 @@
         <span class="tool-go">${A.icon.chevronRight}</span>
       </a>`;
     const bag = M.bagSummary(app.state);
+    // 宝宝出生后，只在孕期用的几样收起来
+    const born = Boolean(app.state.baby);
     return `
       <section class="tool-menu" aria-label="小工具">
-        ${tile('kicks', A.icon.feet, kickStatus(ga, now))}
-        ${tile('contractions', A.icon.timer, contractionStatus(ga, now))}
+        ${born ? '' : tile('kicks', A.icon.feet, kickStatus(ga, now))}
+        ${born ? '' : tile('contractions', A.icon.timer, contractionStatus(ga, now))}
         ${tile('food', A.icon.bowl, { text: `${C.FOODS.length} 种常见食物，搜一下就知道` })}
         ${tile('recipes', A.icon.pot, recipeStatus(now))}
-        ${tile('bag', A.icon.suitcase, { text: bag.total ? `已备好 ${bag.done}/${bag.total}` : '清单空了，去加几样' })}
-        ${tile('weeks', A.icon.book, { text: `现在是第 ${Math.max(ga.weeks, 0)} 周，看看宝宝和妈妈的变化` })}
+        ${born ? '' : tile('bag', A.icon.suitcase, { text: bag.total ? `已备好 ${bag.done}/${bag.total}` : '清单空了，去加几样' })}
+        ${born ? '' : tile('weeks', A.icon.book, { text: `现在是第 ${Math.max(ga.weeks, 0)} 周，看看宝宝和妈妈的变化` })}
         ${tile('story', A.icon.moon, storyStatus(now))}
       </section>`;
   }
@@ -231,9 +233,17 @@
     }).join('');
   }
 
+  /** 喂奶、睡觉这种可能超过一小时的：1:05 / 1:20:05 */
+  function elapsedText(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(s / 3600);
+    return h ? `${h}:${pad2(Math.floor(s / 60) % 60)}:${pad2(s % 60)}` : clockText(ms);
+  }
+
   function paintClocks(now) {
     document.querySelectorAll('[data-until]').forEach((el) => { el.textContent = clockText(Number(el.dataset.until) - now); });
     document.querySelectorAll('[data-since]').forEach((el) => { el.textContent = clockText(now - Number(el.dataset.since)); });
+    document.querySelectorAll('[data-elapsed]').forEach((el) => { el.textContent = elapsedText(now - Number(el.dataset.elapsed)); });
   }
 
   function viewBag(ga) {

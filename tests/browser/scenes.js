@@ -67,6 +67,47 @@ function seedScene(name) {
       session('k6', 0, Math.max(new Date(now).getHours() - 2, 0), [2, 7, 1, 8, 6, 9, 7]),
     ];
   }
+  if (name === 'baby' || name === 'baby-7m') {
+    // 宝宝出生后：baby 是 2 个月大、记了一整天的；baby-7m 是 7 个月大、开始吃辅食的
+    const B = Baby.baby;
+    const small = name === 'baby';
+    s.profile.dueDate = small ? '2026-08-20' : '2026-03-05';
+    s.baby = B.born({ name: '豆豆', sex: 'girl', birthDate: small ? '2026-08-15' : '2026-03-02', birthTime: '06:40', weight: '3.2', length: '50', head: '34' });
+    const b = s.baby;
+    const grow = small
+      ? [['2026-09-15', 4.4, 54.5, 37.2], ['2026-10-10', 5.3, 57.8, 38.6]]
+      : [['2026-04-02', 4.3, 54.2, 37], ['2026-05-02', 5.4, 58, 38.9], ['2026-06-02', 6.2, 61.1, 40.3], ['2026-07-02', 6.8, 63.4, 41.2], ['2026-09-02', 7.6, 66.6, 42.4], ['2026-10-02', 7.9, 68, 42.9]];
+    grow.forEach(([date, weight, length, head]) => B.setGrowth(b, { date, weight, length, head }));
+    const done = small ? ['hepb-1', 'bcg', 'hepb-2'] : ['hepb-1', 'bcg', 'hepb-2', 'ipv-1', 'dtap-1', 'ipv-2', 'bopv-3', 'dtap-2', 'hepb-3', 'dtap-3'];
+    for (const r of B.vaccineRows(b, Baby.babyBook, '2026-10-12')) if (done.includes(r.id)) B.setVaccine(b, r.id, { done: r.due });
+    if (small) B.setVaccine(b, 'ipv-1', { booked: '2026-10-13' });
+    else {
+      ['smile', 'head', 'roll', 'sit'].forEach((id, i) => { b.milestones[id] = ['2026-04-20', '2026-05-10', '2026-07-05', '2026-09-20'][i]; });
+      B.addMoment(b, '第一次去公园', '2026-05-01');
+      ['强化铁米粉', '猪肉', '南瓜', '胡萝卜', '西兰花', '苹果', '鸡蛋', '牛肉'].forEach((f, i) => { b.tried[f] = Baby.dates.addDays('2026-09-02', i * 3); });
+    }
+    const t = (day, hm) => B.msAt(day, hm);
+    const log = (day, hm, type, fields) => B.addLog(b, { type, start: t(day, hm), note: '', ...fields });
+    const day = '2026-10-12';
+    const prev = '2026-10-11';
+    log(prev, '22:40', 'sleep', { end: t(day, '01:10') });
+    log(day, '01:20', 'breast', { left: 600, right: 420, end: t(day, '01:37'), side: null, since: null });
+    log(day, '01:45', 'diaper', { pee: true, poo: false, color: '' });
+    log(day, '02:00', 'sleep', { end: t(day, '05:30') });
+    log(day, '05:40', 'breast', { left: 480, right: 540, end: t(day, '05:57'), side: null, since: null });
+    log(day, '06:00', 'diaper', { pee: true, poo: true, color: 'yellow' });
+    log(day, '08:30', 'med', { name: '维生素 D', dose: '1 粒' });
+    log(day, '09:00', 'bottle', { ml: small ? 90 : 150, milk: 'breast' });
+    log(day, '09:40', 'sleep', { end: t(day, '11:10') });
+    log(day, '11:15', 'diaper', { pee: true, poo: false, color: '' });
+    if (!small) log(day, '11:30', 'food', { text: '猪肉泥', amount: '5 勺', recipe: 'pork-puree' });
+    log(day, '12:30', 'breast', { left: 720, right: 300, end: t(day, '12:47'), side: null, since: null });
+    log(day, '13:00', 'temp', { value: 36.9, site: 'armpit' });
+    log(day, '13:20', 'sleep', { end: t(day, '15:00') });
+    log(day, '15:05', 'diaper', { pee: false, poo: true, color: 'green' });
+    log(day, '17:30', 'bottle', { ml: small ? 120 : 180, milk: 'formula' });
+    if (!small) log(day, '18:10', 'food', { text: '南瓜小米粥', amount: '半碗', recipe: 'millet-pumpkin-congee' });
+  }
   if (name === 'labor') {
     s.profile.dueDate = '2026-10-19';
     s.kicks = [session('k1', 1, 21, [3, 6, 7, 2, 9, 6, 8, 6, 7]),

@@ -6,6 +6,7 @@
   const St = Baby.stories;
   const J = Baby.journal;
   const R = Baby.recipes;
+  const B = Baby.baby;
 
   const VERSION = 1;
   const KG_MIN = 25;
@@ -111,6 +112,7 @@
       stories: St.empty(),
       journal: [],
       meals: R.empty(),
+      baby: null,
       notified: {},
     };
   }
@@ -315,6 +317,7 @@
       stories: St.normalize(raw.stories),
       journal: J.normalize(raw.journal),
       meals: R.normalize(raw.meals),
+      baby: B.normalize(raw.baby),
       notified,
     };
   }

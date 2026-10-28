@@ -131,5 +131,51 @@
     return `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="血压变化">${out.join('')}</svg>`;
   }
 
-  Baby.chart = { weight, bp };
+  /**
+   * 生长曲线（SVG 字符串）：横轴月龄，纵轴体重 / 身长 / 头围。
+   * curves 是 P3、P15、P50、P85、P97 五条线 [{ label, points: [[天, 数值]] }]，points 是宝宝自己量的 [{ day, value, date }]
+   */
+  function growth({ curves, points, unit, label, width, height }) {
+    const pad = { l: 36, r: 34, t: 12, b: 28 };
+    const iw = width - pad.l - pad.r;
+    const ih = height - pad.t - pad.b;
+    const maxDay = curves[0].points[curves[0].points.length - 1][0];
+    const months = maxDay / 30.4375;
+    const vals = curves.flatMap((c) => c.points.map((p) => p[1])).concat(points.map((p) => p.value));
+    const span = Math.max(...vals) - Math.min(...vals);
+    const yStep = [0.5, 1, 2, 5, 10].find((s) => span / s <= 7) || 10;
+    const y0 = Math.floor(Math.min(...vals) / yStep) * yStep;
+    const y1 = Math.ceil(Math.max(...vals) / yStep) * yStep;
+    const sx = (day) => pad.l + (day / maxDay) * iw;
+    const sy = (v) => pad.t + ((y1 - v) / (y1 - y0)) * ih;
+    const path = (pts) => pts.map(([d, v], i) => `${i ? 'L' : 'M'}${f1(sx(d))} ${f1(sy(v))}`).join(' ');
+    const band = (lo, hi) => `${path(lo.points)} ${hi.points.slice().reverse().map(([d, v]) => `L${f1(sx(d))} ${f1(sy(v))}`).join(' ')} Z`;
+
+    const out = [];
+    for (let v = y0; v <= y1 + 1e-9; v += yStep) {
+      const y = f1(sy(v));
+      out.push(`<line x1="${pad.l}" x2="${width - pad.r}" y1="${y}" y2="${y}" class="c-grid"/>`);
+      out.push(`<text x="${pad.l - 8}" y="${y}" dy="0.35em" text-anchor="end" class="c-label">${Math.round(v * 10) / 10}</text>`);
+    }
+    const maxLabels = Math.max(2, Math.floor(iw / 44));
+    const xStep = [1, 2, 3, 4, 6].find((s) => months / s <= maxLabels) || 6;
+    for (let m = 0; m <= months + 1e-9; m += xStep) {
+      out.push(`<text x="${f1(sx(m * 30.4375))}" y="${height - 8}" text-anchor="middle" class="c-label">${m}月</text>`);
+    }
+    out.push(`<path d="${band(curves[0], curves[4])}" class="c-band"/>`);
+    out.push(`<path d="${band(curves[1], curves[3])}" class="c-band c-band-mid"/>`);
+    curves.forEach((c) => {
+      out.push(`<path d="${path(c.points)}" class="c-pline${c.label === 'P50' ? ' c-pline-mid' : ''}"/>`);
+      const [d, v] = c.points[c.points.length - 1];
+      out.push(`<text x="${f1(sx(d) + 4)}" y="${f1(sy(v))}" dy="0.35em" class="c-plabel">${c.label}</text>`);
+    });
+    if (points.length > 1) out.push(`<path d="${path(points.map((p) => [p.day, p.value]))}" class="c-line"/>`);
+    points.forEach((p, i) => {
+      const last = i === points.length - 1;
+      out.push(`<circle cx="${f1(sx(p.day))}" cy="${f1(sy(p.value))}" r="${last ? 5 : 3.5}" class="c-pt${last ? ' c-pt-last' : ''}"><title>${D.formatDate(p.date)} · ${p.value} ${unit}</title></circle>`);
+    });
+    return `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${label}">${out.join('')}</svg>`;
+  }
+
+  Baby.chart = { weight, bp, growth };
 })();
