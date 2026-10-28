@@ -23,8 +23,8 @@
   const isFavorite = (id) => app.state.meals.favorites.includes(id);
 
   /** 菜名前的小圆点，左右两半是两样主要食材的颜色 */
-  function recipeDot(r) {
-    const [a, b] = R.dotOf(BOOK, r);
+  function recipeDot(r, colors = BOOK.colors) {
+    const [a, b] = R.dotOf(colors, r);
     return `<span class="dish-dot" style="--a:${a};--b:${b}" aria-hidden="true"></span>`;
   }
 

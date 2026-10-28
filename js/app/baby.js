@@ -1,8 +1,8 @@
 (function () {
   'use strict';
   // 「宝宝」页（日常、成长、疫苗、健康、辅食）和宝宝出生后的首页；孕晚期首页上「宝宝出生了吗」那块也在这里
-  const { dates: D, baby: Bb, babyBook: BOOK, babyFood: FOOD, growthStandard: STD, chart: Chart, art: A, app } = globalThis.Baby;
-  const { esc, ui, hhmm, TERM_FROM, todoMood, todoMeal } = app;
+  const { dates: D, baby: Bb, babyBook: BOOK, babyFood: FOOD, recipeBook: RB, growthStandard: STD, chart: Chart, art: A, app } = globalThis.Baby;
+  const { esc, ui, hhmm, TERM_FROM, todoMood, todoMeal, recipeDot } = app;
 
   const VIEWS = [['', '日常'], ['growth', '成长'], ['vaccines', '疫苗'], ['health', '健康'], ['food', '辅食']];
   const LEVEL_NAMES = { cool: '偏低', normal: '正常', low: '低热', mid: '中等发热', high: '高热' };
@@ -10,6 +10,8 @@
   const allergenName = Object.fromEntries(FOOD.allergens);
   const siteName = Object.fromEntries(BOOK.feverSites.map(([id, name]) => [id, name]));
   const colorOf = (id) => BOOK.pooColors.find((c) => c[0] === id) || null;
+  const foodColors = { ...RB.colors, ...FOOD.colors };
+  const foodDot = (r) => recipeDot(r, foodColors);
 
   const kid = () => app.state.baby;
   const who = () => esc(kid().name || app.state.profile.nickname || '宝宝');
@@ -506,7 +508,8 @@
     const tags = [...r.good.map((g) => tagName[g]), ...r.allergens.map((a) => `含${allergenName[a]}`)];
     return `
       <li class="dish">
-        <button type="button" class="dish-open no-dot" id="food-${r.id}" data-action="baby-food-open" data-id="${r.id}">
+        <button type="button" class="dish-open" id="food-${r.id}" data-action="baby-food-open" data-id="${r.id}">
+          ${foodDot(r)}
           <span class="dish-name">${esc(r.name)}${fresh.length ? `<span class="tag tag-next">新：${fresh.map(esc).join('、')}</span>` : ''}</span>
           <span class="dish-meta">${r.minutes} 分钟 · ${tags.join(' · ')}</span>
         </button>
@@ -586,6 +589,23 @@
       </li>`;
   }
 
+  /** 今天推荐的辅食，点菜名直接看做法 */
+  function todoFood(picks) {
+    return `
+      <li class="todo-item">
+        <span class="todo-icon">${A.icon.bowl}</span>
+        <div class="todo-body">
+          <div class="todo-head">
+            <p class="todo-title">今天的辅食</p>
+            <a class="link" href="#/baby/food">全部辅食</a>
+          </div>
+          <ul class="meal-chips">${picks.map((r) => `
+            <li><button type="button" class="meal-chip" id="food-chip-${r.id}" data-action="baby-food-open" data-id="${r.id}">${foodDot(r)}${esc(r.name)}</button></li>`).join('')}
+          </ul>
+        </div>
+      </li>`;
+  }
+
   function viewBabyTodo(now) {
     const b = kid();
     const age = ageNow();
@@ -612,7 +632,7 @@
     if (ms) items.push(todoItem({ icon: A.icon.flag, title: `这阵子可能会：${ms.name}`, text: `会了就记一下，以后翻着看 · <a class="link" href="#/baby/growth">里程碑</a>` }));
     if (age.months >= 6) {
       const picks = Bb.foodToday(FOOD, BOOK, b, ui.today);
-      if (picks.length) items.push(todoItem({ icon: A.icon.bowl, title: '今天的辅食', text: `${picks.map((r) => esc(r.name)).join('、')} · <a class="link" href="#/baby/food">看做法</a>` }));
+      if (picks.length) items.push(todoFood(picks));
     }
     items.push(todoMeal(now));
     items.push(todoMood(ui.today));
@@ -655,6 +675,6 @@
 
   Object.assign(app, {
     viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, babyMinText: minText, babyLogInfo: logInfo,
-    viewWeaningTool: viewFood
+    babyFoodDot: foodDot, viewWeaningTool: viewFood
   });
 })();

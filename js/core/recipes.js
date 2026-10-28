@@ -302,11 +302,11 @@
     return on;
   }
 
-  /** 菜名前小圆点左右两半的颜色：两样主要食材的颜色，只找到一样时整颗一个颜色 */
-  function dotOf(book, recipe) {
-    const names = recipe.dot || [...recipe.items.map((i) => i[0]), ...recipe.season];
-    const colors = names.map((n) => book.colors[n]).filter(Boolean);
-    return [colors[0], colors[1] || colors[0]];
+  /** 菜名前小圆点左右两半的颜色：两样主要食材的颜色，只找到一样时整颗一个颜色。辅食也用这个，它没有 season */
+  function dotOf(colors, recipe) {
+    const names = recipe.dot || [...recipe.items.map((i) => i[0]), ...(recipe.season || [])];
+    const found = names.map((n) => colors[n]).filter(Boolean);
+    return [found[0], found[1] || found[0]];
   }
 
   /** 菜单里补到了哪些营养 */

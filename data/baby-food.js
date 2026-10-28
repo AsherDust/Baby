@@ -5,6 +5,12 @@
   allergens: [['egg', '鸡蛋'], ['fish', '鱼'], ['shrimp', '虾'], ['wheat', '小麦'], ['soy', '大豆']],
   // 不算作「新食材」的：水、奶、油、淀粉
   plain: ['温开水', '母乳或配方奶', '油', '淀粉'],
+  // 菜名前小圆点的颜色：和孕期食谱同名的食材用 recipeBook.colors 里的，这里只补那边没有的。
+  // 左右两半默认取前两样有颜色的用料（上面那几样不算）；粥、软饭、面条写了 dot，取肉和菜
+  colors: {
+    强化铁米粉: '#EFE2C2', 猪肉: '#E9A7A0', 牛肉: '#B04A3E', 鸡肉: '#F3D7B5', 香菇: '#9A6B47', 苹果: '#C73E4A',
+    面条: '#F1E2B8', 饺子皮: '#F3E6C4',
+  },
 
   recipes: [
     // ---------- 6 个月：细腻的泥糊 ----------
@@ -83,7 +89,7 @@
       tip: '不放盐和酱油，原味就好。',
     },
     {
-      id: 'beef-carrot-congee', stage: 7, name: '牛肉胡萝卜粥', minutes: 40, good: ['iron', 'protein'], allergens: [],
+      id: 'beef-carrot-congee', stage: 7, name: '牛肉胡萝卜粥', minutes: 40, good: ['iron', 'protein'], allergens: [], dot: ['牛肉', '胡萝卜'],
       items: [['大米', '15 克'], ['牛肉', '15 克'], ['胡萝卜', '20 克']],
       steps: ['大米加 10 倍的水，小火熬 30 分钟成稠粥。', '牛肉煮熟切成很碎的末，胡萝卜蒸软压碎。', '一起倒进粥里再煮 5 分钟，刚开始可以打得更细一些。'],
       tip: '',
@@ -95,7 +101,7 @@
       tip: '鱼容易过敏，第一次只吃一两勺；鲈鱼、鳕鱼这类刺少的鱼都可以。',
     },
     {
-      id: 'liver-spinach-congee', stage: 7, name: '菠菜猪肝粥', minutes: 40, good: ['iron', 'vitamin'], allergens: [],
+      id: 'liver-spinach-congee', stage: 7, name: '菠菜猪肝粥', minutes: 40, good: ['iron', 'vitamin'], allergens: [], dot: ['猪肝', '菠菜'],
       items: [['大米', '15 克'], ['猪肝', '10 克'], ['菠菜', '15 克']],
       steps: ['大米熬成稠粥。', '猪肝泡去血水，煮熟后剁成末；菠菜放进开水里焯 1 分钟，剁碎。', '一起放进粥里再煮 3 分钟。'],
       tip: '猪肝一周 1～2 次就够。菠菜焯过水，草酸少了，更好吸收。',
@@ -119,7 +125,7 @@
       tip: '',
     },
     {
-      id: 'tomato-beef-noodle', stage: 7, name: '番茄牛肉碎面', minutes: 20, good: ['iron', 'vitamin'], allergens: ['wheat'],
+      id: 'tomato-beef-noodle', stage: 7, name: '番茄牛肉碎面', minutes: 20, good: ['iron', 'vitamin'], allergens: ['wheat'], dot: ['番茄', '牛肉'],
       items: [['面条', '婴儿面条 15 克'], ['牛肉', '15 克'], ['番茄', '30 克']],
       steps: ['番茄用开水烫一下去皮，切碎；牛肉煮熟剁成末。', '面条掰成短段，放进开水煮软。', '放番茄碎和牛肉末再煮 3 分钟，压一压就好。'],
       tip: '选不加盐的婴儿面条；面条含小麦，第一次少吃点。',
@@ -133,13 +139,13 @@
 
     // ---------- 10～12 个月：碎块、软块、手指食物 ----------
     {
-      id: 'pork-soft-rice', stage: 10, name: '肉末蔬菜软饭', minutes: 30, good: ['iron', 'protein'], allergens: [],
+      id: 'pork-soft-rice', stage: 10, name: '肉末蔬菜软饭', minutes: 30, good: ['iron', 'protein'], allergens: [], dot: ['猪肉', '小油菜'],
       items: [['大米', '20 克'], ['猪肉', '肉末 20 克'], ['胡萝卜', '20 克'], ['小油菜', '15 克']],
       steps: ['大米多放一倍的水，煮成软软的饭。', '少许油把肉末炒熟，放胡萝卜碎和青菜碎炒软，加两勺水焖 2 分钟。', '拌进软饭里。'],
       tip: '不放盐和酱油，肉和菜本身的鲜味就够了。',
     },
     {
-      id: 'veggie-egg-pancake', stage: 10, name: '蔬菜鸡蛋小饼', minutes: 15, good: ['protein', 'vitamin'], allergens: ['egg', 'wheat'],
+      id: 'veggie-egg-pancake', stage: 10, name: '蔬菜鸡蛋小饼', minutes: 15, good: ['protein', 'vitamin'], allergens: ['egg', 'wheat'], dot: ['鸡蛋', '西葫芦'],
       items: [['鸡蛋', '1 个'], ['面粉', '10 克'], ['西葫芦', '20 克'], ['胡萝卜', '10 克'], ['油', '少许']],
       steps: ['西葫芦和胡萝卜擦成细丝，剁碎一点。', '和鸡蛋、面粉搅成稠糊。', '平底锅刷一点油，小火煎成小圆饼，两面熟透，切成小条让宝宝抓着吃。'],
       tip: '',
@@ -157,7 +163,7 @@
       tip: '三文鱼的 DHA 多、含汞低，一定要做熟透。',
     },
     {
-      id: 'shrimp-congee', stage: 10, name: '虾仁西兰花粥', minutes: 35, good: ['protein', 'vitamin'], allergens: ['shrimp'],
+      id: 'shrimp-congee', stage: 10, name: '虾仁西兰花粥', minutes: 35, good: ['protein', 'vitamin'], allergens: ['shrimp'], dot: ['虾仁', '西兰花'],
       items: [['大米', '20 克'], ['虾仁', '20 克'], ['西兰花', '15 克']],
       steps: ['大米熬成稠粥。', '虾仁去虾线剁碎，西兰花切碎。', '放进粥里煮 5 分钟，虾仁全部变红就好。'],
       tip: '虾容易过敏，第一次少吃一点，观察 2～3 天。',
@@ -177,7 +183,7 @@
 
     // ---------- 1～2 岁：软一点、淡一点的家常饭菜 ----------
     {
-      id: 'tomato-beef-rice', stage: 13, name: '番茄牛肉烩饭', minutes: 30, good: ['iron', 'vitamin'], allergens: [],
+      id: 'tomato-beef-rice', stage: 13, name: '番茄牛肉烩饭', minutes: 30, good: ['iron', 'vitamin'], allergens: [], dot: ['番茄', '牛肉'],
       items: [['大米', '米饭半碗'], ['牛肉', '肉末 30 克'], ['番茄', '50 克'], ['洋葱', '10 克']],
       steps: ['番茄去皮切小丁，洋葱切碎。', '少许油炒熟牛肉末，放洋葱和番茄炒出汤汁。', '加小半碗水煮 5 分钟，浇在软米饭上拌匀。'],
       tip: '1 岁以后可以放一点点盐，全天加起来不超过 1.5 克。',
@@ -189,7 +195,7 @@
       tip: '',
     },
     {
-      id: 'pork-cabbage-dumpling', stage: 13, name: '猪肉白菜小饺子', minutes: 40, good: ['protein', 'fiber'], allergens: ['wheat'],
+      id: 'pork-cabbage-dumpling', stage: 13, name: '猪肉白菜小饺子', minutes: 40, good: ['protein', 'fiber'], allergens: ['wheat'], dot: ['猪肉', '白菜'],
       items: [['饺子皮', '8 张'], ['猪肉', '肉末 40 克'], ['白菜', '40 克']],
       steps: ['白菜剁碎，挤掉一点水，和肉末拌匀。', '包成小一点的饺子。', '水开后下锅，再开两次就熟了，捞出切成两半晾温。'],
       tip: '可以一次多包些冷冻起来。',
@@ -201,13 +207,13 @@
       tip: '',
     },
     {
-      id: 'mushroom-chicken-rice', stage: 13, name: '香菇鸡肉饭', minutes: 30, good: ['protein', 'fiber'], allergens: [],
+      id: 'mushroom-chicken-rice', stage: 13, name: '香菇鸡肉饭', minutes: 30, good: ['protein', 'fiber'], allergens: [], dot: ['香菇', '鸡肉'],
       items: [['大米', '米饭半碗'], ['鸡肉', '鸡腿肉 30 克'], ['香菇', '1 朵'], ['胡萝卜', '20 克']],
       steps: ['鸡腿肉去皮切小丁，香菇、胡萝卜切碎。', '少许油把鸡肉炒熟，放香菇和胡萝卜炒软，加两勺水焖 3 分钟。', '拌进软米饭里。'],
       tip: '',
     },
     {
-      id: 'egg-tomato-noodle', stage: 13, name: '番茄鸡蛋面', minutes: 15, good: ['protein', 'vitamin'], allergens: ['egg', 'wheat'],
+      id: 'egg-tomato-noodle', stage: 13, name: '番茄鸡蛋面', minutes: 15, good: ['protein', 'vitamin'], allergens: ['egg', 'wheat'], dot: ['番茄', '鸡蛋'],
       items: [['面条', '30 克'], ['鸡蛋', '1 个'], ['番茄', '50 克'], ['小油菜', '15 克']],
       steps: ['番茄去皮切小丁，炒出汤汁后加一碗水煮开。', '下面条煮软，淋入打散的鸡蛋，蛋花凝固。', '放剁碎的青菜煮 1 分钟，剪成小段。'],
       tip: '',

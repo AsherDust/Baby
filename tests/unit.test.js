@@ -1187,13 +1187,13 @@ test('菜名前的小圆点：每样用料都有颜色，指定的两样确实�
     if (r.dot) {
       ok(r.dot.length === 2 && r.dot.every((n) => BOOK.colors[n] && [...r.items.map((i) => i[0]), ...r.season].includes(n)), `${r.id} 的 dot`);
     }
-    const [a, b] = R.dotOf(BOOK, r);
+    const [a, b] = R.dotOf(BOOK.colors, r);
     ok(hex.test(a) && hex.test(b), `${r.id} 的小圆点 ${a} ${b}`);
   }
-  eq(R.dotOf(BOOK, R.find(BOOK, 'tomato-egg')), [BOOK.colors['鸡蛋'], BOOK.colors['番茄']]);
-  eq(R.dotOf(BOOK, R.find(BOOK, 'steamed-bass')), [BOOK.colors['鲈鱼'], BOOK.colors['葱']]);
-  eq(R.dotOf(BOOK, R.find(BOOK, 'kungpao-chicken')), [BOOK.colors['鸡胸肉'], BOOK.colors['干辣椒']]);
-  eq(R.dotOf(BOOK, R.find(BOOK, 'edamame')), [BOOK.colors['毛豆'], BOOK.colors['毛豆']]);
+  eq(R.dotOf(BOOK.colors, R.find(BOOK, 'tomato-egg')), [BOOK.colors['鸡蛋'], BOOK.colors['番茄']]);
+  eq(R.dotOf(BOOK.colors, R.find(BOOK, 'steamed-bass')), [BOOK.colors['鲈鱼'], BOOK.colors['葱']]);
+  eq(R.dotOf(BOOK.colors, R.find(BOOK, 'kungpao-chicken')), [BOOK.colors['鸡胸肉'], BOOK.colors['干辣椒']]);
+  eq(R.dotOf(BOOK.colors, R.find(BOOK, 'edamame')), [BOOK.colors['毛豆'], BOOK.colors['毛豆']]);
 });
 
 test('食谱里没有「能不能吃」标着别吃的，不放料酒；猪肝只在孕中晚期推荐，写明每周上限', () => {
@@ -1664,6 +1664,26 @@ test('辅食食谱：编号唯一，阶段、营养、易过敏的都登记过�
   }
   for (const stage of [6, 7, 10, 13]) ok(FOOD.recipes.filter((r) => r.stage === stage).length >= 5, `${stage} 个月的太少`);
   ok(FOOD.recipes.filter((r) => r.stage === 6 && r.good.includes('iron')).length >= 3, '6 个月要有好几样补铁的');
+});
+
+test('辅食菜名前的小圆点：和孕期食谱同名的食材同一个颜色，除了水奶油淀粉每样都有颜色；粥、软饭、面条取肉和菜', () => {
+  const hex = /^#[0-9A-F]{6}$/;
+  const colors = { ...BOOK.colors, ...FOOD.colors };
+  const used = new Set(FOOD.recipes.flatMap((r) => r.items.map((i) => i[0])));
+  Object.entries(FOOD.colors).forEach(([name, c]) => ok(hex.test(c) && !BOOK.colors[name] && used.has(name), `${name} 的颜色 ${c}`));
+  FOOD.plain.forEach((name) => ok(!colors[name], `${name} 不该有颜色`));
+  for (const r of FOOD.recipes) {
+    r.items.forEach(([name]) => ok(FOOD.plain.includes(name) || colors[name], `${r.id} 的「${name}」没有颜色`));
+    if (r.dot) ok(r.dot.length === 2 && r.dot.every((n) => colors[n] && r.items.some((i) => i[0] === n)), `${r.id} 的 dot`);
+    if (r.items.some(([n]) => n === '大米' || n === '面条')) ok(r.dot && !r.dot.includes('大米') && !r.dot.includes('面条'), `${r.id} 的小圆点该取肉和菜`);
+    const [a, b] = R.dotOf(colors, r);
+    ok(hex.test(a) && hex.test(b), `${r.id} 的小圆点 ${a} ${b}`);
+  }
+  const dot = (id) => R.dotOf(colors, FOOD.recipes.find((r) => r.id === id));
+  eq(dot('potato-puree'), [colors['土豆'], colors['土豆']]);
+  eq(dot('beef-carrot-congee'), [colors['牛肉'], colors['胡萝卜']]);
+  eq(dot('chicken-balls'), [colors['鸡肉'], colors['胡萝卜']]);
+  eq(dot('egg-tomato-noodle'), R.dotOf(BOOK.colors, R.find(BOOK, 'tomato-egg-noodle')));
 });
 
 // ---------- chart ----------

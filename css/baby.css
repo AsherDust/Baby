@@ -154,7 +154,7 @@ button.ms-open:hover { background: var(--honey-glow); }
 .food-tried .recipe-chips { margin-top: 8px; }
 .food-tried { margin-top: 0; }
 .recipe-group.is-later h3, .recipe-group.is-later .dish-name { color: var(--ink-3); }
-.dish-open.no-dot { grid-template-columns: minmax(0, 1fr); }
+.recipe-group.is-later .dish-dot { opacity: 0.5; }
 .dish-name .tag { margin-left: 8px; vertical-align: 1px; }
 
 /* ---------- 首页 ---------- */

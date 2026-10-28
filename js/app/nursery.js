@@ -4,7 +4,7 @@
   const { dates: D, baby: Bb, babyBook: BOOK, babyFood: FOOD, calendar: Cal, app } = globalThis.Baby;
   const {
     sheetDialog, settingsDialog, esc, ui, hhmm, render, showDialog, dialogHead, closeDialog, formError, toast, oops, say,
-    cheer, persist, download, babyMinText, babyLogInfo
+    cheer, persist, download, babyMinText, babyLogInfo, babyFoodDot
   } = app;
 
   const TYPE_NAMES = { breast: '亲喂', bottle: '瓶喂', food: '辅食', sleep: '睡觉', diaper: '尿布', temp: '体温', med: '用药' };
@@ -178,7 +178,7 @@
     const allergenName = Object.fromEntries(FOOD.allergens);
     sheetDialog.innerHTML = `
       <div class="dialog-body recipe-sheet" data-id="${r.id}">
-        ${dialogHead(esc(r.name), `${stage.name}起 · 约 ${r.minutes} 分钟`)}
+        ${dialogHead(`${babyFoodDot(r)}${esc(r.name)}`, `${stage.name}起 · 约 ${r.minutes} 分钟`)}
         <p class="recipe-tags">${r.good.map((g) => `<span class="tag tag-good">${tagName[g]}</span>`).join('')}${r.allergens.map((a) => `<span class="tag tag-lv-high">含${allergenName[a]}</span>`).join('')}</p>
         <section class="recipe-part">
           <h3>用料</h3>

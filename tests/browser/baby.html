@@ -58,8 +58,11 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log($('.born-card') && tabs() === '今天,记录,心情,产检,工具', '孕晚期首页问「宝宝出生了吗」，底部还是产检');
     await nav('#/tools/weaning');
     log(text($('.page-title')) === '辅食食谱' && $$('.baby-food-all .dish').length === w.Baby.babyFood.recipes.length && $('.food-amounts thead'), '孕期也能先看辅食食谱：全部按月龄排好');
+    const dots = $$('.baby-food-all .dish-open .dish-dot');
+    log(dots.length === w.Baby.babyFood.recipes.length && dots.every((el) => ['--a', '--b'].every((v) => /^#[0-9A-F]{6}$/.test(el.style.getPropertyValue(v).trim()))), '每道辅食前面都有两种颜色的小圆点');
     await click('#food-pork-puree');
     log(sheet().open && sheet().querySelectorAll('.recipe-steps li').length > 0 && !sheet().querySelector('[data-action="baby-food-log"]'), '打开做法看看，还不能记吃了');
+    log(sheet().querySelector('h2 .dish-dot') && text(sheet().querySelector('h2')) === '猪肉泥', '做法的标题前也有小圆点');
     await click('#sheet-dialog [data-action="close-dialog"]');
     await nav('#/');
     await click('.born-card [data-action="baby-birth-open"]');
@@ -264,6 +267,13 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await wait(20);
     await click('#tried-香蕉');
     log(baby().tried['香蕉'] === TODAY && $('#food-tried').open, '自己勾上吃过的食材，面板保持展开');
+    await nav('#/');
+    const expect = w.Baby.baby.foodToday(w.Baby.babyFood, w.Baby.babyBook, baby(), TODAY).map((r) => r.name);
+    const chips = $$('.panel-today .meal-chip[data-action="baby-food-open"]');
+    log(expect.length && chips.map(text).join() === expect.join() && chips.every((c) => c.querySelector('.dish-dot')), '首页「今天的辅食」是带小圆点的菜名', chips.map(text).join());
+    await click(`#${chips[0].id}`);
+    log(sheet().open && text(sheet().querySelector('h2')) === expect[0] && sheet().querySelector('[data-action="baby-food-log"]'), '点菜名直接看做法，能记一笔');
+    await click('#sheet-dialog [data-action="close-dialog"]');
 
     log(errors.length === 0, '没有报错', errors.join(' | '));
   } catch (err) {
