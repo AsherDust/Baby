@@ -56,6 +56,12 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     // ---- 孕晚期：宝宝出生了 ----
     await open('labor');
     log($('.born-card') && tabs() === '今天,记录,心情,产检,工具', '孕晚期首页问「宝宝出生了吗」，底部还是产检');
+    await nav('#/tools/weaning');
+    log(text($('.page-title')) === '辅食食谱' && $$('.baby-food-all .dish').length === w.Baby.babyFood.recipes.length && $('.food-amounts thead'), '孕期也能先看辅食食谱：全部按月龄排好');
+    await click('#food-pork-puree');
+    log(sheet().open && sheet().querySelectorAll('.recipe-steps li').length > 0 && !sheet().querySelector('[data-action="baby-food-log"]'), '打开做法看看，还不能记吃了');
+    await click('#sheet-dialog [data-action="close-dialog"]');
+    await nav('#/');
     await click('.born-card [data-action="baby-birth-open"]');
     const f = sheet().querySelector('form[data-form="baby-birth"]');
     log(sheet().open && f.elements.name.value === '豆豆', '打开出生面板，小名先填好了');
@@ -73,6 +79,14 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(b0 && b0.name === '小米' && b0.sex === 'girl' && b0.growth[0].weight === 3.4 && state().profile.nickname === '小米', '宝宝出生记下了，出生体重按斤换成千克');
     log(tabs() === '今天,记录,心情,宝宝,工具' && $('.hero-baby') && /第\s*3\s*天/.test(text($('.panel-baby-age'))) && /欢迎小米|小米的第一天/.test(toastText()), '底部换成「宝宝」，首页换成宝宝的一天', `${tabs()} ${toastText()}`);
     log(!$('.born-card') && /小米 2 天 · 蜜罐/.test(d.title), '不再问出生了，网页标题写着宝宝几天', d.title);
+    const momMeal = $$('.panel-today .todo-item').find((li) => /妈妈.*吃什么/.test(li.textContent));
+    log(momMeal && /妈妈早餐吃什么/.test(text(momMeal)) && momMeal.querySelector('.meal-chip'), '宝宝首页也有妈妈下一顿吃什么', text(momMeal));
+    await nav('#/tools');
+    log($('[data-tool="recipes"] .tool-name').textContent === '哺乳食谱', '工具里的「孕期食谱」换成「哺乳食谱」');
+    await nav('#/tools/recipes');
+    log(text($('.page-title')) === '哺乳食谱' && /坐月子 · 宝宝 2 天/.test(text($('.recipe-intro .eyebrow'))) && /产后头几天/.test(text($('.recipe-tip'))) && /2100 毫升/.test(text($('.recipe-tip'))), '按坐月子配：先吃软烂的，每餐有汤水', text($('.recipe-intro')));
+    log($$('.meal').length === 5 && $$('.dish-open').length === 9 && $('#dish-lunch-soup') && $('#dish-night-snack'), '一天五顿九道：午餐也有汤，多一顿睡前加餐');
+    await nav('#/');
 
     // ---- 首页一键记 ----
     await click('#breast-left');
@@ -219,7 +233,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await nav('#/checkups/schedule');
     log(text($('.tab[aria-current="page"]')) === '记录' && $('.seg-tab[aria-current="page"]').getAttribute('href') === '#/checkups/schedule', '产检页亮的是「记录」');
     await nav('#/tools');
-    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,story', '工具页收起数胎动、宫缩、待产包、每周变化');
+    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,weaning,story', '工具页收起数胎动、宫缩、待产包、每周变化');
 
     // ---- 刷新、清除 ----
     await new Promise((r) => { iframe.onload = r; w.location.reload(); });

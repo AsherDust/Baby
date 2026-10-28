@@ -1,8 +1,8 @@
 (function () {
   'use strict';
   // 「工具」页：工具目录、数胎动、宫缩计时、能不能吃、待产包（孕期食谱在 recipes.js）
-  const { dates: D, content: C, model: M, art: A, app } = globalThis.Baby;
-  const { SUB_NAMES, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, pad2, hhmm, ui, storyStatus, recipeStatus } = app;
+  const { dates: D, content: C, model: M, baby: Bb, babyBook: BB, babyFood: FOOD, art: A, app } = globalThis.Baby;
+  const { subName, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, pad2, hhmm, ui, storyStatus, recipeStatus } = app;
 
   /** 今天（按真实时钟）数完的几次，新的在前 */
   function todayKicks(now) {
@@ -22,7 +22,7 @@
     const tile = (id, icon, { text, live = false }) => `
       <a class="tool${live ? ' is-live' : ''}" href="#/tools/${id}" data-tool="${id}">
         <span class="tool-icon">${icon}</span>
-        <span class="tool-text"><span class="tool-name">${SUB_NAMES[id]}</span><span class="tool-status">${text}</span></span>
+        <span class="tool-text"><span class="tool-name">${subName(id)}</span><span class="tool-status">${text}</span></span>
         <span class="tool-go">${A.icon.chevronRight}</span>
       </a>`;
     const bag = M.bagSummary(app.state);
@@ -34,10 +34,20 @@
         ${born ? '' : tile('contractions', A.icon.timer, contractionStatus(ga, now))}
         ${tile('food', A.icon.bowl, { text: `${C.FOODS.length} 种常见食物，搜一下就知道` })}
         ${tile('recipes', A.icon.pot, recipeStatus(now))}
+        ${tile('weaning', A.icon.spoon, weaningStatus())}
         ${born ? '' : tile('bag', A.icon.suitcase, { text: bag.total ? `已备好 ${bag.done}/${bag.total}` : '清单空了，去加几样' })}
         ${born ? '' : tile('weeks', A.icon.book, { text: `现在是第 ${Math.max(ga.weeks, 0)} 周，看看宝宝和妈妈的变化` })}
         ${tile('story', A.icon.moon, storyStatus(now))}
       </section>`;
+  }
+
+  function weaningStatus() {
+    const b = app.state.baby;
+    if (!b) return { text: '按月龄分好的辅食，宝宝满 6 个月就用得上' };
+    const months = Bb.ageOf(b.birthDate, ui.today).months;
+    if (months < 6) return { text: `满 6 个月（${D.formatDate(Bb.addMonths(b.birthDate, 6), { relativeTo: ui.today })}）开始加辅食` };
+    const picks = Bb.foodToday(FOOD, BB, b, ui.today);
+    return { text: picks.length ? `今天可以做：${esc(picks.map((r) => r.name).join('、'))}` : '按月龄推荐营养全面的辅食' };
   }
 
   function kickStatus(ga, now) {

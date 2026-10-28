@@ -39,7 +39,7 @@
     if (key) {
       more = `<button type="button" class="btn btn-ghost" data-action="recipe-swap" data-key="${key}">${A.icon.shuffle}换一道</button>`;
     } else if (fits) {
-      more = R.slotsFor(r.kind).map((s) => (used.includes(s.key)
+      more = R.slotsFor(r.kind, ctx).map((s) => (used.includes(s.key)
         ? `<span class="recipe-in">${A.icon.check}已在${dayLabel()}${mealName[s.meal]}</span>`
         : `<button type="button" class="btn btn-ghost" data-action="recipe-place" data-id="${r.id}" data-key="${s.key}">放进${dayLabel()}${mealName[s.meal]}</button>`)).join('');
     }

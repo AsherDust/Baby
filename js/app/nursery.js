@@ -171,8 +171,8 @@
     const r = FOOD.recipes.find((x) => x.id === id);
     if (!r) return;
     const b = kid();
-    const months = Bb.ageOf(b.birthDate, ui.today).months;
-    const fresh = Bb.newFoods(FOOD, b, r);
+    const months = b ? Bb.ageOf(b.birthDate, ui.today).months : null;
+    const fresh = b ? Bb.newFoods(FOOD, b, r) : [];
     const stage = BOOK.foodStages.find((s) => s.from === r.stage);
     const tagName = Object.fromEntries(FOOD.tags);
     const allergenName = Object.fromEntries(FOOD.allergens);
@@ -190,11 +190,11 @@
         </section>
         ${r.tip ? `<p class="recipe-note"><b>小贴士</b>${esc(r.tip)}</p>` : ''}
         ${fresh.length ? '<p class="hint">第一次吃的食材先单独吃 2～3 天，看看有没有起疹子、呕吐、拉肚子，再加下一样。</p>' : ''}
-        ${months < r.stage ? `<p class="hint">这道满 ${r.stage} 个月以后再吃。</p>` : ''}
+        ${b && months < r.stage ? `<p class="hint">这道满 ${r.stage} 个月以后再吃。</p>` : ''}
         <div class="dialog-actions">
           <span class="spacer"></span>
           <button type="button" class="btn btn-ghost" data-action="close-dialog">关闭</button>
-          ${months >= 6 ? `<button type="button" class="btn" data-action="baby-food-log" data-id="${r.id}">吃了，记一笔</button>` : ''}
+          ${b && months >= 6 ? `<button type="button" class="btn" data-action="baby-food-log" data-id="${r.id}">吃了，记一笔</button>` : ''}
         </div>
       </div>`;
     showDialog(sheetDialog);

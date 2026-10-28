@@ -10,13 +10,13 @@ A gentle companion for pregnancy and the baby's first years that runs entirely i
 - **Records**: weight chart against the pre-pregnancy baseline, blood pressure and blood sugar with out-of-range warnings, and a timeline of medicines and supplements.
 - **Mood journal**: pick a mood face, write a few lines, and look back on a timeline grouped by day and month. Edits and deletions can be undone.
 - **Checkups**: the usual checkup schedule by week, booked appointments, reminders (calendar file or browser notifications), and ultrasound reports that can be filled in by pasting the report text.
-- **Pregnancy recipes**: a daily menu (breakfast, lunch, a snack and dinner) picked for the current trimester, with swaps, favourites and foods to avoid. When recent blood sugar readings run high, it switches to low-GI dishes. About 60 home-style recipes with ingredients and steps, plus a shopping list for today or tomorrow that can be ticked off or sent to family.
+- **Pregnancy and nursing recipes**: a daily menu (breakfast, lunch, a snack and dinner) picked for the current trimester, with swaps, favourites and foods to avoid. After the birth it switches to a nursing menu: a soup with lunch as well as dinner, plus a bedtime snack, with confinement-month and first-days advice. When recent blood sugar readings run high, it switches to low-GI dishes. Over 60 home-style recipes with ingredients and steps, plus a shopping list for today or tomorrow that can be ticked off or sent to family.
 - **Baby**: once the baby is born, the 「产检」 tab becomes 「宝宝」 and the home page turns into the baby's day.
   - One-tap logging for breastfeeding (timed, left and right), bottles, naps and nappies. Solid food, temperature and medicine can be added in a couple of taps, past entries can be filled in later, and each day comes with a summary.
   - A growth record with weight, length and head-circumference curves against the WHO standards, plus milestones and other firsts.
   - The national vaccination schedule (with the 2025 DTaP change) with booked dates, reminders and a calendar file. Paid vaccines can be added too.
   - Fever levels with when-to-see-a-doctor advice.
-  - Weaning recipes by age, from iron-rich purées at 6 months to soft family meals at 1–2 years. New foods are introduced one at a time, and foods already tried are remembered.
+  - Weaning recipes by age, from iron-rich purées at 6 months to soft family meals at 1–2 years. New foods are introduced one at a time, and foods already tried are remembered. The recipes can also be browsed from Tools before the baby arrives.
 - **Tools**: kick counter, contraction timer that says when it's time to go, "can I eat this" food lookup, hospital bag checklist, week-by-week changes for mom and baby, and bedtime stories with read-aloud.
 - **Feels like an app**: add it to the home screen, use it offline, light and dark themes, and less motion when the system asks for it.
 - **Your data, your copy**: records live in `localStorage`; Settings exports and imports a JSON backup.

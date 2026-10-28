@@ -2,7 +2,7 @@
   'use strict';
   // 「宝宝」页（日常、成长、疫苗、健康、辅食）和宝宝出生后的首页；孕晚期首页上「宝宝出生了吗」那块也在这里
   const { dates: D, baby: Bb, babyBook: BOOK, babyFood: FOOD, growthStandard: STD, chart: Chart, art: A, app } = globalThis.Baby;
-  const { esc, ui, hhmm, TERM_FROM, todoMood } = app;
+  const { esc, ui, hhmm, TERM_FROM, todoMood, todoMeal } = app;
 
   const VIEWS = [['', '日常'], ['growth', '成长'], ['vaccines', '疫苗'], ['health', '健康'], ['food', '辅食']];
   const LEVEL_NAMES = { cool: '偏低', normal: '正常', low: '低热', mid: '中等发热', high: '高热' };
@@ -417,8 +417,36 @@
       </article>`;
   }
 
+  /** 宝宝还没出生：按月龄分好的辅食先看看 */
+  function viewFoodPreview() {
+    return `
+      <article class="card baby-food-stage">
+        <p class="eyebrow">宝宝满 6 个月开始加辅食</p>
+        <p class="recipe-tip">第一口从富含铁的泥糊开始，一样一样地加，慢慢从泥变成碎末、软块；1 岁以后吃软一点、淡一点的家常饭。下面按月龄分好了，先看看。宝宝出生后，这里会按月龄推荐今天做什么。</p>
+        <table class="food-amounts">
+          <caption>每天大概吃多少</caption>
+          <thead><tr><th></th><th>7～12 个月</th><th>1～2 岁</th></tr></thead>
+          <tbody>${BOOK.foodAmounts.map((a) => `<tr><th>${a[0]}</th><td>${a[1]}</td><td>${a[2]}</td></tr>`).join('')}</tbody>
+        </table>
+        <details class="food-rules">
+          <summary>加辅食的几条规矩</summary>
+          <ul>${BOOK.foodRules.map((t) => `<li>${t}</li>`).join('')}</ul>
+        </details>
+      </article>
+      <article class="card baby-food-all">
+        <header class="card-head"><h2 class="card-title">${A.icon.pot}全部辅食</h2></header>
+        ${BOOK.foodStages.map((s) => `
+          <section class="recipe-group">
+            <h3>${s.name}<small>${s.texture}</small></h3>
+            <ul class="dish-list">${FOOD.recipes.filter((r) => r.stage === s.from).map((r) => viewFoodRow(r)).join('')}</ul>
+          </section>`).join('')}
+      </article>
+      <p class="fineprint">参考《中国 7～24 月龄婴幼儿喂养指南（2022）》。早产、过敏体质、长得慢的宝宝，什么时候加、加什么听医生的。</p>`;
+  }
+
   function viewFood() {
     const b = kid();
+    if (!b) return viewFoodPreview();
     const age = ageNow();
     const stage = Bb.foodStage(BOOK, age.months);
     const picks = age.months >= 6 ? Bb.foodToday(FOOD, BOOK, b, ui.today) : [];
@@ -474,7 +502,7 @@
   }
 
   function viewFoodRow(r) {
-    const fresh = Bb.newFoods(FOOD, kid(), r);
+    const fresh = kid() ? Bb.newFoods(FOOD, kid(), r) : [];
     const tags = [...r.good.map((g) => tagName[g]), ...r.allergens.map((a) => `含${allergenName[a]}`)];
     return `
       <li class="dish">
@@ -542,7 +570,7 @@
           ${s.lastFeed ? `<p class="last-feed">上次喂奶：<b>${agoText(s.lastFeed, now)}</b></p>` : ''}
           ${viewQuick()}
         </article>
-        ${viewBabyTodo()}
+        ${viewBabyTodo(now)}
       </section>`;
   }
 
@@ -558,7 +586,7 @@
       </li>`;
   }
 
-  function viewBabyTodo() {
+  function viewBabyTodo(now) {
     const b = kid();
     const age = ageNow();
     const items = [];
@@ -586,6 +614,7 @@
       const picks = Bb.foodToday(FOOD, BOOK, b, ui.today);
       if (picks.length) items.push(todoItem({ icon: A.icon.bowl, title: '今天的辅食', text: `${picks.map((r) => esc(r.name)).join('、')} · <a class="link" href="#/baby/food">看做法</a>` }));
     }
+    items.push(todoMeal(now));
     items.push(todoMood(ui.today));
     return `
       <article class="panel panel-today">
@@ -625,6 +654,7 @@
   }
 
   Object.assign(app, {
-    viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, babyMinText: minText, babyLogInfo: logInfo
+    viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, babyMinText: minText, babyLogInfo: logInfo,
+    viewWeaningTool: viewFood
   });
 })();

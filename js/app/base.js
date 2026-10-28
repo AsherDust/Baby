@@ -21,7 +21,7 @@
     checkups: { name: '产检', subs: ['schedule', 'ultrasound'] },
     // 宝宝出生后底部的「产检」换成「宝宝」，产检收进「记录」里
     baby: { name: '宝宝', subs: ['', 'growth', 'vaccines', 'health', 'food'] },
-    tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'recipes', 'bag', 'weeks', 'story'] },
+    tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'recipes', 'weaning', 'bag', 'weeks', 'story'] },
   };
   const TABS = { pregnant: ['today', 'records', 'journal', 'checkups', 'tools'], baby: ['today', 'records', 'journal', 'baby', 'tools'] };
   // 有的页面里还分几页，地址里多一段，例如 #/tools/recipes/shop
@@ -37,10 +37,14 @@
     contractions: '宫缩计时',
     food: '能不能吃',
     recipes: '孕期食谱',
+    weaning: '辅食食谱',
     bag: '待产包包',
     weeks: '每周变化',
     story: '睡前故事',
   };
+
+  /** 页面的名字；宝宝出生后「孕期食谱」叫「哺乳食谱」 */
+  const subName = (id) => (id === 'recipes' && app.state && app.state.baby ? '哺乳食谱' : SUB_NAMES[id]);
 
   const WEIGHTS_SHOWN = 6;
   // 心情时间线一次显示几条，点「看更早的」再多显示这么多
@@ -117,7 +121,7 @@
   }
 
   Object.assign(app, {
-    root, toastBox, settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES,
+    root, toastBox, settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES, subName,
     WEIGHTS_SHOWN, JOURNAL_SHOWN, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, kg, kgDiff, clamp01, pad2, hhmm,
     notifyPermission, isStandalone, isIOS, isWeChat, isMobile, isTouch, atRisk, ui, storyTexts, afterRender, greeting
   });

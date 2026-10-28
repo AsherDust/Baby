@@ -217,7 +217,7 @@ const menuIds = () => $$('.dish-open').map((b) => b.dataset.id);
     log(!$('.recipe-sugar') && /孕中期/.test(text($('.recipe-intro .eyebrow'))), '没有血糖偏高时不提控糖');
     calm.profile.dueDate = '2027-05-20';
     await open(calm, 'tools/recipes/all');
-    log(!$('#dish-liver-spinach') && /还有 1 道/.test(text($('.recipe-hidden'))), '孕早期先不推荐猪肝，说一声藏了 1 道');
+    log(!$('#dish-liver-spinach') && /还有 2 道/.test(text($('.recipe-hidden'))), '孕早期先不推荐猪肝和月子里的猪蹄汤，说一声藏了 2 道');
     await nav('#/tools/recipes');
     log(/孕早期/.test(text($('.recipe-intro .eyebrow'))) && /叶酸片接着吃/.test(text($('.recipe-tip'))), '孕早期的吃饭重点');
 

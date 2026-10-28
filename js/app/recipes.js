@@ -1,8 +1,8 @@
 (function () {
   'use strict';
-  // 「孕期食谱」页：今日菜单、全部食谱、买菜清单；首页「今天吃什么」和工具页那一格的文字也在这里
-  const { dates: D, model: M, recipes: R, recipeBook: BOOK, art: A, app } = globalThis.Baby;
-  const { esc, ui } = app;
+  // 「孕期食谱」页（宝宝出生后是「哺乳食谱」）：今日菜单、全部食谱、买菜清单；首页「今天吃什么」和工具页那一格的文字也在这里
+  const { dates: D, model: M, recipes: R, recipeBook: BOOK, baby: Bb, art: A, app } = globalThis.Baby;
+  const { esc, ui, subName } = app;
 
   const VIEWS = [['', '今日菜单'], ['all', '全部食谱'], ['shop', '买菜清单']];
   const kindName = Object.fromEntries(R.KINDS.map((k) => [k.id, k.name]));
@@ -11,11 +11,12 @@
   const dayOf = (offset) => D.addDays(ui.today, offset);
   const dayLabel = (offset) => (offset ? '明天' : '今天');
 
-  /** 这天按什么挑：孕期阶段，最近 7 天血糖偏高了几次 */
+  /** 这天按什么挑：孕期阶段（宝宝出生后是哺乳期），最近 7 天血糖偏高了几次 */
   function context(date) {
     const ga = D.gestation(app.state.profile.dueDate, date);
     const high = M.glucoseSummary(app.state, ui.today).high;
-    return { stage: R.stageOf(ga.days), sugar: high > 0, high, ga };
+    const b = app.state.baby;
+    return { stage: b ? 'nursing' : R.stageOf(ga.days), sugar: high > 0, high, ga, sinceBirth: b ? D.diffDays(b.birthDate, date) : null };
   }
 
   const menuOn = (date) => R.menu(BOOK, app.state.meals, date, context(date));
@@ -29,7 +30,7 @@
 
   /** 下一顿吃什么，首页和工具页用：{ label: '午餐' / '明天早餐', day, dishes: [{ key, recipe }] } */
   function upcoming(now) {
-    const { meal, tomorrow } = R.nextMeal(new Date(now).getHours());
+    const { meal, tomorrow } = R.nextMeal(new Date(now).getHours(), context(ui.today).stage);
     const day = tomorrow ? 1 : 0;
     const m = menuOn(dayOf(day)).find((x) => x.meal === meal);
     return { label: `${tomorrow ? '明天' : ''}${m.name}`, day, dishes: m.dishes.filter((x) => x.recipe) };
@@ -38,7 +39,7 @@
   function recipeStatus(now) {
     const next = upcoming(now);
     const names = next.dishes.map((x) => x.recipe.name);
-    return { text: names.length ? `${next.label}：${esc(names.join(' · '))}` : '按孕周配好三餐，不知道吃什么时看看' };
+    return { text: names.length ? `${next.label}：${esc(names.join(' · '))}` : '配好一天的饭菜，不知道吃什么时看看' };
   }
 
   /** 首页：下一顿的几道菜，点菜名直接看做法 */
@@ -50,7 +51,7 @@
         <span class="todo-icon">${A.icon.pot}</span>
         <div class="todo-body">
           <div class="todo-head">
-            <p class="todo-title">${next.label}吃什么</p>
+            <p class="todo-title">${app.state.baby ? '妈妈' : ''}${next.label}吃什么</p>
             <a class="link" href="#/tools/recipes">看菜单</a>
           </div>
           <ul class="meal-chips">${next.dishes.map(({ key, recipe }) => `
@@ -63,7 +64,7 @@
   function viewRecipesTool(route) {
     const views = { '': viewMenu, all: viewLibrary, shop: viewShopping };
     return `
-      <nav class="seg-tabs" aria-label="孕期食谱">
+      <nav class="seg-tabs" aria-label="${subName('recipes')}">
         ${VIEWS.map(([id, name]) => `<a href="#/tools/recipes${id ? `/${id}` : ''}" class="seg-tab"${route.view === id ? ' aria-current="page"' : ''}>${name}</a>`).join('')}
       </nav>
       ${views[route.view]()}`;
@@ -83,6 +84,19 @@
 
   // ---------- 今日菜单 ----------
 
+  /** 孕中期 · 24 周 / 坐月子 · 宝宝 5 天 / 哺乳期 · 宝宝 3 个月 */
+  function stageTitle(ctx) {
+    if (ctx.stage !== 'nursing') return `${D.TRIMESTER_NAMES[D.trimester(ctx.ga.days)]} · ${Math.max(ctx.ga.weeks, 0)} 周`;
+    const b = app.state.baby;
+    return `${ctx.sinceBirth < 42 ? '坐月子' : '哺乳期'} · 宝宝 ${Bb.ageText(Bb.ageOf(b.birthDate, D.addDays(b.birthDate, Math.max(0, ctx.sinceBirth))))}`;
+  }
+
+  /** 产后头几天、坐月子的时候，在哺乳期的重点前面多说一句 */
+  function stageTip(ctx) {
+    if (ctx.stage !== 'nursing') return BOOK.tips[ctx.stage];
+    return [ctx.sinceBirth < 4 ? BOOK.tips.firstDays : '', ctx.sinceBirth < 42 ? BOOK.tips.confinement : '', BOOK.tips.nursing].filter(Boolean).join('');
+  }
+
   function viewMenu() {
     const date = dayOf(ui.recipeDay);
     const ctx = context(date);
@@ -91,10 +105,10 @@
     return `
       <article class="card recipe-intro">
         <div class="recipe-intro-top">
-          <p class="eyebrow">${D.TRIMESTER_NAMES[D.trimester(ctx.ga.days)]} · ${Math.max(ctx.ga.weeks, 0)} 周</p>
+          <p class="eyebrow">${stageTitle(ctx)}</p>
           ${daySwitch()}
         </div>
-        <p class="recipe-tip">${esc(BOOK.tips[ctx.stage])}</p>
+        <p class="recipe-tip">${esc(stageTip(ctx))}</p>
         ${ctx.sugar ? `<p class="recipe-sugar">${A.icon.drop}<span>${esc(BOOK.tips.sugar.replace('{n}', ctx.high))}</span></p>` : ''}
         ${viewAvoid()}
       </article>

@@ -1,6 +1,7 @@
 (function () {
   'use strict';
-  // 孕期食谱：按孕期阶段、忌口和最近的血糖，每天配好三餐和一顿加餐；换菜、收藏、买菜清单也在这里。
+  // 孕期和哺乳期食谱：按孕期阶段（宝宝出生后是哺乳期）、忌口和最近的血糖，每天配好三餐和加餐；
+  // 换菜、收藏、买菜清单也在这里。
   // 食谱本身在 data/recipes.js，这里只管挑和记，不碰页面
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
@@ -12,14 +13,15 @@
     { id: 'soup', name: '汤' },
     { id: 'snack', name: '加餐' },
   ];
-  // 每顿有哪几格：[格子, 放哪类菜]
+  // 每顿有哪几格：[格子, 放哪类菜, 只在哪个阶段有]。哺乳期每餐都要有汤水，一天五六顿，所以多一碗午餐的汤和一顿睡前加餐
   const MEALS = [
     { id: 'breakfast', name: '早餐', slots: [['breakfast', 'breakfast']] },
-    { id: 'lunch', name: '午餐', staple: true, slots: [['lunch-main', 'main'], ['lunch-veg', 'veg']] },
+    { id: 'lunch', name: '午餐', staple: true, slots: [['lunch-main', 'main'], ['lunch-veg', 'veg'], ['lunch-soup', 'soup', 'nursing']] },
     { id: 'snack', name: '加餐', slots: [['snack', 'snack']] },
     { id: 'dinner', name: '晚餐', staple: true, slots: [['dinner-main', 'main'], ['dinner-veg', 'veg'], ['dinner-soup', 'soup']] },
+    { id: 'night', name: '睡前加餐', slots: [['night-snack', 'snack', 'nursing']] },
   ];
-  const SLOTS = MEALS.flatMap((m) => m.slots.map(([key, kind]) => ({ key, kind, meal: m.id })));
+  const SLOTS = MEALS.flatMap((m) => m.slots.map(([key, kind, only]) => ({ key, kind, meal: m.id, only: only || '' })));
   const TAGS = [
     { id: 'iron', name: '补铁' },
     { id: 'calcium', name: '补钙' },
@@ -49,9 +51,12 @@
     { id: 'grain', name: '主食杂粮' },
     { id: 'dry', name: '干货坚果' },
   ];
-  const STAGES = ['early', 'mid', 'late'];
-  // 现在看哪一顿：10 点前早餐，14 点前午餐，17 点前加餐，21 点前晚餐，再晚就看明天早餐
-  const MEAL_UNTIL = [['breakfast', 10], ['lunch', 14], ['snack', 17], ['dinner', 21]];
+  const STAGES = ['early', 'mid', 'late', 'nursing'];
+  // 现在看哪一顿：10 点前早餐，14 点前午餐，17 点前加餐，21 点前晚餐，再晚就看明天早餐；哺乳期 20 点后是睡前加餐
+  const MEAL_UNTIL = {
+    pregnant: [['breakfast', 10], ['lunch', 14], ['snack', 17], ['dinner', 21]],
+    nursing: [['breakfast', 10], ['lunch', 14], ['snack', 17], ['dinner', 20], ['night', 23]],
+  };
   // 按天轮换从这天数起
   const DAY0 = '2026-01-01';
   const KEEP_DAYS = 14;
@@ -62,7 +67,9 @@
   const isId = (v) => typeof v === 'string' && ID.test(v);
   const idList = (list) => [...new Set(Array.isArray(list) ? list.filter(isId) : [])].slice(-LIST_MAX);
   const slotOf = (key) => SLOTS.find((s) => s.key === key) || null;
-  const perDay = (kind) => SLOTS.filter((s) => s.kind === kind).length;
+  /** 这个阶段一天有哪几格 */
+  const slotsOf = (ctx) => SLOTS.filter((s) => !s.only || s.only === ctx.stage);
+  const perDay = (kind, ctx) => slotsOf(ctx).filter((s) => s.kind === kind).length;
   const mod = (n, m) => ((n % m) + m) % m;
 
   function empty() {
@@ -131,10 +138,10 @@
   function pool(book, st, kind, ctx) {
     const of = (k) => book.recipes.filter((r) => r.kind === k && fits(book, r, st, ctx.stage));
     let list = of(kind);
-    if (kind === 'main' && list.length < perDay(kind)) list = list.concat(of('veg').filter((r) => accepts('main', r)));
+    if (kind === 'main' && list.length < perDay(kind, ctx)) list = list.concat(of('veg').filter((r) => accepts('main', r)));
     if (ctx.sugar) {
       const calm = list.filter((r) => r.gdm);
-      if (calm.length >= perDay(kind)) list = calm;
+      if (calm.length >= perDay(kind, ctx)) list = calm;
     }
     return list;
   }
@@ -156,33 +163,42 @@
 
   /**
    * 同一类的菜按天往后轮，一轮里每道各出现一次，下一轮换个顺序。
-   * 新一轮开头要是碰上上一轮结尾刚吃过的，和中间的换个位置，免得连着两天一样
-   * （只动开头和中间，结尾不动，所以下一轮比的还是这里的结尾）。
-   * nth：这一类在一天里的第几格（午餐主菜 0、晚餐主菜 1）
+   * 一天有几格时，换轮那天可能半天在上一轮、半天在新一轮，所以新一轮开头要避开
+   * 上一轮结尾 2×per−1 个（前一天可能吃过的），免得连着两天一样。
+   * nth：这一类在一天里的第几格（午餐主菜 0、晚餐主菜 1），per：这一类一天几格
    */
-  function turn(list, kind, date, nth) {
-    const per = perDay(kind);
+  function turn(list, kind, date, nth, per) {
     const p = D.diffDays(DAY0, date) * per + nth;
     const cycle = Math.floor(p / list.length);
-    const order = shuffled(list, kind, cycle);
-    if (order.length > 2 * per) {
-      const last = new Set(shuffled(list, kind, cycle - 1).slice(-per));
-      let j = per;
-      for (let i = 0; i < per; i += 1) {
-        if (!last.has(order[i])) continue;
-        while (j < order.length - per && last.has(order[j])) j += 1;
-        if (j < order.length - per) {
-          [order[i], order[j]] = [order[j], order[i]];
-          j += 1;
-        }
-      }
-    }
-    return { order, index: p - cycle * list.length };
+    return { order: cycleOrder(list, kind, cycle, 2 * per - 1), index: p - cycle * list.length };
   }
 
-  const nthOf = (slot) => SLOTS.filter((s) => s.kind === slot.kind).indexOf(slot);
-  // 主菜先挑：忌口太多时主菜要借用豆腐这类蔬菜，别让蔬菜的格子先拿走
-  const FILL_ORDER = [...SLOTS.filter((s) => s.kind === 'main'), ...SLOTS.filter((s) => s.kind !== 'main')];
+  const orderCache = new Map();
+  /**
+   * 第 cycle 轮的顺序：开头 span 个从上一轮结尾 span 个以外的里面挑，其余照打乱的顺序。
+   * 下一轮比的是这一轮排好以后的结尾，所以从第 0 轮一轮一轮往后推，推过的记下来
+   */
+  function cycleOrder(list, kind, cycle, span) {
+    if (cycle <= 0 || list.length < 2 * span) return shuffled(list, kind, cycle);
+    const key = `${kind}/${span}/${list.map((r) => r.id).join(',')}`;
+    let memo = orderCache.get(key);
+    if (!memo) {
+      memo = [shuffled(list, kind, 0)];
+      orderCache.set(key, memo);
+      if (orderCache.size > 60) orderCache.delete(orderCache.keys().next().value);
+    }
+    for (let c = memo.length; c <= cycle; c += 1) {
+      const last = new Set(memo[c - 1].slice(-span));
+      const order = shuffled(list, kind, c);
+      const head = order.filter((r) => !last.has(r)).slice(0, span);
+      memo.push([...head, ...order.filter((r) => !head.includes(r))]);
+    }
+    return memo[cycle];
+  }
+
+  const nthOf = (slot, ctx) => slotsOf(ctx).filter((s) => s.kind === slot.kind).indexOf(slot);
+  /** 主菜先挑：忌口太多时主菜要借用豆腐这类蔬菜，别让蔬菜的格子先拿走 */
+  const fillOrder = (ctx) => [...slotsOf(ctx).filter((s) => s.kind === 'main'), ...slotsOf(ctx).filter((s) => s.kind !== 'main')];
 
   function stapleOf(book, date, meal, sugar) {
     const list = book.staples.filter(([, , calm]) => !sugar || calm);
@@ -198,31 +214,33 @@
     const pinned = st.days[date] || {};
     const used = new Set();
     const chosen = {};
-    for (const s of SLOTS) {
+    const slots = slotsOf(ctx);
+    for (const s of slots) {
       const r = find(book, pinned[s.key]);
       if (r && accepts(s.kind, r) && fits(book, r, st, ctx.stage) && !used.has(r.id)) {
         chosen[s.key] = r;
         used.add(r.id);
       }
     }
-    for (const s of FILL_ORDER) {
+    for (const s of fillOrder(ctx)) {
       if (chosen[s.key]) continue;
       chosen[s.key] = null;
       const list = pool(book, st, s.kind, ctx);
       if (!list.length) continue;
-      const { order, index } = turn(list, s.kind, date, nthOf(s));
+      const { order, index } = turn(list, s.kind, date, nthOf(s, ctx), perDay(s.kind, ctx));
       const r = order.map((_, i) => order[(index + i) % order.length]).find((x) => !used.has(x.id));
       if (r) {
         chosen[s.key] = r;
         used.add(r.id);
       }
     }
+    const keys = new Set(slots.map((s) => s.key));
     return MEALS.map((m) => ({
       meal: m.id,
       name: m.name,
       staple: m.staple ? stapleOf(book, date, m.id, ctx.sugar) : null,
-      dishes: m.slots.map(([key, kind]) => ({ key, kind, recipe: chosen[key] })),
-    }));
+      dishes: m.slots.filter(([key]) => keys.has(key)).map(([key, kind]) => ({ key, kind, recipe: chosen[key] })),
+    })).filter((m) => m.dishes.length);
   }
 
   const dishesOf = (meals) => meals.flatMap((m) => m.dishes);
@@ -234,14 +252,14 @@
 
   /** 换一道：顺着这一格的轮换顺序往后找，同一天别的格子正用着的跳过；没得换时返回 null */
   function swap(book, st, date, key, ctx) {
-    const slot = slotOf(key);
+    const slot = slotsOf(ctx).find((s) => s.key === key);
     if (!slot) return null;
     const dishes = dishesOf(menu(book, st, date, ctx));
     const current = dishes.find((x) => x.key === key).recipe;
     const others = new Set(dishes.filter((x) => x.key !== key && x.recipe).map((x) => x.recipe.id));
     const list = pool(book, st, slot.kind, ctx);
     if (!list.length) return null;
-    const { order, index } = turn(list, slot.kind, date, nthOf(slot));
+    const { order, index } = turn(list, slot.kind, date, nthOf(slot, ctx), perDay(slot.kind, ctx));
     const at = order.indexOf(current);
     const from = at >= 0 ? at : index - 1;
     for (let i = 1; i <= order.length; i += 1) {
@@ -254,8 +272,8 @@
     return null;
   }
 
-  /** 这类菜能放进哪几格 */
-  const slotsFor = (kind) => SLOTS.filter((s) => s.kind === kind);
+  /** 这类菜在这个阶段能放进哪几格 */
+  const slotsFor = (kind, ctx = { stage: '' }) => slotsOf(ctx).filter((s) => s.kind === kind);
 
   /** 从全部食谱里挑一道放进某一格；同一天别的格子里也放了这道的，那一格让出来重新轮 */
   function place(book, st, date, key, id) {
@@ -383,8 +401,8 @@
   }
 
   /** 现在该看哪一顿：{ meal, tomorrow } */
-  function nextMeal(hour) {
-    const hit = MEAL_UNTIL.find(([, until]) => hour < until);
+  function nextMeal(hour, stage = '') {
+    const hit = MEAL_UNTIL[stage === 'nursing' ? 'nursing' : 'pregnant'].find(([, until]) => hour < until);
     return hit ? { meal: hit[0], tomorrow: false } : { meal: 'breakfast', tomorrow: true };
   }
 
@@ -392,6 +410,7 @@
     KINDS,
     MEALS,
     SLOTS,
+    STAGES,
     TAGS,
     AVOIDS,
     SHOP_GROUPS,

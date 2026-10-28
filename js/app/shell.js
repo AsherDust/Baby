@@ -3,10 +3,10 @@
   // 整页渲染、换页、顶栏和底栏、开始页、图表，以及计时时屏幕常亮
   const { dates: D, model: M, chart: Chart, art: A, app } = globalThis.Baby;
   const {
-    root, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds,
+    root, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES, subName, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds,
     viewMom, viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
     viewFoodTool, viewRecipesTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby,
-    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth
+    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, viewWeaningTool
   } = app;
   const Bb = globalThis.Baby.baby;
   const BOOK = globalThis.Baby.babyBook;
@@ -197,6 +197,7 @@
       contractions: () => viewContractionsTool(now),
       food: () => viewFoodTool(),
       recipes: () => viewRecipesTool(route),
+      weaning: () => viewWeaningTool(),
       bag: () => viewBag(ga),
       weeks: () => viewWeeks(ga),
       story: () => viewStoryTool(now),
@@ -204,7 +205,7 @@
     return `
       <header class="page-head">
         <a href="#/tools" class="back">${A.icon.chevronLeft}<span>工具</span></a>
-        <h1 class="page-title">${SUB_NAMES[route.sub]}</h1>
+        <h1 class="page-title">${subName(route.sub)}</h1>
       </header>
       ${views[route.sub]()}`;
   }
