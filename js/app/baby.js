@@ -704,6 +704,12 @@
     } else if (nextExam && (nextExam.booked || nextExam.status === 'due' || nextExam.status === 'soon')) {
       items.push(todoItem({ icon: A.icon.calendarHeart, title: `下一次体检：${nextExam.name}`, text: `${examWhen(nextExam)} · <a class="link" href="#/baby/exams">体检</a>` }));
     }
+    if (age.months < 3) {
+      const papers = Bb.paperRows(b, BOOK, ui.today);
+      const left = papers.filter((r) => !r.done).length;
+      const pick = papers.find((r) => r.status === 'late' || r.status === 'soon') || Bb.nextPaper(papers);
+      if (left) items.push(todoItem({ icon: A.icon.docCheck, title: `出生后要办的事 ${papers.length - left}/${papers.length}`, text: `下一件：${pick.name}${pick.by ? `，最好 ${D.formatDate(pick.by)}前办` : ''} · <a class="link" href="#/tools/papers">办证清单</a>` }));
+    }
     const lastGrowth = b.growth[b.growth.length - 1];
     const gap = lastGrowth ? D.diffDays(lastGrowth.date, ui.today) : Infinity;
     if (gap >= (age.months < 6 ? 30 : 90)) {

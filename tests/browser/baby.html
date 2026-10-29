@@ -64,6 +64,8 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(sheet().open && sheet().querySelectorAll('.recipe-steps li').length > 0 && !sheet().querySelector('[data-action="baby-food-log"]'), '打开做法看看，还不能记吃了');
     log(sheet().querySelector('h2 .dish-dot') && text(sheet().querySelector('h2')) === '猪肉泥', '做法的标题前也有小圆点');
     await click('#sheet-dialog [data-action="close-dialog"]');
+    await nav('#/tools/papers');
+    log(text($('.page-title')) === '办证清单' && $$('.paper').length === 8 && $$('.paper input:disabled').length === 8 && /出生一件事/.test(text($('.papers-intro'))) && /先办好「出生医学证明」/.test(text($('.paper-waiting'))), '孕期先看办证清单：上海的「出生一件事」，出生后才能勾');
     await nav('#/');
     await click('.born-card [data-action="baby-birth-open"]');
     const f = sheet().querySelector('form[data-form="baby-birth"]');
@@ -89,6 +91,18 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await nav('#/tools/recipes');
     log(text($('.page-title')) === '哺乳食谱' && /坐月子 · 宝宝 2 天/.test(text($('.recipe-intro .eyebrow'))) && /产后头几天/.test(text($('.recipe-tip'))) && /2100 毫升/.test(text($('.recipe-tip'))), '按坐月子配：先吃软烂的，每餐有汤水', text($('.recipe-intro')));
     log($$('.meal').length === 5 && $$('.dish-open').length === 9 && $('#dish-lunch-soup') && $('#dish-night-snack'), '一天五顿九道：午餐也有汤，多一顿睡前加餐');
+    await nav('#/');
+    log(/出生后要办的事 0\/8/.test(text($('.panel-today'))) && /下一件：出生医学证明/.test(text($('.panel-today'))), '宝宝首页提醒出生后要办的事');
+    await nav('#/tools/papers');
+    log(/办好了 0\/8/.test(text($('.card-papers .card-meta'))) && !$('.paper input:disabled'), '出生后能勾了');
+    await click('#paper-cert');
+    log(baby().papers.cert === TODAY && /「出生医学证明」办好了/.test(toastText()) && $('.paper-done') && !/先办好「出生医学证明」/.test(text($('.card-papers'))), '勾上出生医学证明，落户不用再等它', toastText());
+    await click('#toast [data-action="undo"]');
+    log(!baby().papers.cert && /办好了 0\/8/.test(text($('.card-papers .card-meta'))), '勾错了能撤销');
+    await click('#paper-cert');
+    await click('#paper-hukou');
+    await nav('#/tools');
+    log(/办好了 2\/8 · 下一件：居民医保参保、缴费/.test(text($('[data-tool="papers"]'))), '工具页那一格写着办了几件、下一件', text($('[data-tool="papers"]')));
     await nav('#/');
 
     // ---- 首页一键记 ----
@@ -268,7 +282,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await nav('#/checkups/schedule');
     log(text($('.tab[aria-current="page"]')) === '记录' && $('.seg-tab[aria-current="page"]').getAttribute('href') === '#/checkups/schedule', '产检页亮的是「记录」');
     await nav('#/tools');
-    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,weaning,story', '工具页收起数胎动、宫缩、待产包、每周变化');
+    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,weaning,papers,story', '工具页收起数胎动、宫缩、待产包、每周变化');
 
     // ---- 刷新、清除 ----
     await new Promise((r) => { iframe.onload = r; w.location.reload(); });

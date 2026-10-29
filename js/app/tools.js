@@ -35,6 +35,7 @@
         ${tile('food', A.icon.bowl, { text: `${C.FOODS.length} 种常见食物，搜一下就知道` })}
         ${tile('recipes', A.icon.pot, recipeStatus(now))}
         ${tile('weaning', A.icon.spoon, weaningStatus())}
+        ${tile('papers', A.icon.docCheck, papersStatus())}
         ${born ? '' : tile('bag', A.icon.suitcase, { text: bag.total ? `已备好 ${bag.done}/${bag.total}` : '清单空了，去加几样' })}
         ${born ? '' : tile('weeks', A.icon.book, { text: `现在是第 ${Math.max(ga.weeks, 0)} 周，看看宝宝和妈妈的变化` })}
         ${tile('story', A.icon.moon, storyStatus(now))}
@@ -48,6 +49,57 @@
     if (months < 6) return { text: `满 6 个月（${D.formatDate(Bb.addMonths(b.birthDate, 6), { relativeTo: ui.today })}）开始加辅食` };
     const picks = Bb.foodToday(FOOD, BB, b, ui.today);
     return { text: picks.length ? `今天可以做：${esc(picks.map((r) => r.name).join('、'))}` : '按月龄推荐营养全面的辅食' };
+  }
+
+  function papersStatus() {
+    const b = app.state.baby;
+    if (!b) return { text: '宝宝出生后要办的证件和补贴，以上海为例' };
+    const rows = Bb.paperRows(b, BB, ui.today);
+    const left = rows.filter((r) => !r.done).length;
+    return { text: left ? `办好了 ${rows.length - left}/${rows.length} · 下一件：${Bb.nextPaper(rows).name}` : '都办好啦' };
+  }
+
+  /** 「办证清单」：出生后要办的证件和补贴，按上海的做法；宝宝出生前先看看，出生后一件件勾 */
+  function viewPapersTool() {
+    const b = app.state.baby;
+    const rows = b ? Bb.paperRows(b, BB, ui.today) : BB.papers.map((p) => ({ ...p, done: null, wait: p.after || [], by: null, status: p.after ? 'waiting' : 'todo' }));
+    const names = Object.fromEntries(BB.papers.map((p) => [p.id, p.name]));
+    const done = rows.filter((r) => r.done).length;
+    const status = (r) => {
+      if (r.done) return `${D.formatDate(r.done, { relativeTo: ui.today })}办好了`;
+      if (r.wait.length) return `先办好「${r.wait.map((id) => names[id]).join('」「')}」`;
+      if (r.status === 'late') return `最好在 ${D.formatDate(r.by, { relativeTo: ui.today })}前办，过了也打电话问问能不能补办`;
+      return r.by ? `最好在 ${D.formatDate(r.by, { relativeTo: ui.today })}前办` : '';
+    };
+    return `
+      <article class="card card-papers">
+        <header class="card-head">
+          <div>
+            <h2 class="card-title">${A.icon.docCheck}出生后要办的事</h2>
+            <p class="card-meta">${b ? `办好了 ${done}/${rows.length}` : '宝宝出生后就能一件件勾了'} · 以上海为例</p>
+          </div>
+        </header>
+        ${b ? `
+          <div class="bag-progress${done === rows.length ? ' is-full' : ''}" role="progressbar" aria-label="办好了几件" aria-valuemin="0" aria-valuemax="${rows.length}" aria-valuenow="${done}">
+            <i style="width:${((done / rows.length) * 100).toFixed(1)}%"></i>
+          </div>` : ''}
+        <p class="papers-intro">${BB.papersIntro}</p>
+        <ol class="paper-list">${rows.map((r) => `
+          <li class="paper paper-${r.status}">
+            <label class="bag-check">
+              <input type="checkbox" id="paper-${r.id}" data-action="paper-toggle" data-id="${r.id}"${r.done ? ' checked' : ''}${b ? '' : ' disabled'}>
+              <span class="bag-box" aria-hidden="true">${A.icon.check}</span>
+              <span class="paper-text">
+                <span class="paper-name">${r.name}${r.who === 'mom' ? '<span class="tag">妈妈办</span>' : ''}</span>
+                <span class="paper-how">${r.how}</span>
+                ${r.note ? `<span class="paper-note">${r.note}</span>` : ''}
+                ${status(r) ? `<span class="paper-status">${status(r)}</span>` : ''}
+              </span>
+            </label>
+          </li>`).join('')}
+        </ol>
+        <p class="fineprint">整理于 ${BB.papersUpdated}，按上海的做法写；政策会变，以随申办和各部门的说明为准。其他城市大多也有「出生一件事」，能一起办的事项不太一样，看当地的政务服务平台。用不上的（比如妈妈没有上海的职工医保）勾上就行。</p>
+      </article>`;
   }
 
   function kickStatus(ga, now) {
@@ -311,6 +363,6 @@
 
   Object.assign(app, {
     todayKicks, kickResult, bagTiming, viewToolMenu, viewKicksTool, viewContractionsTool, viewFoodTool,
-    viewFoodResults, paintClocks, viewBag
+    viewFoodResults, paintClocks, viewBag, viewPapersTool
   });
 })();

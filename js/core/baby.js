@@ -120,6 +120,7 @@
       vaccines: {},
       extraVaccines: [],
       exams: {},
+      papers: {},
       milestones: {},
       moments: [],
       tried: {},
@@ -241,6 +242,7 @@
       extraVaccines: list(raw.extraVaccines, (v) => (v && isId(v.id) && text(v.name, 20) && D.isISODate(v.date)
         ? { id: v.id, name: text(v.name, 20), date: v.date, done: v.done === true } : null)),
       exams: bookings(raw.exams),
+      papers: datedMap(raw.papers, isId),
       milestones: datedMap(raw.milestones, isId),
       moments: list(raw.moments, (m) => (m && isId(m.id) && text(m.name, 20) && D.isISODate(m.date) ? { id: m.id, name: text(m.name, 20), date: m.date } : null)),
       tried: datedMap(raw.tried, (k) => text(k, 20) === k && k.length > 0),
@@ -584,6 +586,42 @@
     return before;
   }
 
+  // ---------- 出生后要办的事 ----------
+
+  /**
+   * 每件事：done 办好的日子；wait 还没办好的前置事项；by 最好在哪天前办；
+   * status：done / waiting（前面的还没办好）/ late（过了最好办的日子）/ soon（两周内到期）/ todo
+   */
+  function paperRows(b, book, today) {
+    return book.papers.map((p) => {
+      const done = b.papers[p.id] || null;
+      const wait = (p.after || []).filter((id) => !b.papers[id]);
+      let by = null;
+      if (p.by && p.by.months) by = addMonths(b.birthDate, p.by.months);
+      if (p.by && p.by.years) by = `${Number(b.birthDate.slice(0, 4)) + p.by.years}-12-31`;
+      let status = 'todo';
+      if (done) status = 'done';
+      else if (wait.length) status = 'waiting';
+      else if (by && today > by) status = 'late';
+      else if (by && D.diffDays(today, by) <= 14) status = 'soon';
+      return { ...p, done, wait, by, status };
+    });
+  }
+
+  /** 下一件：前面都办好了的里面最靠前的，没有就是还没办的第一件 */
+  function nextPaper(rows) {
+    const open = rows.filter((r) => !r.done);
+    return open.find((r) => !r.wait.length) || open[0] || null;
+  }
+
+  /** 勾上或取消；返回勾之前的日子，撤销用 */
+  function togglePaper(b, id, today) {
+    const before = b.papers[id] || null;
+    if (before) delete b.papers[id];
+    else b.papers[id] = today;
+    return before;
+  }
+
   // ---------- 里程碑 ----------
 
   /** 预设的里程碑：done 记过了 / now 多数宝宝这阵子会 / soon 还早 / past 一般已经会了，还没记 */
@@ -732,6 +770,9 @@
     examReminders,
     setExam,
     markPastExams,
+    paperRows,
+    nextPaper,
+    togglePaper,
     milestoneRows,
     addMoment,
     tempLevel,

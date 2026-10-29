@@ -1691,6 +1691,29 @@ test('儿保体检：产后访视和 42 天检查按天算，之后按月龄到�
   eq(b.exams.d42, undefined);
 });
 
+test('出生后要办的事：按上海的顺序，前面没办的先等着；少儿住院互助基金 2 个月内，育儿补贴第二年年底前', () => {
+  const ids = BOOKB.papers.map((p) => p.id);
+  eq(ids, ['cert', 'hukou', 'insure', 'fund', 'card', 'vax', 'subsidy', 'maternity']);
+  ok(BOOKB.papers.every((p) => p.name && p.how && (p.after || []).every((a) => ids.indexOf(a) >= 0 && ids.indexOf(a) < ids.indexOf(p.id))), '要先办的排在前面');
+  const b = newborn('2026-10-10');
+  let rows = Bb.paperRows(b, BOOKB, '2026-10-12');
+  const row = (id) => rows.find((r) => r.id === id);
+  eq([row('cert').status, row('hukou').status, row('hukou').wait, row('fund').by, row('subsidy').by, row('vax').status], ['todo', 'waiting', ['cert'], '2026-12-10', '2027-12-31', 'todo']);
+  eq(Bb.nextPaper(rows).id, 'cert');
+  eq(Bb.togglePaper(b, 'cert', '2026-10-12'), null);
+  Bb.togglePaper(b, 'hukou', '2026-10-13');
+  rows = Bb.paperRows(b, BOOKB, '2026-11-30');
+  eq([row('cert').status, row('hukou').done, row('insure').status, row('fund').status, Bb.nextPaper(rows).id], ['done', '2026-10-13', 'todo', 'soon', 'insure']);
+  rows = Bb.paperRows(b, BOOKB, '2026-12-11');
+  eq(row('fund').status, 'late');
+  eq(Bb.togglePaper(b, 'cert', '2026-12-11'), '2026-10-12', '取消勾选，返回原来的日子');
+  eq(b.papers.cert, undefined);
+  eq(Bb.normalize({ ...newborn(), papers: { cert: '2026-10-12', 'BAD ID': '2026-10-12', hukou: 'soon' } }).papers, { cert: '2026-10-12' });
+  const old = newborn();
+  delete old.papers;
+  eq(Bb.normalize(old).papers, {}, '老数据没有这一项');
+});
+
 test('里程碑：这阵子会的、还早的、一般已经会了的；记下的带上那时几个月大；自己加的', () => {
   const b = newborn('2026-01-15');
   let rows = Bb.milestoneRows(b, BOOKB, '2026-06-20');

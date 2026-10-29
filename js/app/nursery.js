@@ -546,6 +546,19 @@
       toast(`导出了 ${rows.length} 针，打开下载的文件就能加进日历`);
     },
 
+    'paper-toggle'(el) {
+      const b = kid();
+      const p = BOOK.papers.find((x) => x.id === el.dataset.id);
+      if (!b || !p) return;
+      const before = Bb.togglePaper(b, p.id, ui.today);
+      const all = Bb.paperRows(b, BOOK, ui.today).every((r) => r.done);
+      if (!before && all) cheer(el);
+      saved(before ? `「${p.name}」改回还没办` : say(all ? 'papersDone' : 'paper', { name: p.name }), () => {
+        if (before) b.papers[p.id] = before;
+        else delete b.papers[p.id];
+      });
+    },
+
     'exam-done'(el) {
       const b = kid();
       const id = el.dataset.id;

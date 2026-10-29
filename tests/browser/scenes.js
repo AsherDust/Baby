@@ -82,6 +82,8 @@ function seedScene(name) {
     for (const r of B.vaccineRows(b, Baby.babyBook, '2026-10-12')) if (done.includes(r.id)) B.setVaccine(b, r.id, { done: r.due });
     const exams = small ? [['visit', '2026-08-20'], ['d42', '2026-09-27']] : [['visit', '2026-03-08'], ['d42', '2026-04-14'], ['m3', '2026-06-05']];
     exams.forEach(([id, date]) => B.setExam(b, id, { done: date }));
+    const papers = small ? ['cert', 'hukou', 'insure', 'card', 'vax'] : Baby.babyBook.papers.map((p) => p.id);
+    papers.forEach((id, i) => { b.papers[id] = Baby.dates.addDays(b.birthDate, 2 + i); });
     if (small) B.setVaccine(b, 'ipv-1', { booked: '2026-10-13' });
     else {
       ['smile', 'head', 'roll', 'sit'].forEach((id, i) => { b.milestones[id] = ['2026-04-20', '2026-05-10', '2026-07-05', '2026-09-20'][i]; });

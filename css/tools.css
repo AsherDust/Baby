@@ -191,6 +191,26 @@
 .bag-item.is-done .bag-note { color: var(--ink-3); }
 .bag-item .icon-btn-sm { color: var(--icon-faint); }
 
+/* ---------- 办证清单 ---------- */
+
+.papers-intro { margin: 0 0 12px; padding: 10px 14px; border-radius: 14px; background: var(--honey-glow); color: var(--warn-ink); font-size: 13.5px; }
+.paper-list { margin: 0; padding: 0; list-style: none; }
+.paper { border-top: 1px dashed var(--line); }
+.paper:first-child { border-top: 0; }
+.paper .bag-check { padding: 10px 2px; }
+.paper .bag-check input:disabled + .bag-box { opacity: 0.5; }
+.paper-text { display: grid; gap: 3px; min-width: 0; }
+.paper-name { font-size: 15px; font-weight: 600; }
+.paper-name .tag { margin-left: 8px; vertical-align: 1px; }
+.paper-how { font-size: 13.5px; color: var(--ink-2); }
+.paper-note { font-size: 12.5px; color: var(--ink-3); }
+.paper-status { font-size: 13px; font-weight: 600; color: var(--honey-deep); }
+.paper-done .paper-name { color: var(--ink-3); text-decoration: line-through; text-decoration-color: rgba(168, 149, 124, 0.55); }
+.paper-done .paper-how, .paper-done .paper-note { display: none; }
+.paper-done .paper-status { color: var(--leaf-deep); font-weight: 400; }
+.paper-waiting .paper-status { color: var(--ink-3); font-weight: 400; }
+.paper-late .paper-status { color: var(--alert-ink); }
+
 .bag-add {
   display: inline-flex;
   align-items: center;

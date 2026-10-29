@@ -6,7 +6,7 @@
     root, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES, subName, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds,
     viewMom, viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
     viewFoodTool, viewRecipesTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby,
-    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, viewWeaningTool
+    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, viewWeaningTool, viewPapersTool
   } = app;
   const Bb = globalThis.Baby.baby;
   const BOOK = globalThis.Baby.babyBook;
@@ -199,6 +199,7 @@
       food: () => viewFoodTool(),
       recipes: () => viewRecipesTool(route),
       weaning: () => viewWeaningTool(),
+      papers: () => viewPapersTool(),
       bag: () => viewBag(ga),
       weeks: () => viewWeeks(ga),
       story: () => viewStoryTool(now),
