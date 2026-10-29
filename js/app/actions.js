@@ -1,15 +1,55 @@
 (function () {
   'use strict';
   // 表单提交和按钮动作
-  const { dates: D, content: C, model: M, storage: S, journal: J, app } = globalThis.Baby;
+  const { dates: D, content: C, model: M, storage: S, journal: J, merge: Mg, app } = globalThis.Baby;
   const {
     settingsDialog, checkupDialog, medDialog, sheetDialog, notifyPermission, JOURNAL_SHOWN, ui, render, go, closeDialog,
-    openGlucoseSheet, openUltrasoundSheet, openJournalSheet, openSettings, openCheckupDialog, openMedDialog, formError,
+    openGlucoseSheet, openUltrasoundSheet, openJournalSheet, openSettings, openCheckupDialog, openMedDialog, openMergeSheet, formError,
     toast, oops, say, cheer, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose,
     checkNotifications, storyActions, recipeActions, babyForms, babyActions, noiseActions, startPelvic, stopPelvic
   } = app;
 
   const submitButton = (form) => form.querySelector('button:not([type="button"])');
+
+  /** 选一个 .json 文件，读出文字交给 then */
+  function pickJson(then) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (file) then(await file.text());
+    });
+    input.click();
+  }
+
+  // 文件里记的导出时间，例如「10月28日 21:30」；读不出来就不显示
+  function exportedAt(text) {
+    try {
+      const t = new Date(JSON.parse(text).exportedAt);
+      if (Number.isNaN(t.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${D.formatDate(D.localISO(t), { relativeTo: ui.today })} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /** 家人发来的文件：先合一份看看加了什么，点「合并」时再按那会儿的记录合一遍换上 */
+  function previewMerge(text) {
+    let other;
+    try {
+      other = S.parseBackup(text);
+    } catch (e) {
+      if (settingsDialog.open) formError(settingsDialog.querySelector('form'), e.message);
+      else oops(e.message);
+      return;
+    }
+    ui.mergePending = other;
+    if (settingsDialog.open) closeDialog(settingsDialog);
+    openMergeSheet(Mg.merge(app.state, other), exportedAt(text));
+  }
+
   const journalFields = (form) => ({
     mood: form.elements.mood.value,
     text: form.elements.text.value,
@@ -532,14 +572,9 @@
 
     'import-backup'() {
       const form = settingsDialog.open ? settingsDialog.querySelector('form') : document.querySelector('form[data-form="onboard"]');
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.json,application/json';
-      input.addEventListener('change', async () => {
-        const file = input.files[0];
-        if (!file) return;
+      pickJson((text) => {
         try {
-          const next = S.parseBackup(await file.text());
+          const next = S.parseBackup(text);
           if (app.state && !window.confirm('导入会覆盖现在的全部记录，确定吗？')) return;
           app.state = next;
           persist();
@@ -551,7 +586,35 @@
           else oops(e.message);
         }
       });
-      input.click();
+    },
+
+    async 'share-family'(el) {
+      const how = await saveFile(S.backupText(app.state, new Date()), `蜜罐-发给家人-${ui.today}.json`, 'application/json');
+      if (how === 'cancelled') return;
+      cheer(el);
+      const message = how === 'shared' ? '发好了，让家人在设置里点「合并家人的记录」，选这个文件'
+        : '文件下载好了，用微信发给家人，让对方在设置里点「合并家人的记录」';
+      const state = settingsDialog.open && settingsDialog.querySelector('.family-state');
+      if (!state) return toast(message);
+      state.textContent = message;
+      state.hidden = false;
+    },
+
+    'merge-family'() {
+      pickJson(previewMerge);
+    },
+
+    'merge-apply'() {
+      if (!ui.mergePending) return;
+      const r = Mg.merge(app.state, ui.mergePending);
+      const before = app.state;
+      app.state = r.state;
+      ui.mergePending = null;
+      persist();
+      closeDialog(sheetDialog);
+      render();
+      const what = [r.added ? `加了 ${r.added} 条` : '', r.updated ? `改了 ${r.updated} 条` : '', r.dropped ? `删了 ${r.dropped} 条` : ''].filter(Boolean).join('、');
+      toast(`合并好了，${what}`, () => { app.state = before; });
     },
 
     'hide-install-hint'() {
@@ -606,5 +669,5 @@
     },
   };
 
-  Object.assign(app, { forms, actions });
+  Object.assign(app, { forms, actions, previewMerge });
 })();

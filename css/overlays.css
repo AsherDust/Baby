@@ -26,6 +26,16 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
 .settings-data { margin-top: 8px; padding-top: 18px; border-top: 1px dashed var(--line-strong); }
 .settings-data h3 { margin: 0 0 4px; font-size: 14px; }
 .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.family-state { color: var(--ink-2); }
+
+/* 合并家人的记录：合之前看一眼 */
+.merge-list { margin: 0; padding: 0; list-style: none; }
+.merge-list li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 2px; border-top: 1px dashed var(--line); font-size: 14.5px; }
+.merge-list li:first-child { border-top: 0; }
+.merge-list b { flex: none; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.merge-same { margin: 0; padding: 14px; border-radius: 14px; background: var(--field); color: var(--ink-2); font-size: 14.5px; text-align: center; }
+.merge-note { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--honey-glow); color: var(--warn-ink); font-size: 13.5px; }
+.merge-note svg { flex: none; width: 16px; height: 16px; margin-top: 2px; }
 
 /* ---------- 提示条 ---------- */
 

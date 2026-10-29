@@ -189,6 +189,85 @@ save(seed);
     await pick(backupText);
     log($('.hero') && state() && state().weights.length === 1 && confirms === asked && /导入好了/.test(toastText()), '在开始页导入备份，直接进首页，不用确认覆盖',
       `hero=${Boolean($('.hero'))} weights=${state() && state().weights.length} confirms=${confirms - asked} toast=${toastText()} err=${text('form[data-form="onboard"] .form-error')} backup=${backupText.slice(0, 60)}`);
+
+    // ---- 两台手机合并 ----
+    pretend({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36', platform: 'MacIntel' });
+    rerender();
+    const sheet = () => d.getElementById('sheet-dialog');
+    const pickMerge = async (content, done = () => sheet().open && $('.merge-sheet')) => {
+      settings().querySelector('[data-action="merge-family"]').click();
+      Object.defineProperty(picker, 'files', { value: [new w.File([content], 'dad.json', { type: 'application/json' })] });
+      picker.dispatchEvent(new w.Event('change'));
+      for (let i = 0; i < 100 && !done(); i++) await wait(20);
+      await wait(0);
+    };
+    const closeSheet = async (action = 'merge-apply') => {
+      sheet().querySelector(`[data-action="${action}"]`).click();
+      await wait(0);
+      if (w.history.state && w.history.state.sheet) await new Promise((r) => w.addEventListener('popstate', () => setTimeout(r, 0), { once: true }));
+    };
+    const dadFile = (change) => {
+      const s = JSON.parse(JSON.stringify(state()));
+      change(s);
+      return Baby.storage.backupText(s, new Date('2026-10-12T13:30:00Z'));
+    };
+    const fromDad = dadFile((s) => {
+      Baby.model.upsertWeight(s, '2026-10-11', 55.6);
+      Baby.journal.add(s, { mood: 'happy', text: '爸爸记的', date: TODAY }, TODAY, Date.now());
+    });
+
+    $('[data-action="open-settings"]').click();
+    await wait(0);
+    log(/两台手机一起记/.test(text('#settings-dialog .settings-family')) && settings().querySelector('[data-action="share-family"]'), '设置里有「两台手机一起记」');
+    const before = blobs.length;
+    save({ ...state(), prefs: { ...state().prefs, lastBackup: '2026-09-01' } });
+    rerender();
+    settings().querySelector('[data-action="share-family"]').click();
+    await wait(0);
+    const sent = blobs.length === before + 1 && JSON.parse(await blobs[blobs.length - 1].text());
+    log(sent && sent.weights.length === 1 && /发给家人/.test(text('#settings-dialog .family-state')) && state().prefs.lastBackup === '2026-09-01',
+      '「发给家人」下载整份记录，说明下一步怎么做，不算备份', text('#settings-dialog .family-state'));
+
+    await pickMerge('不是备份', () => text('#settings-dialog .form-error'));
+    log(/打不开/.test(text('#settings-dialog .form-error')) && !sheet().open, '选错文件时在设置里提示');
+    await pickMerge(fromDad);
+    log(!settings().open && /体重\s*加 1 条/.test(text('.merge-sheet')) && /心情\s*加 1 条/.test(text('.merge-sheet')) && /导出的/.test(text('.merge-sheet .dialog-sub')),
+      '合并前先列出要加的', text('.merge-sheet'));
+    log(state().weights.length === 1, '点「合并」之前不动这台的记录');
+    await closeSheet();
+    log(state().weights.length === 2 && state().journal.length === 1 && /合并好了，加了 2 条/.test(toastText()) && $('#toast [data-action="undo"]'),
+      '合并后两边的都在，可以撤销', toastText());
+    $('#toast [data-action="undo"]').click();
+    log(state().weights.length === 1 && state().journal.length === 0, '撤销后回到合并之前');
+
+    $('[data-action="open-settings"]').click();
+    await pickMerge(fromDad);
+    await closeSheet();
+    const merged = state();
+    $('[data-action="open-settings"]').click();
+    await pickMerge(fromDad);
+    log(/已经一样了/.test(text('.merge-sheet')) && !sheet().querySelector('[data-action="merge-apply"]'), '同一个文件再合一次：说已经一样了');
+    await closeSheet('close-dialog');
+    const dadDeleted = dadFile((s) => { Baby.journal.remove(s, merged.journal[0].id); });
+    $('[data-action="open-settings"]').click();
+    await pickMerge(dadDeleted);
+    log(/心情\s*跟着对方删 1 条/.test(text('.merge-sheet')), '对方删掉的列出来', text('.merge-sheet'));
+    await closeSheet();
+    log(state().journal.length === 0 && state().weights.length === 2 && /删了 1 条/.test(toastText()), '对方删掉的这台也删了', toastText());
+
+    const dadEdited = dadFile((s) => {
+      Baby.merge.track(s);
+      s.weights[0].kg = 54.9;
+      Baby.merge.track(s);
+    });
+    $('[data-action="open-settings"]').click();
+    await pickMerge(dadEdited);
+    log(/体重\s*改 1 条/.test(text('.merge-sheet')), '对方后来改过的列出来', text('.merge-sheet'));
+    await closeSheet();
+    log(state().weights[0].kg === 54.9 && /改了 1 条/.test(toastText()), '对方后来改过的用对方的', toastText());
+    w.Baby.model.upsertWeight(w.Baby.app.state, '2026-10-12', 55.5);
+    w.Baby.app.persist();
+    log(state().edits['weight:2026-10-12'] > Date.now() - 60000, '这台改过的保存时记下时间', JSON.stringify(state().edits));
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }

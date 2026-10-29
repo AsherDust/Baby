@@ -136,6 +136,8 @@
       foodNotes: {},
       stash: [],
       teeth: {},
+      removed: {},
+      edits: {},
     };
   }
 
@@ -281,6 +283,8 @@
         if (!m || !isId(m.id) || !isTime(m.at) || !STASH_PLACES.some((p) => p.id === m.place) || !(ml >= STASH_ML[0] && ml <= STASH_ML[1])) return null;
         return { id: m.id, ml, at: m.at, place: m.place, thawedAt: m.place === 'freezer' && isTime(m.thawedAt) ? m.thawedAt : null };
       }).sort((x, y) => x.at - y.at),
+      removed: Baby.merge.clean(raw.removed),
+      edits: Baby.merge.cleanEdits(raw.edits),
     };
   }
 
@@ -440,8 +444,22 @@
 
   function removeLog(b, id) {
     const index = b.logs.findIndex((l) => l.id === id);
-    return index < 0 ? null : { entry: b.logs.splice(index, 1)[0], index };
+    if (index < 0) return null;
+    const entry = b.logs.splice(index, 1)[0];
+    Baby.merge.drop(b.removed, `log:${id}`, entry);
+    return { entry, index };
   }
+
+  /** 删一件「第一次」、一针自费疫苗：{ item, index }，撤销时放回原处 */
+  function removeFrom(b, field, tag, id) {
+    const index = b[field].findIndex((x) => x.id === id);
+    if (index < 0) return null;
+    const item = b[field].splice(index, 1)[0];
+    Baby.merge.drop(b.removed, `${tag}:${id}`, item);
+    return { item, index };
+  }
+  const removeMoment = (b, id) => removeFrom(b, 'moments', 'moment', id);
+  const removeExtraVaccine = (b, id) => removeFrom(b, 'extraVaccines', 'xv', id);
 
   function restoreLog(b, removed) {
     b.logs.splice(Math.min(removed.index, b.logs.length), 0, removed.entry);
@@ -527,7 +545,10 @@
 
   function removeStash(b, id) {
     const index = b.stash.findIndex((x) => x.id === id);
-    return index < 0 ? null : { bag: b.stash.splice(index, 1)[0], index };
+    if (index < 0) return null;
+    const bag = b.stash.splice(index, 1)[0];
+    Baby.merge.drop(b.removed, `stash:${id}`, bag);
+    return { bag, index };
   }
 
   function restoreStash(b, removed) {
@@ -566,7 +587,10 @@
 
   function removeGrowth(b, date) {
     const index = b.growth.findIndex((g) => g.date === date);
-    return index < 0 ? null : b.growth.splice(index, 1)[0];
+    if (index < 0) return null;
+    const hit = b.growth.splice(index, 1)[0];
+    Baby.merge.drop(b.removed, `growth:${date}`, hit);
+    return hit;
   }
 
   /** 某天的 L、M、S：按周取的点之间线性插值；超出 0–2 岁返回 null */
@@ -949,6 +973,8 @@
     nextFeed,
     sleepNeed,
     weekSummary,
+    removeMoment,
+    removeExtraVaccine,
     addStash,
     stashRows,
     thawStash,

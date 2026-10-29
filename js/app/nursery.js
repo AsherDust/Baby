@@ -614,10 +614,9 @@
 
     'moment-delete'(el) {
       const b = kid();
-      const index = b.moments.findIndex((m) => m.id === el.dataset.id);
-      if (index < 0) return;
-      const [m] = b.moments.splice(index, 1);
-      saved(`删掉了「${m.name}」`, () => b.moments.splice(index, 0, m));
+      const removed = Bb.removeMoment(b, el.dataset.id);
+      if (!removed) return;
+      saved(`删掉了「${removed.item.name}」`, () => b.moments.splice(removed.index, 0, removed.item));
     },
 
     'vaccine-done'(el) {
@@ -727,10 +726,9 @@
 
     'extra-vaccine-delete'(el) {
       const b = kid();
-      const index = b.extraVaccines.findIndex((x) => x.id === el.dataset.id);
-      if (index < 0) return;
-      const [v] = b.extraVaccines.splice(index, 1);
-      saved(`删掉了「${v.name}」`, () => b.extraVaccines.splice(index, 0, v));
+      const removed = Bb.removeExtraVaccine(b, el.dataset.id);
+      if (!removed) return;
+      saved(`删掉了「${removed.item.name}」`, () => b.extraVaccines.splice(removed.index, 0, removed.item));
     },
 
     'baby-med-fill'(el) {

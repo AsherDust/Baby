@@ -15,6 +15,8 @@
 //   hour   假装现在几点，例如 21 看晚上首页的故事卡片
 //   story / reading  今晚读哪篇（例如 prose-07）、假装朗读暂停在第几段（从 0 数）
 //   profile 改几项资料（JSON），例如 {"preWeight":48} 看体重长得偏快的样子
+//   then   打开弹窗以后再滚到哪里，例如 .settings-family
+//   merge  假装收到家人发来的文件，打开「合并家人的记录」：1 只打开，apply 再点「合并」
 const p = new URLSearchParams(location.search);
 const scenario = p.get('s') || 'empty';
 const today = p.get('today') || '2026-10-12';
@@ -46,6 +48,27 @@ document.querySelector('iframe').addEventListener('load', (e) => {
   if (p.get('scroll')) d.querySelector(p.get('scroll')).scrollIntoView();
   if (p.get('click')) d.querySelector(p.get('click')).click();
   if (p.get('open')) d.querySelector(`[data-action="open-${p.get('open')}"]`).click();
+  if (p.get('then')) d.querySelector(p.get('then')).scrollIntoView({ block: 'center' });
+  if (p.get('merge')) {
+    // 爸爸那台：昨晚多记了两顿奶、两次尿布，删了一条重复的，改了一条备注，还量了体重、记了第一次笑
+    const B = fw.Baby.baby;
+    const dad = JSON.parse(JSON.stringify(fw.Baby.app.state));
+    fw.Baby.merge.track(dad);
+    const b = dad.baby;
+    const prev = fw.Baby.dates.addDays(today, -1);
+    const late = B.msAt(today, '23:59');
+    [['bottle', '19:00', { ml: '100', milk: 'formula' }], ['diaper', '19:15', { pee: true }], ['bottle', '21:30', { ml: '90', milk: 'formula' }],
+      ['diaper', '21:40', { pee: true, poo: true, color: 'yellow' }]].forEach(([type, time, f]) => B.addLog(b, B.readLog(type, { date: prev, time, ...f }, late)));
+    B.removeLog(b, b.logs.find((l) => l.type === 'diaper' && fw.Baby.dates.localISO(new Date(l.start)) === prev).id);
+    b.logs.find((l) => l.type === 'breast' && fw.Baby.dates.localISO(new Date(l.start)) === today).note = '左边吃得多';
+    B.setGrowth(b, { date: today, weight: '5.4', length: '', head: '' });
+    b.milestones.smile = '2026-09-28';
+    fw.Baby.merge.track(dad);
+    fw.Baby.app.previewMerge(fw.Baby.storage.backupText(dad, new Date(`${today}T13:30:00Z`)));
+    // 真机上是点完按钮、选完文件才打开，不会有键盘焦点的框
+    d.activeElement.blur();
+    if (p.get('merge') === 'apply') d.querySelector('[data-action="merge-apply"]').click();
+  }
   if (p.get('paste')) {
     const t = d.getElementById('us-paste');
     t.value = p.get('paste');

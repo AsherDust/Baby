@@ -14,7 +14,10 @@
     if (!raw) return null;
     try {
       const state = Baby.model.normalize(JSON.parse(raw));
-      if (state) return state;
+      if (state) {
+        Baby.merge.track(state);
+        return state;
+      }
     } catch (e) {
       // 读不出来的数据在下面另存一份，避免被新数据覆盖后彻底丢失
     }
@@ -27,6 +30,7 @@
   }
 
   function save(state) {
+    Baby.merge.track(state);
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
       return true;

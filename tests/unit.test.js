@@ -2009,6 +2009,323 @@ test('离线缓存清单里有页面用到的每个文件，清单里的文件�
   eq(files.filter((f) => f !== './' && !readFile(f, 'binary').length), [], '这些文件是空的');
 });
 
+// ---------- 两台手机合并 ----------
+
+const Mg = globalThis.Baby.merge;
+const clone = (x) => JSON.parse(JSON.stringify(x));
+// 另一台手机：同一份记录导出再导入，跟真的用文件传过去一样
+const viaFile = (s) => S.parseBackup(S.backupText(s, new Date('2026-10-12T10:00:00Z')));
+const statOf = (r, label) => r.stats.find((s) => s.label === label) || { added: 0, updated: 0, dropped: 0, kept: 0 };
+const stat = (label, added, updated, dropped, kept, unit = '条') => ({ label, unit, added, updated, dropped, kept });
+
+/** 每样记录都有的一台：孕期的、宝宝的，都是刚记下、还没存过的样子 */
+function fullState() {
+  const s = M.createState({ dueDate: DUE, preWeight: 52 });
+  M.upsertWeight(s, '2026-10-10', 56.2);
+  M.addBp(s, { date: '2026-10-12', time: '08:30', sys: '118', dia: '76', pulse: '', note: '' });
+  M.setGlucose(s, { date: '2026-10-12', slot: 'fasting', value: '5.1' });
+  M.addMed(s, { name: '叶酸', kind: 'supplement', dose: '', start: '2026-02-01', end: '', note: '' });
+  M.addUltrasound(s, { date: '2026-09-25', values: { bpd: '48' }, placenta: '', note: '' });
+  J.add(s, { mood: 'calm', text: '今天很好', date: '2026-10-12' }, '2026-10-12', Date.UTC(2026, 9, 12, 4));
+  M.startKicks(s, Date.UTC(2026, 9, 12, 2));
+  M.tapKick(s, Date.UTC(2026, 9, 12, 2, 1));
+  M.toggleContraction(s, Date.UTC(2026, 9, 12, 3));
+  M.addCheckup(s, { title: '复查', date: '2026-11-01', items: ['血常规'] });
+  M.addBagItem(s, 'baby', '口水巾');
+  s.baby = newborn();
+  const b = s.baby;
+  Bb.addLog(b, Bb.readLog('diaper', { date: '2026-10-12', time: '09:00', pee: true }, tAt('2026-10-12', '12:00')));
+  Bb.setGrowth(b, { date: '2026-09-15', weight: '4.4', length: '55' });
+  Bb.addMoment(b, '第一次去公园', '2026-10-01');
+  Bb.addExtraVaccine(b, { name: '13 价肺炎', date: '2026-10-05', done: true });
+  Bb.addStash(b, { ml: 100, at: tAt('2026-10-12', '07:00'), place: 'fridge' });
+  return s;
+}
+
+test('合并：指纹不管字段顺序和空着的字段；存一遍再读出来，每条的指纹都不变', () => {
+  eq(Mg.sign({ a: 1, b: null, c: '', d: [] }), Mg.sign({ a: 1 }));
+  eq(Mg.sign({ b: 2, a: 1 }), Mg.sign({ a: 1, b: 2 }));
+  ok(Mg.sign({ a: 1 }) !== Mg.sign({ a: 2 }) && Mg.sign({ done: true }) !== Mg.sign({}), '内容不一样指纹就不一样');
+  const s = fullState();
+  const back = viaFile(s);
+  const kinds = [['weights', (w) => w.date], ['bp'], ['glucose', (g) => g.date + g.slot], ['meds'], ['ultrasounds'], ['journal'],
+    ['kicks'], ['contractions'], ['checkups'], ['bag']];
+  const check = (a, b, field, key = (x) => x.id) => {
+    ok(a[field].length > 0, `${field} 没有记录`);
+    for (const x of a[field]) eq(Mg.sign(b[field].find((y) => key(y) === key(x))), Mg.sign(x), field);
+  };
+  kinds.forEach(([field, key]) => check(s, back, field, key));
+  [['logs'], ['growth', (g) => g.date], ['moments'], ['extraVaccines'], ['stash']].forEach(([field, key]) => check(s.baby, back.baby, field, key));
+});
+
+test('合并：两边各记各的合在一起，分不出先后的同一条以这台为准，空着的补上', () => {
+  const base = M.createState({ dueDate: DUE });
+  M.upsertWeight(base, '2026-10-01', 55);
+  const mine = viaFile(base);
+  const other = viaFile(base);
+  M.upsertWeight(mine, '2026-10-10', 56);
+  M.upsertWeight(other, '2026-10-10', 56.4);
+  M.upsertWeight(other, '2026-10-11', 56.3);
+  J.add(mine, { mood: 'calm', text: '我记的', date: '2026-10-12' }, '2026-10-12', Date.UTC(2026, 9, 12, 1));
+  J.add(other, { mood: 'happy', text: '爸爸记的', date: '2026-10-12' }, '2026-10-12', Date.UTC(2026, 9, 12, 2));
+  M.addCheckup(other, { title: '牙科检查', date: '2026-11-03', items: [] });
+  other.checkups.find((c) => c.id === 'nt').done = true;
+  other.checkups.find((c) => c.id === 'anomaly').date = '2026-10-20';
+  other.bag.find((x) => x.id === 'diapers').done = true;
+  other.profile.height = 160;
+  const before = clone(mine);
+  const r = Mg.merge(mine, other);
+  eq(mine, before, '不改这台原来的');
+  const s = r.state;
+  eq(s.weights.map((w) => [w.date, w.kg]), [['2026-10-01', 55], ['2026-10-10', 56], ['2026-10-11', 56.3]]);
+  eq(statOf(r, '体重'), stat('体重', 1, 0, 0, 1));
+  eq(s.journal.map((e) => e.text).sort(), ['我记的', '爸爸记的'].sort());
+  ok(s.checkups.some((c) => c.title === '牙科检查'), '对方加的产检');
+  ok(s.checkups.find((c) => c.id === 'nt').done && s.checkups.find((c) => c.id === 'anomaly').date === '2026-10-20', '对方填的日期、勾的做完补上');
+  ok(s.bag.find((x) => x.id === 'diapers').done, '待产包对方勾了的补上');
+  eq(s.profile.height, 160, '这台没填的身高用对方的');
+  eq([r.notes, r.added, r.dropped], [[], 3, 0], '体重、心情、产检各加 1 条');
+  const again = Mg.merge(s, other);
+  eq([again.added, again.dropped], [0, 0], '再合一次没有新的');
+  other.profile.dueDate = '2027-02-01';
+  ok(/预产期不一样/.test(Mg.merge(mine, other).notes.join()), '预产期不一样要说');
+});
+
+test('合并：对方删掉的这台也删；这台删过的不会加回来；撤销删除、删之前改过的都不删', () => {
+  const base = M.createState({ dueDate: DUE });
+  const e1 = J.add(base, { mood: 'calm', text: '一', date: '2026-10-10' }, '2026-10-12', Date.UTC(2026, 9, 10, 1));
+  const e2 = J.add(base, { mood: 'calm', text: '二', date: '2026-10-11' }, '2026-10-12', Date.UTC(2026, 9, 11, 1));
+  const bp = M.addBp(base, { date: '2026-10-12', time: '08:30', sys: '118', dia: '76', pulse: '', note: '' });
+  M.upsertWeight(base, '2026-10-10', 56.2);
+  const mine = viaFile(base);
+  const other = viaFile(base);
+  J.remove(other, e1.id);
+  J.remove(other, e2.id);
+  mine.journal.find((e) => e.id === e2.id).text = '二，后来补了几句';
+  M.removeBp(mine, bp.id);
+  M.upsertWeight(mine, '2026-10-10', 56.2);
+  const w = M.removeWeight(mine, '2026-10-10');
+  mine.weights.push(w);
+  const r = Mg.merge(mine, viaFile(other));
+  eq(r.state.journal.map((e) => e.id), [e2.id], '一模一样的那条跟着删，改过的留着');
+  eq(statOf(r, '心情').dropped, 1);
+  eq(r.state.bp, [], '这台删过的血压不会被加回来');
+  eq(r.state.weights.length, 1, '这台删了又撤销的还在');
+  ok(r.state.removed[`journal:${e1.id}`] && r.state.removed[`bp:${bp.id}`], '两边的标记都留着');
+  const back = Mg.merge(viaFile(other), viaFile(mine));
+  eq(back.state.weights.length, 1, '对方那台：这台撤销了删除，就不跟着删');
+  eq(back.state.bp, [], '对方那台：这台删掉的血压也删了');
+  eq(back.state.journal.map((e) => e.id), [e2.id], '对方那台：自己删过的不加回来，这台后来改过的那条宁可留着');
+});
+
+test('合并：宝宝 — 这台还没有就整个拿来，同一个宝宝逐项合，出生日期不一样要说', () => {
+  const preg = M.createState({ dueDate: DUE });
+  const other = fullState();
+  const r = Mg.merge(preg, viaFile(other));
+  eq(r.state.baby, viaFile(other).baby, '整个拿过来');
+  eq([statOf(r, '宝宝的出生信息').added, statOf(r, '宝宝的日常记录').added], [1, 1]);
+
+  const twin = fullState();
+  twin.baby.birthDate = '2026-08-16';
+  const diff = Mg.merge(fullState(), viaFile(twin));
+  ok(/出生日期不一样，用的是这台手机上的/.test(diff.notes.join()), diff.notes.join());
+  eq(diff.state.baby.birthDate, '2026-08-15');
+
+  const base = viaFile(fullState());
+  const mine = clone(base);
+  const dad = clone(base);
+  const at = tAt('2026-10-12', '10:00');
+  Bb.addLog(mine.baby, Bb.readLog('bottle', { date: '2026-10-12', time: '10:00', ml: '90', milk: 'formula' }, at));
+  Bb.addLog(dad.baby, Bb.readLog('diaper', { date: '2026-10-12', time: '10:30', poo: true }, at + 3600e3));
+  Bb.removeLog(dad.baby, base.baby.logs[0].id);
+  Bb.setVaccine(dad.baby, 'hepb-2', { done: '2026-09-15' });
+  Bb.setTooth(dad.baby, 'la-r', '2026-10-01');
+  Bb.togglePaper(dad.baby, 'cert', '2026-08-20');
+  Bb.setFoodNote(dad.baby, '鸡蛋', 'reaction', '起了小红点', '2026-10-12');
+  dad.baby.tried['南瓜'] = '2026-10-10';
+  Bb.setGrowth(dad.baby, { date: '2026-10-10', weight: '6.1', length: '60' });
+  mine.baby.milestones.roll = '2026-09-01';
+  dad.baby.milestones.roll = '2026-09-05';
+  const m = Mg.merge(mine, viaFile(dad));
+  const b = m.state.baby;
+  eq(b.logs.map((l) => l.type).sort(), ['bottle', 'diaper'], '各记的都在，爸爸删掉的那条也删了');
+  eq(statOf(m, '宝宝的日常记录'), stat('宝宝的日常记录', 1, 0, 1, 0));
+  eq([b.vaccines['hepb-2'].done, b.teeth['la-r'], b.papers.cert, b.foodNotes['鸡蛋'].feel, b.tried['南瓜']],
+    ['2026-09-15', '2026-10-01', '2026-08-20', 'reaction', '2026-10-10']);
+  eq(b.growth.map((g) => g.date), ['2026-08-15', '2026-09-15', '2026-10-10'], '出生那天的、各记的都在');
+  eq([b.milestones.roll, b.milestones.tooth], ['2026-09-01', '2026-10-01'], '里程碑这台记过的不动，没记的加上');
+  eq(statOf(m, '里程碑').kept, 1);
+});
+
+test('合并：两边都在计时的不合，对方停了的那条用停了的', () => {
+  const base = viaFile(fullState());
+  const mine = clone(base);
+  const dad = clone(base);
+  const t = tAt('2026-10-12', '13:00');
+  Bb.startSleep(mine.baby, t);
+  Bb.startSleep(dad.baby, t + 5 * MINUTE);
+  const r = Mg.merge(mine, viaFile(dad));
+  eq(r.state.baby.logs.filter((l) => l.type === 'sleep').length, 1, '只留这台在计时的');
+  ok(/正在计时/.test(r.notes.join()), r.notes.join());
+  const shared = Mg.merge(mine, viaFile(mine)).state;
+  const dad2 = viaFile(shared);
+  Bb.stopSleep(dad2.baby, t + 40 * MINUTE);
+  const done = Mg.merge(shared, dad2).state.baby.logs.find((l) => l.type === 'sleep');
+  eq(done.end, t + 40 * MINUTE, '对方已经停了，就用停了的');
+});
+
+test('合并：盆底肌取多的，收藏和买过的菜合在一起', () => {
+  const base = M.createState({ dueDate: DUE });
+  const mine = viaFile(base);
+  const other = viaFile(base);
+  M.addPelvicSet(mine, '2026-10-12');
+  M.addPelvicSet(other, '2026-10-12');
+  M.addPelvicSet(other, '2026-10-12');
+  M.addPelvicSet(other, '2026-10-11');
+  mine.meals.favorites.push('fish-soup');
+  other.meals.favorites.push('fish-soup', 'egg-custard');
+  other.meals.bought['2026-10-12'] = ['鸡蛋'];
+  mine.meals.bought['2026-10-12'] = ['牛奶'];
+  const s = Mg.merge(mine, viaFile(other)).state;
+  eq(s.pelvic.days, { '2026-10-11': 1, '2026-10-12': 2 });
+  eq(s.meals.favorites, ['fish-soup', 'egg-custard']);
+  eq(s.meals.bought['2026-10-12'].sort(), ['牛奶', '鸡蛋'].sort());
+});
+
+test('合并：保存时记下哪条什么时候改的，只是换了字段顺序不算改', () => {
+  const t0 = Date.now() - 60e3;
+  const s = viaFile(fullState());
+  Mg.track(s, t0);
+  eq([s.edits, s.baby.edits], [{}, {}], '刚读出来只记个底');
+  const logId = s.baby.logs[0].id;
+  M.upsertWeight(s, '2026-10-10', 56.8);
+  s.journal[0] = Object.fromEntries(Object.entries(s.journal[0]).reverse());
+  s.profile.height = 162;
+  Bb.togglePaper(s.baby, 'cert', '2026-08-20');
+  Bb.removeLog(s.baby, logId);
+  Mg.track(s, t0 + 1000);
+  eq(Object.keys(s.edits).sort(), ['info:height', 'weight:2026-10-10']);
+  eq(Object.keys(s.baby.edits), ['paper:cert'], '随机编号的记录删掉时有删过的标记，不用记时间');
+  Bb.addLog(s.baby, Bb.readLog('diaper', { date: '2026-10-12', time: '10:00', pee: true }, tAt('2026-10-12', '12:00')));
+  Mg.track(s, t0 + 1500);
+  eq(Object.keys(s.baby.edits), ['paper:cert'], '新记一条也不用');
+  s.baby.logs[0].note = '改一下';
+  Mg.track(s, t0 + 1500);
+  eq(s.baby.edits[`log:${s.baby.logs[0].id}`], t0 + 1500, '改过的要记');
+  Mg.track(s, t0 + 2000);
+  eq(s.edits['weight:2026-10-10'], t0 + 1000, '没再改就不动');
+  const copy = viaFile(s);
+  Mg.track(copy, t0 + 3000);
+  Mg.track(copy, t0 + 4000);
+  eq(copy.edits, s.edits, '换了一份数据重新记底，时间跟着文件走');
+  const preg = viaFile(M.createState({ dueDate: DUE }));
+  Mg.track(preg, t0);
+  preg.baby = newborn();
+  Mg.track(preg, t0 + 5000);
+  ok(preg.baby.edits['info:birthDate'] === t0 + 5000 && preg.baby.edits['growth:2026-08-15'] === t0 + 5000, '宝宝刚出生，每样都算新记的');
+});
+
+test('合并：两边都改过的同一条取后改的那边，合回去两台就一样了', () => {
+  const t0 = Date.now() - 60e3;
+  const base = M.createState({ dueDate: DUE });
+  const e = J.add(base, { mood: 'calm', text: '原来的', date: '2026-10-11' }, '2026-10-12', Date.UTC(2026, 9, 11, 1));
+  M.upsertWeight(base, '2026-10-10', 56.2);
+  const mine = viaFile(base);
+  const dad = viaFile(base);
+  Mg.track(mine, t0);
+  Mg.track(dad, t0);
+  J.update(dad, e.id, { mood: 'happy', text: '爸爸改的', date: '2026-10-11' });
+  M.upsertWeight(dad, '2026-10-10', 56);
+  Mg.track(dad, t0 + 1000);
+  M.upsertWeight(mine, '2026-10-10', 56.4);
+  Mg.track(mine, t0 + 2000);
+  const r = Mg.merge(mine, viaFile(dad));
+  eq([r.state.journal[0].text, r.state.weights[0].kg], ['爸爸改的', 56.4], '心情是爸爸后改的，体重是这台后改的');
+  eq([statOf(r, '心情'), statOf(r, '体重')], [stat('心情', 0, 1, 0, 0), stat('体重', 0, 0, 0, 1)]);
+  const back = Mg.merge(viaFile(dad), viaFile(r.state));
+  eq([back.state.journal[0].text, back.state.weights[0].kg], ['爸爸改的', 56.4], '对方合回去也一样');
+  const again = Mg.merge(r.state, viaFile(back.state));
+  eq([again.added, again.updated, again.dropped, again.kept], [0, 0, 0, 0], '两台一样了');
+});
+
+test('合并：疫苗、办证这些，对方后来去掉的跟着去掉，这台后来去掉的不加回来', () => {
+  const t0 = Date.now() - 60e3;
+  const base = viaFile(fullState());
+  Bb.togglePaper(base.baby, 'cert', '2026-08-20');
+  Bb.togglePaper(base.baby, 'hukou', '2026-08-22');
+  const mine = viaFile(base);
+  const dad = viaFile(base);
+  Mg.track(mine, t0);
+  Mg.track(dad, t0);
+  Bb.togglePaper(dad.baby, 'cert', '2026-10-12');
+  Bb.togglePaper(dad.baby, 'insure', '2026-09-01');
+  Mg.track(dad, t0 + 1000);
+  Bb.togglePaper(mine.baby, 'hukou', '2026-10-12');
+  Mg.track(mine, t0 + 2000);
+  const r = Mg.merge(mine, viaFile(dad));
+  eq(Object.keys(r.state.baby.papers), ['insure']);
+  eq(statOf(r, '办证清单'), stat('办证清单', 1, 0, 1, 0));
+  eq(Object.keys(Mg.merge(viaFile(dad), viaFile(r.state)).state.baby.papers), ['insure'], '对方那台合回去也一样');
+});
+
+test('合并：预产期、宝宝的出生信息一项一项比，后改的那边算', () => {
+  const t0 = Date.now() - 60e3;
+  const base = M.createState({ dueDate: DUE, preWeight: 52 });
+  base.baby = newborn();
+  const mine = viaFile(base);
+  const dad = viaFile(base);
+  Mg.track(mine, t0);
+  Mg.track(dad, t0);
+  dad.profile.dueDate = '2027-02-01';
+  dad.baby.birthDate = '2026-08-16';
+  Mg.track(dad, t0 + 1000);
+  mine.profile.nickname = '豆豆';
+  mine.baby.name = '小豆';
+  Mg.track(mine, t0 + 2000);
+  const r = Mg.merge(mine, viaFile(dad));
+  eq([r.state.profile.dueDate, r.state.profile.nickname, r.state.baby.birthDate, r.state.baby.name], ['2027-02-01', '豆豆', '2026-08-16', '小豆']);
+  ok(/预产期不一样，用的是对方后来改的/.test(r.notes.join()) && /出生日期不一样，用的是对方后来改的/.test(r.notes.join()), r.notes.join());
+  eq([statOf(r, '预产期和资料'), statOf(r, '宝宝的出生信息')], [stat('预产期和资料', 0, 1, 0, 0, '项'), stat('宝宝的出生信息', 0, 1, 0, 0, '项')]);
+});
+
+test('合并：上万条记录，保存时比一遍、合并都不慢', () => {
+  const s = viaFile(fullState());
+  const t = tAt('2026-08-15', '08:00');
+  for (let i = 0; i < 10000; i += 1) s.baby.logs.push({ id: `di-${i.toString(36)}x`, type: 'diaper', start: t + i * 5 * MINUTE, note: '', pee: true, poo: false, color: '' });
+  const big = viaFile(s);
+  let at = Date.now();
+  Mg.track(big);
+  big.baby.logs[5].note = '改一条';
+  Mg.track(big);
+  const trackMs = Date.now() - at;
+  const dad = viaFile(big);
+  Bb.removeLog(dad.baby, dad.baby.logs[9].id);
+  at = Date.now();
+  const r = Mg.merge(big, viaFile(dad));
+  const mergeMs = Date.now() - at;
+  ok(trackMs < 300 && mergeMs < 1500, `保存时比一遍 ${trackMs}ms，合并 ${mergeMs}ms`);
+  eq([r.dropped, r.state.baby.logs.length], [1, 10000]);
+});
+
+test('合并：旧备份没有删过的标记照样能合；标记半年后清掉，最多留 500 个', () => {
+  const old = clone(M.createState({ dueDate: DUE }));
+  delete old.removed;
+  M.upsertWeight(old, '2026-10-01', 55);
+  const parsed = S.parseBackup(JSON.stringify(old));
+  eq(parsed.removed, {});
+  eq(Mg.merge(M.createState({ dueDate: DUE }), parsed).added, 1);
+  const today = D.today();
+  eq(Object.keys(Mg.clean({
+    a: { on: today, sig: '0a1b2c3d' },
+    b: { on: D.addDays(today, -200), sig: '0a1b2c3d' },
+    c: { on: today, sig: 'xyz' },
+    d: null,
+  })), ['a']);
+  const store = {};
+  for (let i = 0; i < 505; i += 1) Mg.drop(store, `k:${i}`, { i });
+  eq([Object.keys(store).length, 'k:0' in store, 'k:504' in store], [500, false, true]);
+});
+
 print(`\n${passed} 通过，${failures.length} 失败`);
 if (failures.length) {
   print(failures.join('\n'));

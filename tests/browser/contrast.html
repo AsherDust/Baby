@@ -146,6 +146,16 @@ const SHEETS = [
       await wait(600);
       bad = bad.concat(audit(d.querySelector('dialog[open]'), `${scene} #/${route} ${button}`));
     }
+    // 合并家人的记录：合之前看一眼的面板，带两条没合的说明
+    await open('baby', 'today');
+    const dad = JSON.parse(JSON.stringify(w.Baby.app.state));
+    dad.profile.dueDate = '2026-08-20';
+    dad.weights.push({ date: '2026-06-01', kg: 60 });
+    dad.baby.birthDate = '2026-08-14';
+    w.Baby.app.previewMerge(w.Baby.storage.backupText(dad, new Date()));
+    await wait(600);
+    log(Boolean(d.querySelector('dialog[open] .merge-note')), '合并面板打开了');
+    bad = bad.concat(audit(d.querySelector('dialog[open]'), 'baby 合并家人的记录'));
     await open('main', 'records/bp');
     d.getElementById('bp-sys').value = '30';
     d.getElementById('bp-sys').form.requestSubmit();

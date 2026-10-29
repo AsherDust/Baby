@@ -102,6 +102,8 @@
     noiseMinutes: 30,
     noiseVolume: 0.6,
     noiseOn: null,
+    // 合并家人的记录：选好的、对方那份记录，点「合并」时才合进来
+    mergePending: null,
     triedOpen: false,
     vaccinesDoneOpen: false,
     examsDoneOpen: false,

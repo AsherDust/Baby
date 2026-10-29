@@ -7,6 +7,7 @@
   const J = Baby.journal;
   const R = Baby.recipes;
   const B = Baby.baby;
+  const Mg = Baby.merge;
 
   const VERSION = 1;
   const KG_MIN = 25;
@@ -143,6 +144,8 @@
       meals: R.empty(),
       pelvic: { hold: 5, days: {} },
       baby: null,
+      removed: {},
+      edits: {},
       notified: {},
     };
   }
@@ -360,6 +363,8 @@
       meals: R.normalize(raw.meals),
       pelvic: normalizePelvic(raw.pelvic),
       baby: B.normalize(raw.baby),
+      removed: Mg.clean(raw.removed),
+      edits: Mg.cleanEdits(raw.edits),
       notified,
     };
   }
@@ -373,6 +378,7 @@
   function removeWeight(state, date) {
     const hit = state.weights.find((w) => w.date === date) || null;
     state.weights = state.weights.filter((w) => w.date !== date);
+    if (hit) Mg.drop(state.removed, `weight:${date}`, hit);
     return hit;
   }
 
@@ -570,6 +576,7 @@
     const index = state.checkups.findIndex((c) => c.id === id);
     if (index < 0) return null;
     const [ck] = state.checkups.splice(index, 1);
+    Mg.drop(state.removed, `checkup:${id}`, ck);
     return { ck, index };
   }
 
@@ -623,6 +630,7 @@
     const index = state.bag.findIndex((b) => b.id === id);
     if (index < 0) return null;
     const [item] = state.bag.splice(index, 1);
+    Mg.drop(state.removed, `bag:${id}`, item);
     return { item, index };
   }
 
@@ -659,6 +667,7 @@
     const index = state.meds.findIndex((m) => m.id === id);
     if (index < 0) return null;
     const [med] = state.meds.splice(index, 1);
+    Mg.drop(state.removed, `med:${id}`, med);
     return { med, index };
   }
 
@@ -756,6 +765,7 @@
     const index = state.kicks.findIndex((k) => k.id === id);
     if (index < 0) return null;
     const [session] = state.kicks.splice(index, 1);
+    Mg.drop(state.removed, `kick:${id}`, session);
     return { session, index };
   }
 
@@ -829,6 +839,7 @@
     const index = state.contractions.findIndex((c) => c.id === id);
     if (index < 0) return null;
     const [contraction] = state.contractions.splice(index, 1);
+    Mg.drop(state.removed, `contraction:${id}`, contraction);
     return { contraction, index };
   }
 
@@ -881,6 +892,7 @@
     const index = state.bp.findIndex((r) => r.id === id);
     if (index < 0) return null;
     const [record] = state.bp.splice(index, 1);
+    Mg.drop(state.removed, `bp:${id}`, record);
     return { record, index };
   }
 
@@ -929,15 +941,19 @@
 
   /** 同一天同一时间点只留一条，返回被替换掉的那条（没有就是 null） */
   function setGlucose(state, f) {
-    const previous = removeGlucose(state, f.date, f.slot);
+    const previous = removeGlucose(state, f.date, f.slot, false);
     state.glucose.push({ date: f.date, slot: f.slot, value: parseGlucose(f.value) });
     state.glucose.sort(byDateSlot);
     return previous;
   }
 
-  function removeGlucose(state, date, slot) {
+  /** mark：删掉时留个删过的标记；改数时换掉旧的那条不用留 */
+  function removeGlucose(state, date, slot, mark = true) {
     const index = state.glucose.findIndex((g) => g.date === date && g.slot === slot);
-    return index < 0 ? null : state.glucose.splice(index, 1)[0];
+    if (index < 0) return null;
+    const [hit] = state.glucose.splice(index, 1);
+    if (mark) Mg.drop(state.removed, `glucose:${date}/${slot}`, hit);
+    return hit;
   }
 
   /** 按天排好，新的在前：[{ date, values: { fasting: 5.1, ... } }] */
@@ -1000,6 +1016,7 @@
     const index = state.ultrasounds.findIndex((u) => u.id === id);
     if (index < 0) return null;
     const [record] = state.ultrasounds.splice(index, 1);
+    Mg.drop(state.removed, `us:${id}`, record);
     return { record, index };
   }
 

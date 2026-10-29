@@ -215,7 +215,9 @@ iframe.onload = async () => {
     w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(shifted));
     await reload();
     log(state().kicks[1].end === shifted.kicks[1].start + 60 * MIN && !$('.tool.is-live'), '关着页面过了 1 小时，再打开时自动收尾');
-    log(/今天数了 1 回/.test(text('.tool[data-tool="kicks"]')), '首页显示今天数了几回', text('.tool[data-tool="kicks"]'));
+    // 半夜两点前跑的话，往前挪两小时就到了昨天
+    const sameDay = w.Baby.dates.localISO(new Date(shifted.kicks[1].start)) === w.Baby.dates.localISO(new Date());
+    log((sameDay ? /今天数了 1 回/ : /今天还没数/).test(text('.tool[data-tool="kicks"]')), '首页显示今天数了几回', text('.tool[data-tool="kicks"]'));
 
     const old = state();
     delete old.kicks;

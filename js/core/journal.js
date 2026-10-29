@@ -80,6 +80,7 @@
     const index = state.journal.findIndex((e) => e.id === id);
     if (index < 0) return null;
     const [entry] = state.journal.splice(index, 1);
+    Baby.merge.drop(state.removed, `journal:${id}`, entry);
     return { entry, index };
   }
 

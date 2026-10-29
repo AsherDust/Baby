@@ -152,6 +152,34 @@
     showDialog(sheetDialog);
   }
 
+  /** 合并之前先看一眼：每样加几条、改几条、跟着对方删几条，还有要说一声的 */
+  function openMergeSheet(result, when) {
+    const rows = result.stats.filter((s) => s.added || s.updated || s.dropped).map((s) => {
+      const what = [
+        s.added ? `加 ${s.added} ${s.unit}` : '',
+        s.updated ? `改 ${s.updated} ${s.unit}` : '',
+        s.dropped ? `跟着对方删 ${s.dropped} ${s.unit}` : '',
+      ].filter(Boolean).join('，');
+      return `<li><span>${s.label}</span><b>${what}</b></li>`;
+    }).join('');
+    const nothing = !result.added && !result.updated && !result.dropped;
+    sheetDialog.innerHTML = `
+      <div class="dialog-body merge-sheet">
+        ${dialogHead('合并家人的记录', when ? `对方 ${when} 导出的` : '')}
+        ${nothing ? '<p class="merge-same">没有要加的，两边的记录已经一样了。</p>' : `<ul class="merge-list">${rows}</ul>`}
+        ${result.kept ? `<p class="hint">另有 ${result.kept} 条两边不一样，这台改得更晚或者分不出先后，留的是这台手机上的。</p>` : ''}
+        ${result.notes.map((n) => `<p class="merge-note">${A.icon.alert}<span>${n}</span></p>`).join('')}
+        ${nothing ? '' : '<p class="hint">两边都改过的同一条，用后改的那次；对方删掉的，这台也删掉。合完马上可以撤销。</p>'}
+        <div class="dialog-actions">
+          <span class="spacer"></span>
+          ${nothing ? '<button type="button" class="btn" data-action="close-dialog">好的</button>' : `
+            <button type="button" class="btn btn-ghost" data-action="close-dialog">取消</button>
+            <button type="button" class="btn" data-action="merge-apply">合并</button>`}
+        </div>
+      </div>`;
+    showDialog(sheetDialog);
+  }
+
   /**
    * 把粘贴进来的 B 超单文字认一遍，认出来的填进表单并标黄，等人核对。
    * 自己改过的格子不动；粘贴的内容变了（换了张单子、删了几行），上次自动填、没人改过的格子先还原
@@ -250,6 +278,16 @@
             <button type="button" class="btn btn-ghost btn-sm" data-action="reset-checkups">恢复默认产检日程</button>
             <button type="button" class="btn btn-ghost btn-sm" data-action="reset-bag">恢复默认待产包</button>
             <button type="button" class="btn btn-quiet btn-sm" data-action="clear-all">清空全部数据</button>
+          </div>
+        </section>
+        <section class="settings-data settings-family">
+          <h3>两台手机一起记</h3>
+          <p class="hint">爸爸妈妈各用各的手机记也行：一台点「发给家人」，用微信把文件发过去；另一台点「合并家人的记录」，选这个文件。两边的记录合在一起，谁记的都不会丢。合完再发回去一份，两台就一样了。</p>
+          <p class="hint">苹果手机在微信里收到文件后，先点右上角「…」选「用其他应用打开」，存到「文件」里，再回来选它。</p>
+          <p class="hint family-state" hidden></p>
+          <div class="btn-row">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="share-family">${A.icon.share}发给家人</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="merge-family">${A.icon.merge}合并家人的记录</button>
           </div>
         </section>
         <section class="settings-data settings-update">
@@ -392,6 +430,6 @@
 
   Object.assign(app, {
     showDialog, dialogHead, onDialogClose, closeDialog, openGlucoseSheet, openUltrasoundSheet, openJournalSheet, fillFromReport, openSettings,
-    openCheckupDialog, openMedDialog, formError
+    openCheckupDialog, openMedDialog, openMergeSheet, formError
   });
 })();
