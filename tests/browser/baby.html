@@ -129,7 +129,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
 
     // ---- 宝宝页：日常 ----
     await nav('#/baby');
-    log($$('.seg-tab').map((t) => t.textContent).join() === '日常,成长,疫苗,健康,辅食' && $$('.blog').length === 5, '宝宝页五个分页，今天的记录 5 条', `${$$('.blog').length}`);
+    log($$('.seg-tab').map((t) => t.textContent).join() === '日常,成长,疫苗,体检,健康,辅食' && $$('.blog').length === 5, '宝宝页六个分页，今天的记录 5 条', `${$$('.blog').length}`);
     const diaper = baby().logs.find((l) => l.type === 'diaper');
     await click(`#edit-${diaper.id}`);
     const ef = sheet().querySelector('form[data-form="baby-log"]');
@@ -210,6 +210,38 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(baby().extraVaccines.length === 1 && baby().extraVaccines[0].done, '自费疫苗自己加');
     await nav('#/');
     log(/明天打疫苗：卡介苗第 1 剂/.test(text($('.banner'))) && $('.tab-dot'), '首页提醒明天打疫苗，底部「宝宝」有红点');
+    log(/下一次体检：产后访视/.test(text($('.panel-today'))) && /10月13日起可以去/.test(text($('.panel-today'))), '首页说下一次体检是产后访视，10月13日起可以去', text($('.panel-today')).slice(0, 200));
+
+    // ---- 体检 ----
+    await nav('#/baby/exams');
+    log($$('.baby-exams .vx').length === 10 && /下一次：产后访视 · 10月13日起可以去/.test(text($('.remind-strip'))), '体检页列出 10 次，下一次是产后访视', text($('.remind-strip')));
+    log(/妈妈和宝宝/.test(text($('.baby-exams .vx'))) && !$('#ex-done-m36'), '产后访视标着妈妈和宝宝；还早的那几次没有「做完了」');
+    await click('#ex-book-d42');
+    log(sheet().open && /查什么/.test(text(sheet())) && /回分娩的医院/.test(text(sheet())) && /上海是产后 42 天母婴一起回分娩医院查/.test(text(sheet())), '产后 42 天检查：去哪、查什么，按上海的做法');
+    await click('#sheet-dialog [data-action="close-dialog"]');
+    await click('#ex-book-visit');
+    const xf = sheet().querySelector('form[data-form="exam"]');
+    xf.elements.done.value = '2026-10-20';
+    xf.requestSubmit();
+    await wait(30);
+    log(sheet().open && /不能晚于今天/.test(text(xf.querySelector('.form-error'))), '做完的日子不能填以后');
+    xf.elements.done.value = '';
+    xf.elements.booked.value = '2026-10-13';
+    xf.requestSubmit();
+    await wait(40);
+    log(baby().exams.visit.booked === '2026-10-13' && /约在/.test(text($('.remind-strip'))) && /约好了/.test(toastText()), '约好产后访视明天来');
+    await click('.ex-name[data-id="m3"]');
+    log(sheet().querySelectorAll('.exam-watch li').length === 4 && /很大的声音也没有反应/.test(text(sheet())), '3 个月体检列出 4 条要留意');
+    await click('#sheet-dialog [data-action="close-dialog"]');
+    blobs.length = 0;
+    await click('[data-action="exam-ics"]');
+    const eics = blobs.length ? await blobs[0].text() : '';
+    log(/X-WR-CALNAME:儿保体检/.test(eics) && (eics.match(/BEGIN:VEVENT/g) || []).length === 10 && /DTSTART;VALUE=DATE:20261013/.test(eics) && /导出了 10 次体检/.test(toastText()), '导出体检日历，约好的按约的日子', eics.slice(0, 80));
+    await nav('#/');
+    log(/明天体检：产后访视/.test(text($('.banner'))), '首页横幅提醒明天体检');
+    await nav('#/baby/exams');
+    await click('#ex-done-visit');
+    log(baby().exams.visit.done === TODAY && /已经做过 1 次/.test(text($('#ex-done summary'))) && /产后访视/.test(toastText()), '点「做完了」，收进已经做过的', toastText());
 
     // ---- 体温、用药 ----
     await nav('#/baby/health');

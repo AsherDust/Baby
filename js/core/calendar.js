@@ -139,5 +139,23 @@
     };
   }
 
-  Baby.calendar = { build, checkupEvent, vaccineEvent, fold, escapeText, duration };
+  /** 儿保体检 → 日历事件（全天）：前一晚 8 点和当天早上 8 点提醒；约好了按约的日子，没约就按可以去的第一天 */
+  function examEvent(row, babyName) {
+    const who = row.who === 'both' ? '妈妈和宝宝' : babyName || '宝宝';
+    const lines = [row.booked ? `${who}约好了${row.name}` : `${who}从这天起可以去${row.name}，${D.formatDate(row.to)}前去就行，具体日子按医院或社区的预约`];
+    lines.push(`地点：${row.where}`, `查什么：${row.items.join('；')}`);
+    if (row.note) lines.push(row.note);
+    return {
+      uid: `${row.id}@pregnancy-desk-exam`,
+      title: `体检 · ${row.name}`,
+      description: lines.join('\n'),
+      date: row.booked || row.from,
+      alarms: [
+        { before: 240, text: `明天体检：${row.name}` },
+        { before: -480, text: `今天体检：${row.name}` },
+      ],
+    };
+  }
+
+  Baby.calendar = { build, checkupEvent, vaccineEvent, examEvent, fold, escapeText, duration };
 })();

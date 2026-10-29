@@ -167,6 +167,38 @@
     showDialog(sheetDialog);
   }
 
+  function openExamSheet(id) {
+    const r = Bb.examRows(kid(), BOOK, ui.today).find((x) => x.id === id);
+    if (!r) return;
+    sheetDialog.innerHTML = `
+      <form class="dialog-body exam-sheet" data-form="exam" data-id="${id}" novalidate>
+        ${dialogHead(r.name, `${D.formatDate(r.from, { year: true })}～${D.formatDate(r.to)} · ${r.who === 'both' ? '妈妈和宝宝一起' : '宝宝'}`)}
+        <p class="exam-where">${r.where}</p>
+        <section class="recipe-part">
+          <h3>查什么</h3>
+          <ul class="exam-items">${r.items.map((t) => `<li>${t}</li>`).join('')}</ul>
+        </section>
+        ${r.watch.length ? `
+          <section class="recipe-part">
+            <h3>要留意</h3>
+            <p class="hint">有下面任何一条，体检时告诉医生：</p>
+            <ul class="exam-watch">${r.watch.map((t) => `<li>${t}</li>`).join('')}</ul>
+          </section>` : ''}
+        ${r.note ? `<p class="recipe-note">${r.note}</p>` : ''}
+        <div class="field-row">
+          ${field('约在哪天 <small>可选</small>', `<input type="date" name="booked" value="${r.booked || ''}">`)}
+          ${field('哪天做的 <small>做完了再填</small>', `<input type="date" name="done" max="${ui.today}" value="${r.done || ''}">`)}
+        </div>
+        <p class="form-error" hidden></p>
+        <div class="dialog-actions">
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-ghost" data-action="close-dialog">取消</button>
+          <button class="btn">保存</button>
+        </div>
+      </form>`;
+    showDialog(sheetDialog);
+  }
+
   function openFoodSheet(id) {
     const r = FOOD.recipes.find((x) => x.id === id);
     if (!r) return;
@@ -308,6 +340,23 @@
       saved(done ? say('vaccine') : booked ? `约好了，${D.formatDate(booked, { weekday: true })}` : say('saved'), () => {
         if (before) b.vaccines[id] = before;
         else delete b.vaccines[id];
+      });
+    },
+
+    exam(form) {
+      const b = kid();
+      const booked = form.elements.booked.value;
+      const done = form.elements.done.value;
+      if (done && (!D.isISODate(done) || done > ui.today)) return formError(form, '做完的日子不能晚于今天');
+      if (booked && !D.isISODate(booked)) return formError(form, '约的日子格式不对，重新选一下');
+      const id = form.dataset.id;
+      const before = b.exams[id] ? { ...b.exams[id] } : null;
+      const name = (BOOK.exams.find((e) => e.id === id) || {}).name || '体检';
+      Bb.setExam(b, id, { booked: booked || null, done: done || null });
+      closeDialog(sheetDialog);
+      saved(done ? say('exam', { name }) : booked ? `约好了，${D.formatDate(booked, { weekday: true })}` : say('saved'), () => {
+        if (before) b.exams[id] = before;
+        else delete b.exams[id];
       });
     },
 
@@ -495,6 +544,39 @@
       if (!rows.length) return oops('没有要提醒的疫苗了');
       download(Cal.build(rows.map((r) => Cal.vaccineEvent(r, b.name)), new Date(), '疫苗接种'), '疫苗接种.ics', 'text/calendar;charset=utf-8');
       toast(`导出了 ${rows.length} 针，打开下载的文件就能加进日历`);
+    },
+
+    'exam-done'(el) {
+      const b = kid();
+      const id = el.dataset.id;
+      const before = b.exams[id] ? { ...b.exams[id] } : null;
+      const name = (BOOK.exams.find((e) => e.id === id) || {}).name || '体检';
+      cheer(el);
+      Bb.setExam(b, id, { done: ui.today });
+      saved(say('exam', { name }), () => {
+        if (before) b.exams[id] = before;
+        else delete b.exams[id];
+      });
+    },
+
+    'exam-open'(el) {
+      openExamSheet(el.dataset.id);
+    },
+
+    'exam-past-done'() {
+      const b = kid();
+      const before = Bb.markPastExams(b, BOOK, ui.today);
+      saved('过了时间的都记成做过了', () => { b.exams = before; });
+    },
+
+    'exam-ics'() {
+      const b = kid();
+      // 已经可以去、还没约的，提醒放在今天
+      const rows = Bb.examRows(b, BOOK, ui.today).filter((r) => r.status !== 'done' && r.status !== 'late')
+        .map((r) => (r.booked && r.booked >= ui.today ? r : { ...r, booked: null, from: r.from < ui.today ? ui.today : r.from }));
+      if (!rows.length) return oops('没有要提醒的体检了');
+      download(Cal.build(rows.map((r) => Cal.examEvent(r, b.name)), new Date(), '儿保体检'), '儿保体检.ics', 'text/calendar;charset=utf-8');
+      toast(`导出了 ${rows.length} 次体检，打开下载的文件就能加进日历`);
     },
 
     'extra-vaccine-done'(el) {

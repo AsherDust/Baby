@@ -15,6 +15,7 @@ A gentle companion for pregnancy and the baby's first years that runs entirely i
   - One-tap logging for breastfeeding (timed, left and right), bottles, naps and nappies. Solid food, temperature and medicine can be added in a couple of taps, past entries can be filled in later, and each day comes with a summary.
   - A growth record with weight, length and head-circumference curves against the WHO standards, plus milestones and other firsts.
   - The national vaccination schedule (with the 2025 DTaP change) with booked dates, reminders and a calendar file. Paid vaccines can be added too.
+  - Well-child checkups up to age 3: the postnatal home visits and the 42-day check for mother and baby (as done in Shanghai), then the community checkups at 3, 6, 8, 12, 18, 24, 30 and 36 months. Each one lists what is checked and the developmental warning signs to mention to the doctor, and can be booked, reminded and added to the calendar.
   - Fever levels with when-to-see-a-doctor advice.
   - Weaning recipes by age, from iron-rich purées at 6 months to soft family meals at 1–2 years. New foods are introduced one at a time, and foods already tried are remembered. The recipes can also be browsed from Tools before the baby arrives.
 - **Tools**: kick counter, contraction timer that says when it's time to go, "can I eat this" food lookup, hospital bag checklist, week-by-week changes for mom and baby, and bedtime stories with read-aloud.

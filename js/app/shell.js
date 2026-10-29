@@ -102,7 +102,8 @@
     let dot = M.reminders(M.scheduleRows(app.state, ui.today)).length ? 'checkups' : '';
     if (b) {
       const rows = Bb.vaccineRows(b, BOOK, ui.today);
-      dot = Bb.vaccineReminders(rows, ui.today).length || rows.some((r) => r.status === 'late') ? 'baby' : '';
+      const exams = Bb.examReminders(Bb.examRows(b, BOOK, ui.today), ui.today);
+      dot = Bb.vaccineReminders(rows, ui.today).length || rows.some((r) => r.status === 'late') || exams.length ? 'baby' : '';
     }
     const current = b && route.section === 'checkups' ? 'records' : route.section;
     return `

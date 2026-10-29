@@ -4,7 +4,7 @@
   const { dates: D, baby: Bb, babyBook: BOOK, babyFood: FOOD, recipeBook: RB, growthStandard: STD, chart: Chart, art: A, app } = globalThis.Baby;
   const { esc, ui, hhmm, TERM_FROM, todoMood, todoMeal, recipeDot } = app;
 
-  const VIEWS = [['', '日常'], ['growth', '成长'], ['vaccines', '疫苗'], ['health', '健康'], ['food', '辅食']];
+  const VIEWS = [['', '日常'], ['growth', '成长'], ['vaccines', '疫苗'], ['exams', '体检'], ['health', '健康'], ['food', '辅食']];
   const LEVEL_NAMES = { cool: '偏低', normal: '正常', low: '低热', mid: '中等发热', high: '高热' };
   const tagName = Object.fromEntries(FOOD.tags);
   const allergenName = Object.fromEntries(FOOD.allergens);
@@ -170,7 +170,7 @@
           </div>
         </article>`;
     }
-    const views = { '': viewDaily, growth: viewGrowth, vaccines: viewVaccines, health: viewHealth, food: viewFood };
+    const views = { '': viewDaily, growth: viewGrowth, vaccines: viewVaccines, exams: viewExams, health: viewHealth, food: viewFood };
     return `
       <nav class="seg-tabs" aria-label="宝宝">
         ${VIEWS.map(([id, name]) => `<a href="#/baby${id ? `/${id}` : ''}" class="seg-tab"${route.sub === id ? ' aria-current="page"' : ''}>${name}</a>`).join('')}
@@ -355,6 +355,67 @@
       <p class="fineprint">${BOOK.vaccineNotes.join('')}参考《国家免疫规划疫苗儿童免疫程序及说明（2021 年版）》，百白破按 2025 年起的新程序。</p>`;
   }
 
+  /** 体检什么时候去：约好的日子 / 现在可以去了 / 几号起 */
+  function examWhen(r) {
+    if (r.booked) return `约在 ${D.formatDate(r.booked, { weekday: true, relativeTo: ui.today })}`;
+    if (r.status === 'due') return `现在可以去了，${D.formatDate(r.to, { relativeTo: ui.today })}前`;
+    return `${D.formatDate(r.from, { relativeTo: ui.today })}起可以去`;
+  }
+
+  function viewExams() {
+    const rows = Bb.examRows(kid(), BOOK, ui.today);
+    const next = Bb.nextExam(rows);
+    const done = rows.filter((r) => r.status === 'done');
+    const late = rows.filter((r) => r.status === 'late');
+    const open = rows.filter((r) => r.status !== 'done' && r.status !== 'late');
+    return `
+      <div class="remind-strip">
+        <p>${A.icon.calendarHeart}<span>${next ? `下一次：<b>${next.name}</b> · ${examWhen(next)}` : '3 岁前的体检都做完啦'}</span></p>
+        ${open.length ? `<button type="button" class="pill pill-btn" data-action="exam-ics">${A.icon.calendarPlus}导入手机日历</button>` : ''}
+      </div>
+      <article class="card baby-exams" aria-label="儿保体检">
+        ${late.length ? `
+          <div class="past-strip">
+            <span>有 ${late.length} 次体检过了时间、没记做过。</span>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="exam-past-done">都做过了</button>
+          </div>` : ''}
+        ${done.length ? `
+          <details class="vx-done-list" id="ex-done"${ui.examsDoneOpen ? ' open' : ''}>
+            <summary>已经做过 ${done.length} 次</summary>
+            <ul class="vx-list">${done.map((r) => `
+              <li class="vx vx-done vx-compact">
+                <span class="vx-dot">${A.icon.check}</span>
+                <p class="vx-name">${r.name}</p>
+                <button type="button" class="link" id="ex-open-${r.id}" data-action="exam-open" data-id="${r.id}">${D.formatDate(r.done, { relativeTo: ui.today })}</button>
+              </li>`).join('')}
+            </ul>
+          </details>` : ''}
+        <ul class="vx-list">${[...late, ...open].map(viewExamRow).join('')}</ul>
+      </article>
+      <p class="fineprint">${BOOK.examNotes.join('')}项目参考《0～6 岁儿童健康管理服务规范》，「要留意」来自《0～6 岁儿童孤独症筛查干预服务规范（试行）》；产后访视和 42 天检查按上海的做法。</p>`;
+  }
+
+  function viewExamRow(r) {
+    let status = r.booked ? examWhen(r) : '';
+    if (r.status === 'late') status = '过了时间，还没去的话打电话问问社区';
+    else if (!r.booked && r.status === 'due') status = examWhen(r);
+    else if (!r.booked && r.status === 'soon') status = `${D.diffDays(ui.today, r.from)} 天后可以去`;
+    return `
+      <li class="vx vx-${r.status}">
+        <span class="vx-dot"></span>
+        <div class="vx-main">
+          <p class="vx-name"><button type="button" class="ex-name" data-action="exam-open" data-id="${r.id}">${r.name}</button>${r.who === 'both' ? '<span class="tag">妈妈和宝宝</span>' : ''}</p>
+          <p class="vx-when">${D.formatDate(r.from, { relativeTo: ui.today })}～${D.formatDate(r.to, { relativeTo: r.from })}${r.where === BOOK.examWhere ? '' : ` · ${r.where}`}</p>
+          ${r.who === 'both' ? '' : `<p class="vx-when">${r.items.join(' · ')}</p>`}
+          ${status ? `<p class="vx-status">${status}</p>` : ''}
+        </div>
+        <div class="vx-actions">
+          ${r.status === 'later' && !r.booked ? '' : `<button type="button" class="chip" id="ex-done-${r.id}" data-action="exam-done" data-id="${r.id}">${A.icon.check}做完了</button>`}
+          <button type="button" class="chip" id="ex-book-${r.id}" data-action="exam-open" data-id="${r.id}">${r.booked ? '改约' : '约日期'}</button>
+        </div>
+      </li>`;
+  }
+
   function viewVaccineRow(r) {
     const booked = r.booked ? `约在 ${D.formatDate(r.booked, { weekday: true, relativeTo: ui.today })}` : '';
     let status = booked;
@@ -529,14 +590,26 @@
       </section>`;
   }
 
-  /** 今天、明天约了疫苗的，挂在首页最上面 */
+  /** 今天、明天约了疫苗或体检的，挂在首页最上面 */
   function viewBabyBanner() {
     const list = Bb.vaccineReminders(Bb.vaccineRows(kid(), BOOK, ui.today), ui.today);
-    if (!list.length) return '';
+    const exams = Bb.examReminders(Bb.examRows(kid(), BOOK, ui.today), ui.today);
+    if (!list.length && !exams.length) return '';
     return `
       <section class="banner" role="status">
         <span class="banner-bee">${A.bee}</span>
         <div class="banner-list">
+          ${exams.map((r) => {
+            const day = r.booked === ui.today ? '今天' : '明天';
+            return `
+              <div class="banner-item">
+                <div>
+                  <p class="banner-title">${day}体检：${r.name}</p>
+                  <p class="banner-text">${r.where}${r.who === 'both' ? '' : '；带上儿童保健手册和预防接种证'}。</p>
+                </div>
+                ${day === '今天' ? `<button type="button" class="btn btn-sm" data-action="exam-done" data-id="${r.id}">做完了</button>` : ''}
+              </div>`;
+          }).join('')}
           ${list.map((r) => {
             const day = !r.booked || r.booked === ui.today ? '今天' : '明天';
             return `
@@ -622,6 +695,14 @@
     } else if (next) {
       const when = next.booked ? `约在 ${D.formatDate(next.booked, { weekday: true })}` : next.status === 'due' ? '已经可以打了' : `${D.formatDate(next.due)}起可以打`;
       items.push(todoItem({ icon: A.icon.syringe, title: `下一针：${next.name}第 ${next.dose} 剂`, text: `${when} · <a class="link" href="#/baby/vaccines">疫苗</a>` }));
+    }
+    const exams = Bb.examRows(b, BOOK, ui.today);
+    const lateExams = exams.filter((r) => r.status === 'late');
+    const nextExam = Bb.nextExam(exams);
+    if (lateExams.length) {
+      items.push(todoItem({ icon: A.icon.calendarHeart, title: `有 ${lateExams.length} 次体检过了时间、没记做过`, text: `${lateExams.slice(0, 2).map((r) => r.name).join('、')} · <a class="link" href="#/baby/exams">去看看</a>` }));
+    } else if (nextExam && (nextExam.booked || nextExam.status === 'due' || nextExam.status === 'soon')) {
+      items.push(todoItem({ icon: A.icon.calendarHeart, title: `下一次体检：${nextExam.name}`, text: `${examWhen(nextExam)} · <a class="link" href="#/baby/exams">体检</a>` }));
     }
     const lastGrowth = b.growth[b.growth.length - 1];
     const gap = lastGrowth ? D.diffDays(lastGrowth.date, ui.today) : Infinity;

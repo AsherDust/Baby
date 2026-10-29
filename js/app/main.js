@@ -35,6 +35,7 @@
     if (e.target.id === 'recipe-avoid') ui.avoidOpen = e.target.open;
     if (e.target.id === 'food-tried') ui.triedOpen = e.target.open;
     if (e.target.id === 'vx-done') ui.vaccinesDoneOpen = e.target.open;
+    if (e.target.id === 'ex-done') ui.examsDoneOpen = e.target.open;
   }, true);
 
   window.addEventListener('hashchange', () => {

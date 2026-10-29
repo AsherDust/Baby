@@ -119,6 +119,7 @@
       growth: METRICS.some((m) => first[m.id] != null) ? [first] : [],
       vaccines: {},
       extraVaccines: [],
+      exams: {},
       milestones: {},
       moments: [],
       tried: {},
@@ -216,14 +217,18 @@
       const item = normalizeGrowth(g);
       if (item) growth.set(item.date, item);
     }
-    const vaccines = {};
-    if (raw.vaccines && typeof raw.vaccines === 'object') {
-      for (const [id, v] of Object.entries(raw.vaccines)) {
-        if (!isId(id) || !v || typeof v !== 'object') continue;
-        const rec = { done: D.isISODate(v.done) ? v.done : null, booked: D.isISODate(v.booked) ? v.booked : null };
-        if (rec.done || rec.booked) vaccines[id] = rec;
+    // 疫苗、体检：{ 编号: { done 哪天做的, booked 约在哪天 } }
+    const bookings = (items) => {
+      const out = {};
+      if (items && typeof items === 'object') {
+        for (const [id, v] of Object.entries(items)) {
+          if (!isId(id) || !v || typeof v !== 'object') continue;
+          const rec = { done: D.isISODate(v.done) ? v.done : null, booked: D.isISODate(v.booked) ? v.booked : null };
+          if (rec.done || rec.booked) out[id] = rec;
+        }
       }
-    }
+      return out;
+    };
     const list = (items, fix) => (Array.isArray(items) ? items.map(fix).filter(Boolean).slice(0, LIST_MAX) : []);
     return {
       name: text(raw.name, NAME_MAX),
@@ -232,9 +237,10 @@
       birthTime: isClock(raw.birthTime) ? raw.birthTime : '',
       logs: unique,
       growth: [...growth.values()].sort((a, b) => (a.date < b.date ? -1 : 1)),
-      vaccines,
+      vaccines: bookings(raw.vaccines),
       extraVaccines: list(raw.extraVaccines, (v) => (v && isId(v.id) && text(v.name, 20) && D.isISODate(v.date)
         ? { id: v.id, name: text(v.name, 20), date: v.date, done: v.done === true } : null)),
+      exams: bookings(raw.exams),
       milestones: datedMap(raw.milestones, isId),
       moments: list(raw.moments, (m) => (m && isId(m.id) && text(m.name, 20) && D.isISODate(m.date) ? { id: m.id, name: text(m.name, 20), date: m.date } : null)),
       tried: datedMap(raw.tried, (k) => text(k, 20) === k && k.length > 0),
@@ -530,6 +536,54 @@
     return v;
   }
 
+  // ---------- 儿保体检 ----------
+
+  /**
+   * 每次体检的时间窗口 [from, to] 和状态：done 做过了 / late 过了窗口没记 / due 在窗口里 / soon 两周内开始 / later；
+   * 按月龄的从满月那天到这个月龄的第 29 天，按天的是出生后第几天到第几天
+   */
+  function examRows(b, book, today) {
+    return book.exams.map((e) => {
+      const rec = b.exams[e.id] || {};
+      const from = e.months != null ? addMonths(b.birthDate, e.months) : D.addDays(b.birthDate, e.days[0]);
+      const to = e.months != null ? D.addDays(from, 29) : D.addDays(b.birthDate, e.days[1]);
+      let status = 'later';
+      if (rec.done) status = 'done';
+      else if (today > to) status = 'late';
+      else if (today >= from) status = 'due';
+      else if (D.diffDays(today, from) <= 14) status = 'soon';
+      return {
+        id: e.id, name: e.name, who: e.who || 'baby', where: e.where || book.examWhere, items: e.items, watch: e.watch || [], note: e.note || '',
+        from, to, done: rec.done || null, booked: rec.booked || null, status,
+      };
+    });
+  }
+
+  /** 下一次：还没做、也没过时间的里面，约好的日子或者窗口开始那天最近的 */
+  function nextExam(rows) {
+    const open = rows.filter((r) => r.status !== 'done' && r.status !== 'late');
+    return open.sort((a, b) => ((a.booked || a.from) < (b.booked || b.from) ? -1 : 1))[0] || null;
+  }
+
+  /** 今天、明天约了体检的 */
+  function examReminders(rows, today) {
+    const tomorrow = D.addDays(today, 1);
+    return rows.filter((r) => r.status !== 'done' && (r.booked === today || r.booked === tomorrow));
+  }
+
+  function setExam(b, id, patch) {
+    const rec = { done: null, booked: null, ...(b.exams[id] || {}), ...patch };
+    if (rec.done || rec.booked) b.exams[id] = rec;
+    else delete b.exams[id];
+  }
+
+  /** 过了时间没记的，一起记成做过了（日子按约的那天，没约就按窗口开始那天）；返回改之前的样子，撤销用 */
+  function markPastExams(b, book, today) {
+    const before = { ...b.exams };
+    for (const r of examRows(b, book, today)) if (r.status === 'late') setExam(b, r.id, { done: r.booked || r.from });
+    return before;
+  }
+
   // ---------- 里程碑 ----------
 
   /** 预设的里程碑：done 记过了 / now 多数宝宝这阵子会 / soon 还早 / past 一般已经会了，还没记 */
@@ -673,6 +727,11 @@
     vaccineReminders,
     setVaccine,
     addExtraVaccine,
+    examRows,
+    nextExam,
+    examReminders,
+    setExam,
+    markPastExams,
     milestoneRows,
     addMoment,
     tempLevel,

@@ -1584,6 +1584,7 @@ test('normalize：宝宝的数据，老数据没有宝宝时是 null，乱数据
     ],
     growth: [{ date: '2026-09-15', weight: '4.1' }, { date: '2026-09-15', weight: '4.3' }, { date: 'nope', weight: 4 }, { date: '2026-10-01', weight: 99 }],
     vaccines: { 'hepb-1': { done: '2026-08-15' }, 'BAD ID': { done: '2026-08-15' }, 'bcg': { booked: 'soon' } },
+    exams: { visit: { done: '2026-08-20' }, 'BAD ID': { done: '2026-08-20' }, m3: { booked: 'nope' }, m6: 'yes' },
     milestones: { smile: '2026-10-01', head: 'yesterday' },
     tried: { 猪肉: '2026-10-01', '': '2026-10-01' },
   };
@@ -1594,6 +1595,10 @@ test('normalize：宝宝的数据，老数据没有宝宝时是 null，乱数据
   eq([b.logs[0].end, b.logs[2].value, b.logs[2].site], [tAt('2026-10-12', '08:00') + 60000, 37.8, 'armpit']);
   eq(b.growth.map((g) => [g.date, g.weight]), [['2026-09-15', 4.3]]);
   eq([b.vaccines, b.milestones, b.tried], [{ 'hepb-1': { done: '2026-08-15', booked: null } }, { smile: '2026-10-01' }, { 猪肉: '2026-10-01' }]);
+  eq(b.exams, { visit: { done: '2026-08-20', booked: null } });
+  const noExams = { ...newborn() };
+  delete noExams.exams;
+  eq(Bb.normalize(noExams).exams, {}, '老数据没有体检记录');
   raw.baby = { name: '没有生日' };
   eq(M.normalize(raw).baby, null);
 });
@@ -1656,6 +1661,34 @@ test('疫苗：按月龄算日子，到了可以打、两周内、过了建议�
   ok(ev.title === '打疫苗 · 脊灰灭活疫苗第 2 剂' && ev.date === '2026-04-15' && /豆豆3 月龄可以打/.test(ev.description), JSON.stringify(ev));
   ok(Cal.build([ev], new Date(Date.UTC(2026, 3, 1))).includes('X-WR-CALNAME:疫苗接种') === false, '默认名字');
   ok(Cal.build([ev], new Date(Date.UTC(2026, 3, 1)), '疫苗接种').includes('X-WR-CALNAME:疫苗接种'), '日历名字');
+});
+
+test('儿保体检：产后访视和 42 天检查按天算，之后按月龄到第 29 天；做过了、过了时间、两周内，约好的提醒', () => {
+  eq(BOOKB.exams.map((e) => e.id), ['visit', 'd42', 'm3', 'm6', 'm8', 'm12', 'm18', 'm24', 'm30', 'm36']);
+  ok(BOOKB.exams.every((e) => e.name && e.items.length && (e.days ? e.days[0] < e.days[1] : e.watch.length === 4)), '每次都有名字和查什么，按月龄的有 4 条要留意');
+  const has = (re) => BOOKB.exams.filter((e) => e.items.some((t) => re.test(t))).map((e) => e.id);
+  eq([has(/^听力筛查$/), has(/^血常规/)], [['m6', 'm12', 'm24', 'm36'], ['m6', 'm18', 'm30']], '听力 6、12、24、36 月龄，血常规 6～8、18、30 月龄');
+  const b = newborn('2026-01-15');
+  let rows = Bb.examRows(b, BOOKB, '2026-01-16');
+  const row = (id) => rows.find((r) => r.id === id);
+  eq([row('visit').from, row('visit').to, row('visit').status, row('visit').who], ['2026-01-18', '2026-02-05', 'soon', 'both']);
+  eq([row('d42').from, row('d42').to, row('d42').status], ['2026-02-26', '2026-03-12', 'later']);
+  eq([row('m3').from, row('m3').to, row('m3').where, row('m3').who], ['2026-04-15', '2026-05-14', BOOKB.examWhere, 'baby']);
+  rows = Bb.examRows(b, BOOKB, '2026-03-01');
+  eq([row('visit').status, row('d42').status, Bb.nextExam(rows).id, Bb.examReminders(rows, '2026-03-01')], ['late', 'due', 'd42', []]);
+  Bb.setExam(b, 'd42', { booked: '2026-03-02' });
+  rows = Bb.examRows(b, BOOKB, '2026-03-01');
+  eq(Bb.examReminders(rows, '2026-03-01').map((r) => r.id), ['d42'], '明天约了');
+  const before = Bb.markPastExams(b, BOOKB, '2026-03-01');
+  eq([b.exams.visit, b.exams.d42, before.visit], [{ done: '2026-01-18', booked: null }, { done: null, booked: '2026-03-02' }, undefined], '过了时间的记成做过了，约好的不动');
+  Bb.setExam(b, 'd42', { done: '2026-03-02', booked: null });
+  rows = Bb.examRows(b, BOOKB, '2026-03-05');
+  eq([row('d42').status, Bb.nextExam(rows).id, Bb.examReminders(rows, '2026-03-05')], ['done', 'm3', []]);
+  const ev = Cal.examEvent(row('m3'), '豆豆');
+  ok(ev.title === '体检 · 3 个月体检' && ev.date === '2026-04-15' && /豆豆从这天起可以去3 个月体检，5月14日前/.test(ev.description) && /社区卫生服务中心的儿保门诊/.test(ev.description), JSON.stringify(ev));
+  ok(/妈妈和宝宝约好了产后 42 天检查/.test(Cal.examEvent({ ...row('d42'), booked: '2026-03-02' }).description));
+  Bb.setExam(b, 'd42', { done: null });
+  eq(b.exams.d42, undefined);
 });
 
 test('里程碑：这阵子会的、还早的、一般已经会了的；记下的带上那时几个月大；自己加的', () => {

@@ -20,7 +20,7 @@
     journal: { name: '心情', subs: [''] },
     checkups: { name: '产检', subs: ['schedule', 'ultrasound'] },
     // 宝宝出生后底部的「产检」换成「宝宝」，产检收进「记录」里
-    baby: { name: '宝宝', subs: ['', 'growth', 'vaccines', 'health', 'food'] },
+    baby: { name: '宝宝', subs: ['', 'growth', 'vaccines', 'exams', 'health', 'food'] },
     tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'recipes', 'weaning', 'bag', 'weeks', 'story'] },
   };
   const TABS = { pregnant: ['today', 'records', 'journal', 'checkups', 'tools'], baby: ['today', 'records', 'journal', 'baby', 'tools'] };
@@ -94,6 +94,7 @@
     growthMetric: 'weight',
     triedOpen: false,
     vaccinesDoneOpen: false,
+    examsDoneOpen: false,
     glucoseSlot: '',
     // 心情页上选好、还没记下的心情；首页点小脸进来时也先放这里
     journalMood: '',
