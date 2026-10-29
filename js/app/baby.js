@@ -2,7 +2,7 @@
   'use strict';
   // 「宝宝」页（日常、成长、疫苗、健康、辅食）和宝宝出生后的首页；孕晚期首页上「宝宝出生了吗」那块也在这里
   const { dates: D, baby: Bb, babyBook: BOOK, babyFood: FOOD, recipeBook: RB, growthStandard: STD, chart: Chart, art: A, app } = globalThis.Baby;
-  const { esc, ui, hhmm, TERM_FROM, todoMood, todoMeal, recipeDot } = app;
+  const { esc, ui, hhmm, TERM_FROM, todoMood, todoMoodCare, todoMeal, recipeDot } = app;
 
   const VIEWS = [['', '日常'], ['growth', '成长'], ['vaccines', '疫苗'], ['exams', '体检'], ['health', '健康'], ['food', '辅食']];
   const LEVEL_NAMES = { cool: '偏低', normal: '正常', low: '低热', mid: '中等发热', high: '高热' };
@@ -722,6 +722,7 @@
       if (picks.length) items.push(todoFood(picks));
     }
     items.push(todoMeal(now));
+    items.push(todoMoodCare(ui.today));
     items.push(todoMood(ui.today));
     return `
       <article class="panel panel-today">

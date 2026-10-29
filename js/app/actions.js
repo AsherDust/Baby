@@ -216,6 +216,14 @@
       render();
     },
 
+    'mood-care-hide'() {
+      const before = app.state.prefs.moodCareHidden;
+      app.state.prefs.moodCareHidden = ui.today;
+      persist();
+      render();
+      toast('好，过几天再来问问你', () => { app.state.prefs.moodCareHidden = before; });
+    },
+
     'close-dialog'(el) {
       closeDialog(el.closest('dialog'));
     },

@@ -1,7 +1,10 @@
 // 截图和对比度测试共用的示例数据：
-//   empty / main / fresh / checkup-day / late / bag-done / labor
+//   empty / main / fresh / checkup-day / late / bag-done / labor / baby / baby-7m
+//   名字后面加 -blue（比如 main-blue）：最近 5 天记了低落和焦虑，看心情关怀
 // 需要先加载 dates.js、content.js、stories.js、journal.js、model.js；empty 返回 null
-function seedScene(name) {
+function seedScene(scene) {
+  const blue = /-blue$/.test(scene);
+  const name = scene.replace(/-blue$/, '');
   if (name === 'empty') return null;
   const M = Baby.model;
   const s = M.createState({ dueDate: '2027-01-29', preWeight: 52, height: 160, nickname: '豆豆' });
@@ -119,6 +122,11 @@ function seedScene(name) {
     const gaps = [6.5, 6, 5.5, 5.5, 5, 5, 5.5, 4.5, 5, 5, 4.5, 4.5];
     let t = now - gaps.reduce((a, b) => a + b, 0) * MIN;
     s.contractions = gaps.map((g, i) => { const c = { id: `q${i}`, start: t, end: t + (48 + (i % 4) * 6) * 1000 }; t += g * MIN; return c; });
+  }
+  if (blue) {
+    for (let i = 0; i < 5; i += 1) {
+      Baby.journal.add(s, { date: Baby.dates.addDays('2026-10-12', -i), mood: i % 2 ? 'anxious' : 'low', text: i ? '' : '夜里醒了好几次，白天也提不起劲。' }, '2026-10-12', Date.now());
+    }
   }
   return s;
 }

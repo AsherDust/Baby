@@ -665,7 +665,7 @@ test('normalize：新建的数据存取一圈不变', () => {
 
 test('normalize：血压、血糖、B 超的清理', () => {
   const base = M.normalize({ profile: { dueDate: DUE } });
-  eq([base.prefs, base.bp, base.glucose, base.ultrasounds], [{ glucoseAfter: 2, since: null, lastBackup: null, backupNudged: null, installHintHidden: false, storyCardHidden: null }, [], [], []]);
+  eq([base.prefs, base.bp, base.glucose, base.ultrasounds], [{ glucoseAfter: 2, since: null, lastBackup: null, backupNudged: null, installHintHidden: false, storyCardHidden: null, moodCareHidden: null }, [], [], []]);
   const s = M.normalize({
     profile: { dueDate: DUE },
     prefs: { glucoseAfter: '1' },
@@ -1178,6 +1178,20 @@ test('normalize：心情日记的清理，老数据没有这一项时为空', ()
   ]);
   raw.journal = 'oops';
   eq(M.normalize(raw).journal, []);
+});
+
+test('心情关怀：最近 14 天里有 5 天以上低落或焦虑才提醒，同一天只算一天', () => {
+  const e = (date, mood) => ({ id: `${date}-${mood}`, date, time: '', mood, text: '' });
+  const list = [e('2026-10-12', 'low'), e('2026-10-12', 'anxious'), e('2026-10-10', 'anxious'), e('2026-10-08', 'low'), e('2026-10-05', 'happy'), e('2026-10-01', 'tired'), e('2026-10-01', 'low'), e('2026-09-28', 'low')];
+  eq(J.careCheck(list, '2026-10-12'), { days: 4, show: false });
+  eq(J.careCheck([...list, e('2026-09-30', 'anxious')], '2026-10-12'), { days: 5, show: true });
+  eq(J.careCheck(list, '2026-10-20').days, 3, '两周以前的不算');
+  eq([J.CARE_DAYS, J.CARE_MIN], [14, 5]);
+  const raw = M.createState({ dueDate: DUE });
+  raw.prefs.moodCareHidden = '2026-10-12';
+  eq(M.normalize(raw).prefs.moodCareHidden, '2026-10-12');
+  raw.prefs.moodCareHidden = 'later';
+  eq(M.normalize(raw).prefs.moodCareHidden, null);
 });
 
 test('normalize：首页故事卡片关掉的那一晚', () => {

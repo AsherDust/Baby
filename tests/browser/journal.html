@@ -157,6 +157,19 @@ iframe.onload = async () => {
     await wait(10);
     log(state().journal.length === 48 && bursts() === 0, '系统设置了减弱动态效果时不冒爱心');
     w.matchMedia = realMatch;
+
+    // ---- 最近心情不太好时，关心一下 ----
+    const J = w.Baby.journal;
+    for (let i = 1; i <= 5; i += 1) J.add(w.Baby.app.state, { date: w.Baby.dates.addDays('2026-10-12', -i), mood: i % 2 ? 'low' : 'anxious', text: '' }, '2026-10-12', Date.now());
+    w.Baby.app.render();
+    const care = () => ($('.mood-care') || {}).textContent || '';
+    log(/最近两周有 5 天心情低落或焦虑/.test(care()) && /孕期情绪起伏很常见/.test(care()) && $('.mood-care a[href="tel:12356"]') && /120/.test(care()), '两周里有 5 天低落或焦虑：心情页顶上关心一下，给出 12356 和 120', care());
+    await nav('#/');
+    log(/最近心情不太好的日子有点多/.test($('.panel-today').textContent) && $('.panel-today a[href="tel:12356"]'), '首页「今天该记」也提一句');
+    await nav('#/journal');
+    $('[data-action="mood-care-hide"]').click();
+    await wait(20);
+    log(!$('.mood-care') && state().prefs.moodCareHidden === '2026-10-12' && /过几天/.test(toastText()), '点「过几天再说」就收起来，7 天内不再出现');
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }

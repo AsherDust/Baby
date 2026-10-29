@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   // 「心情」页：选个心情、写几句，下面是按天排的时间线；首页「今天心情怎么样」那一条也在这里
-  const { dates: D, journal: J, art: A, app } = globalThis.Baby;
+  const { dates: D, journal: J, baby: Bb, art: A, app } = globalThis.Baby;
   const { esc, ui } = app;
 
   const face = (mood) => `<span class="mood-face">${A.mood[mood]}</span>`;
@@ -28,6 +28,7 @@
   function viewJournalPage(route, { today }) {
     const list = app.state.journal;
     return `
+      ${viewMoodCare(today)}
       <article class="card card-mood">
         <header class="card-head">
           <div>
@@ -76,6 +77,16 @@
       </article>`;
   }
 
+  /** 那天是孕几周；宝宝出生以后写宝宝多大，只到月，窄的那一栏放得下 */
+  function dayAge(day) {
+    const b = app.state.baby;
+    if (b && day.date >= b.birthDate) {
+      const age = Bb.ageOf(b.birthDate, day.date);
+      return age.days === 0 ? '出生那天' : `${Bb.ageText({ ...age, rest: 0 })}大`;
+    }
+    return day.ga >= 0 ? `孕 ${D.formatGA(day.ga)} 周` : '孕前';
+  }
+
   function viewDay(day, today) {
     const ago = D.diffDays(day.date, today);
     const [, m, d] = day.date.split('-').map(Number);
@@ -86,7 +97,7 @@
       <section class="mood-day">
         <p class="mood-day-date">
           ${label}
-          <small>${day.ga >= 0 ? `孕 ${D.formatGA(day.ga)} 周` : '孕前'}</small>
+          <small>${dayAge(day)}</small>
         </p>
         <ul class="mood-entries">
           ${day.entries.map((e) => `
@@ -100,6 +111,50 @@
             </li>`).join('')}
         </ul>
       </section>`;
+  }
+
+  /** 最近两周心情不太好的日子多时才有；收起后 7 天内不再出现 */
+  function moodCare(today) {
+    const c = J.careCheck(app.state.journal, today);
+    const hidden = app.state.prefs.moodCareHidden;
+    return c.show && !(hidden && D.diffDays(hidden, today) < 7) ? c : null;
+  }
+
+  /** 心情页顶上：说几句宽心的话，什么情况要去看医生，给出心理援助热线 */
+  function viewMoodCare(today) {
+    const c = moodCare(today);
+    if (!c) return '';
+    const born = Boolean(app.state.baby);
+    return `
+      <section class="mood-care" aria-label="关心一下你">
+        <span class="mood-care-icon">${A.icon.heart}</span>
+        <div class="mood-care-body">
+          <p class="mood-care-title">最近两周有 ${c.days} 天心情低落或焦虑，抱抱你</p>
+          <p>${born
+            ? '产后情绪起伏很常见，不是你做得不好，也不是矫情。睡不够的时候尤其容易这样，夜里让家人多分担一些；42 天复查时也可以跟医生说说最近的心情。'
+            : '孕期情绪起伏很常见，不是你做得不好。找家人或朋友说说；下次产检时，也可以跟医生说说最近的心情。'}</p>
+          <p>如果低落、提不起兴趣已经持续两周以上，或者有伤害自己${born ? '、伤害宝宝' : ''}的念头，请尽快去医院的心理科或精神科；也可以先打 12356 心理援助热线聊一聊。情况紧急时拨打 120。</p>
+          <div class="mood-care-actions">
+            <a class="btn btn-sm" href="tel:12356">打 12356</a>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="mood-care-hide">过几天再说</button>
+          </div>
+          <p class="mood-care-note">12356 是国家卫生健康委设置的全国统一心理援助热线。</p>
+        </div>
+      </section>`;
+  }
+
+  /** 首页「今天该记」里的一条，详细的在心情页 */
+  function todoMoodCare(today) {
+    const c = moodCare(today);
+    if (!c) return '';
+    return `
+      <li class="todo-item">
+        <span class="todo-icon todo-icon-care">${A.icon.heart}</span>
+        <div class="todo-body">
+          <p class="todo-title">最近心情不太好的日子有点多</p>
+          <p class="todo-text">两周里有 ${c.days} 天低落或焦虑。说出来会好一些，也可以打 <a class="link" href="tel:12356">12356</a> 心理援助热线 · <a class="link" href="#/journal">看看</a></p>
+        </div>
+      </li>`;
   }
 
   /** 首页：还没记就给一排小脸，点了去心情页接着写；记过了显示今天最新的一条 */
@@ -131,5 +186,5 @@
       </li>`;
   }
 
-  Object.assign(app, { moodPicker, viewJournalPage, todoMood });
+  Object.assign(app, { moodPicker, viewJournalPage, todoMood, todoMoodCare });
 })();

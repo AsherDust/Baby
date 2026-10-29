@@ -105,5 +105,17 @@
     return { days, months, more: list.length - shown.length };
   }
 
-  Baby.journal = { MOODS, TEXT_MAX, moodOf, normalize, entryError, add, update, remove, onDay, timeline };
+  // 低落、焦虑算心情不太好；最近 14 天里有 5 天以上这样，温和地关心一下
+  const HEAVY = ['low', 'anxious'];
+  const CARE_DAYS = 14;
+  const CARE_MIN = 5;
+
+  /** 最近 14 天（含今天）里有几天记了低落或焦虑，同一天记好几条只算一天 */
+  function careCheck(list, today) {
+    const from = D.addDays(today, -(CARE_DAYS - 1));
+    const days = new Set(list.filter((e) => e.date >= from && e.date <= today && HEAVY.includes(e.mood)).map((e) => e.date));
+    return { days: days.size, show: days.size >= CARE_MIN };
+  }
+
+  Baby.journal = { MOODS, TEXT_MAX, CARE_DAYS, CARE_MIN, moodOf, normalize, entryError, add, update, remove, onDay, timeline, careCheck };
 })();
