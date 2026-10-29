@@ -25,6 +25,22 @@
 .bsum b { font-family: var(--num); font-size: 24px; font-weight: 400; line-height: 1.15; color: var(--honey-deep); }
 .bsum b small { margin: 0 3px 0 2px; font-family: var(--sans); font-size: 12px; color: var(--ink-2); }
 .bsum-sub { font-size: 11.5px; line-height: 1.4; color: var(--ink-3); }
+.stash-list { margin: 0 0 12px; padding: 0; list-style: none; }
+.stash { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 2px; border-top: 1px dashed var(--line); }
+.stash:first-child { border-top: 0; }
+.stash-ml { text-align: center; }
+.stash-ml b { display: block; font-family: var(--num); font-size: 22px; font-weight: 400; line-height: 1.1; }
+.stash-ml small { font-size: 11.5px; color: var(--ink-3); }
+.stash-title { margin: 0; font-size: 14px; }
+.stash-left { margin: 2px 0 0; font-size: 13px; color: var(--ink-3); }
+.stash-soon .stash-left { color: var(--honey-deep); font-weight: 600; }
+.stash-expired .stash-left { color: var(--alert-ink); font-weight: 600; }
+.stash-expired .stash-ml b { color: var(--ink-3); text-decoration: line-through; }
+.stash-actions { display: flex; align-items: center; gap: 6px; }
+.stash-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.stash-form input[name="ml"] { width: 84px; height: 40px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--field); font-size: 14px; }
+.stash-form .form-error { flex-basis: 100%; }
+.stash-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .baby-trend .recipe-chips { margin-bottom: 8px; }
 .chart.chart-trend { min-height: 190px; }
 .c-bar { fill: var(--honey-soft); stroke: var(--honey); stroke-width: 1; }
@@ -210,6 +226,8 @@ button.ms-open:hover { background: var(--honey-glow); }
   .profile-art { width: 52px; }
   .profile-row { flex-wrap: wrap; }
   .vx { grid-template-columns: 22px minmax(0, 1fr); }
+  .stash { grid-template-columns: 56px minmax(0, 1fr); row-gap: 6px; }
+  .stash-actions { grid-column: 2; }
   .vx-actions { grid-column: 2; justify-content: flex-start; }
 }
 

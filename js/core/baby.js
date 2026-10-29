@@ -6,7 +6,7 @@
   const D = Baby.dates;
 
   const SEXES = [{ id: 'boy', name: '男宝' }, { id: 'girl', name: '女宝' }];
-  const TYPES = ['breast', 'bottle', 'food', 'sleep', 'diaper', 'temp', 'med'];
+  const TYPES = ['breast', 'bottle', 'food', 'sleep', 'diaper', 'temp', 'med', 'pump'];
   const SIDES = ['left', 'right'];
   const MILKS = [{ id: 'breast', name: '母乳' }, { id: 'formula', name: '配方奶' }];
   // 吃过的食材标一下：爱吃、不爱吃、有反应（起疹子、吐、拉肚子这些）
@@ -21,6 +21,13 @@
   // 出生时量的数比之后的范围窄
   const BIRTH_RANGE = { weight: [0.5, 6.5], length: [30, 65], head: [20, 45] };
   const BOTTLE_ML = [5, 400];
+  const PUMP_ML = 500;
+  // 存奶按中国疾控中心的建议（比美国 CDC 保守）：冷藏不超过 2 天，冷冻不超过 3 个月；
+  // 冷冻的拿到冷藏室解冻，解冻后 24 小时内用完、不能再冻
+  const STASH_PLACES = [{ id: 'fridge', name: '冷藏' }, { id: 'freezer', name: '冷冻' }];
+  const STASH_LIFE = { fridge: 2 * 86400000, freezer: 90 * 86400000, thawed: 86400000 };
+  const STASH_SOON = { fridge: 12 * 3600000, freezer: 14 * 86400000, thawed: 6 * 3600000 };
+  const STASH_ML = [5, 500];
   const TEMP_RANGE = [34, 43];
   const NAME_MAX = 12;
   const TEXT_MAX = 40;
@@ -127,6 +134,7 @@
       moments: [],
       tried: {},
       foodNotes: {},
+      stash: [],
     };
   }
 
@@ -177,6 +185,12 @@
         const value = Math.round(toNumber(l.value) * 10) / 10;
         if (!(value >= TEMP_RANGE[0] && value <= TEMP_RANGE[1])) return null;
         return { ...base, value, site: ['armpit', 'ear', 'forehead'].includes(l.site) ? l.site : 'armpit' };
+      }
+      case 'pump': {
+        const left = Math.round(toNumber(l.left));
+        const right = Math.round(toNumber(l.right));
+        const ok = (n) => n >= 0 && n <= PUMP_ML;
+        return ok(left) && ok(right) && left + right > 0 ? { ...base, left, right } : null;
       }
       default: {
         const name = text(l.name, 20);
@@ -260,6 +274,11 @@
       moments: list(raw.moments, (m) => (m && isId(m.id) && text(m.name, 20) && D.isISODate(m.date) ? { id: m.id, name: text(m.name, 20), date: m.date } : null)),
       tried: datedMap(raw.tried, (k) => text(k, 20) === k && k.length > 0),
       foodNotes: foodNotesOf(raw.foodNotes),
+      stash: list(raw.stash, (m) => {
+        const ml = m ? Math.round(toNumber(m.ml)) : 0;
+        if (!m || !isId(m.id) || !isTime(m.at) || !STASH_PLACES.some((p) => p.id === m.place) || !(ml >= STASH_ML[0] && ml <= STASH_ML[1])) return null;
+        return { id: m.id, ml, at: m.at, place: m.place, thawedAt: m.place === 'freezer' && isTime(m.thawedAt) ? m.thawedAt : null };
+      }).sort((x, y) => x.at - y.at),
     };
   }
 
@@ -388,6 +407,12 @@
         if (!(value >= TEMP_RANGE[0] && value <= TEMP_RANGE[1])) return { error: '体温填 34–43 之间的数，例如 36.8' };
         return { ...out, value, site: ['armpit', 'ear', 'forehead'].includes(f.site) ? f.site : 'armpit' };
       }
+      case 'pump': {
+        const left = isBlank(f.left) ? 0 : Math.round(toNumber(f.left));
+        const right = isBlank(f.right) ? 0 : Math.round(toNumber(f.right));
+        if (!(left >= 0 && right >= 0 && left <= PUMP_ML && right <= PUMP_ML && left + right > 0)) return { error: `吸了多少毫升？每边填 0–${PUMP_ML} 之间的数` };
+        return { ...out, left, right };
+      }
       default: {
         const name = text(f.name, 20);
         if (!name) return { error: '吃的什么药？写一下名字' };
@@ -445,6 +470,8 @@
       pee: diapers.filter((l) => l.pee).length,
       poo: diapers.filter((l) => l.poo).length,
       foods: of('food').length,
+      pumps: of('pump').length,
+      pumpMl: of('pump').reduce((s, l) => s + l.left + l.right, 0),
       lastFeed: feeds.length ? feeds[feeds.length - 1].start : null,
     };
   }
@@ -464,6 +491,53 @@
       const s = daySummary(b, date, now);
       return { date, ...s, has: s.logs.length > 0 || s.sleepMin > 0 };
     });
+  }
+
+  // ---------- 存奶 ----------
+
+  /** 存一袋：ml 毫升，at 吸的时间，place fridge / freezer；不对的返回 null */
+  function addStash(b, { ml, at, place }) {
+    const n = Math.round(toNumber(ml));
+    if (!(n >= STASH_ML[0] && n <= STASH_ML[1]) || !isTime(at) || !STASH_PLACES.some((p) => p.id === place)) return null;
+    const bag = { id: newId('mk'), ml: n, at, place, thawedAt: null };
+    b.stash.push(bag);
+    b.stash.sort((x, y) => x.at - y.at);
+    return bag;
+  }
+
+  /** 每袋还能放多久：kind fridge / freezer / thawed，until 最晚什么时候用完，status ok / soon / expired；先吸的在前 */
+  function stashRows(b, now) {
+    return b.stash.map((bag) => {
+      const kind = bag.thawedAt ? 'thawed' : bag.place;
+      const until = bag.thawedAt ? Math.min(bag.thawedAt + STASH_LIFE.thawed, bag.at + STASH_LIFE.freezer) : bag.at + STASH_LIFE[bag.place];
+      const left = until - now;
+      return { ...bag, kind, until, left, status: left <= 0 ? 'expired' : left <= STASH_SOON[kind] ? 'soon' : 'ok' };
+    });
+  }
+
+  /** 冷冻的拿去解冻 */
+  function thawStash(b, id, now) {
+    const bag = b.stash.find((x) => x.id === id);
+    if (!bag || bag.place !== 'freezer' || bag.thawedAt) return null;
+    bag.thawedAt = now;
+    return bag;
+  }
+
+  function removeStash(b, id) {
+    const index = b.stash.findIndex((x) => x.id === id);
+    return index < 0 ? null : { bag: b.stash.splice(index, 1)[0], index };
+  }
+
+  function restoreStash(b, removed) {
+    b.stash.splice(Math.min(removed.index, b.stash.length), 0, removed.bag);
+  }
+
+  /** 用掉一袋：从存奶里拿掉，记成一次母乳瓶喂；返回 { bag, index, log }，撤销用 */
+  function useStash(b, id, now) {
+    const removed = removeStash(b, id);
+    if (!removed) return null;
+    const log = insert(b, { id: newId('bo'), type: 'bottle', start: now, ml: Math.min(removed.bag.ml, BOTTLE_ML[1]), milk: 'breast', note: '存奶' });
+    return { ...removed, log };
   }
 
   // ---------- 身长体重头围、WHO 百分位 ----------
@@ -783,6 +857,7 @@
     TYPES,
     MILKS,
     FEELS,
+    STASH_PLACES,
     METRICS,
     CURVES,
     dayOf,
@@ -838,6 +913,12 @@
     nextFeed,
     sleepNeed,
     weekSummary,
+    addStash,
+    stashRows,
+    thawStash,
+    removeStash,
+    restoreStash,
+    useStash,
     reactionsIn,
     setFoodNote,
     milestoneRows,

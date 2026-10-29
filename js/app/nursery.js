@@ -7,7 +7,7 @@
     cheer, persist, download, babyMinText, babyLogInfo, babyFoodDot
   } = app;
 
-  const TYPE_NAMES = { breast: '亲喂', bottle: '瓶喂', food: '辅食', sleep: '睡觉', diaper: '尿布', temp: '体温', med: '用药' };
+  const TYPE_NAMES = { breast: '亲喂', bottle: '瓶喂', pump: '吸奶', food: '辅食', sleep: '睡觉', diaper: '尿布', temp: '体温', med: '用药' };
   const kid = () => app.state.baby;
   const submitButton = (form) => form.querySelector('button:not([type="button"])');
   const radio = (name, value, label, checked) => `<label><input type="radio" name="${name}" value="${value}"${checked ? ' checked' : ''}><span>${label}</span></label>`;
@@ -77,6 +77,16 @@
         ${field('吃了什么', `<input name="text" maxlength="40" autocomplete="off" placeholder="例如 南瓜泥" value="${esc(val('text'))}">`)}
         ${field('吃了多少 <small>可选</small>', `<input name="amount" maxlength="20" autocomplete="off" placeholder="例如 半碗、5 勺" value="${esc(val('amount'))}">`)}
         <input type="hidden" name="recipe" value="${esc(val('recipe'))}">`,
+      pump: () => `
+        <div class="field-row">
+          ${field('左边 <small>毫升</small>', `<input name="left" inputmode="numeric" autocomplete="off" placeholder="60" value="${e ? e.left || '' : ''}">`)}
+          ${field('右边 <small>毫升</small>', `<input name="right" inputmode="numeric" autocomplete="off" placeholder="60" value="${e ? e.right || '' : ''}">`)}
+        </div>
+        ${e ? '' : `
+          <div class="stash-pick">
+            <label class="pick"><input type="checkbox" name="store" checked><span>存起来</span></label>
+            <div class="seg" role="radiogroup" aria-label="放哪">${Bb.STASH_PLACES.map((p, i) => radio('place', p.id, p.name, !i)).join('')}</div>
+          </div>`}`,
       sleep: () => `${field('几点醒的 <small>还在睡就空着</small>', `<input type="time" name="endTime" value="${e && e.end ? hhmm(e.end) : ''}">`)}`,
       diaper: () => `
         <div class="pick-row" role="group" aria-label="尿还是便">
@@ -307,8 +317,13 @@
       }
       const recipe = type === 'food' && read.recipe ? FOOD.recipes.find((r) => r.id === read.recipe) : null;
       if (recipe) Bb.markTried(FOOD, b, recipe, Bb.dayOf(read.start));
+      const bag = type === 'pump' && !id && form.elements.store && form.elements.store.checked
+        ? Bb.addStash(b, { ml: read.left + read.right, at: read.start, place: form.elements.place.value }) : null;
       closeDialog(sheetDialog);
-      saved(id ? say('saved') : logMessage(entry), id ? null : () => Bb.removeLog(b, entry.id));
+      saved(id ? say('saved') : `${logMessage(entry)}${bag ? `，存进${bag.place === 'freezer' ? '冷冻' : '冷藏'}了` : ''}`, id ? null : () => {
+        Bb.removeLog(b, entry.id);
+        if (bag) Bb.removeStash(b, bag.id);
+      });
     },
 
     'baby-growth'(form) {
@@ -398,6 +413,15 @@
         if (before) b.exams[id] = before;
         else delete b.exams[id];
       });
+    },
+
+    'stash-add'(form) {
+      const b = kid();
+      const f = Object.fromEntries(new FormData(form));
+      const bag = Bb.addStash(b, { ml: f.ml, at: Date.now(), place: f.place });
+      if (!bag) return formError(form, '这袋多少毫升？填 5–500 之间的数');
+      ui.clearInputs.push('stash-ml');
+      saved(`存了一袋 ${bag.ml} 毫升（${bag.place === 'freezer' ? '冷冻' : '冷藏'}）`, () => Bb.removeStash(b, bag.id));
     },
 
     'extra-vaccine'(form) {
@@ -584,6 +608,30 @@
       if (!rows.length) return oops('没有要提醒的疫苗了');
       download(Cal.build(rows.map((r) => Cal.vaccineEvent(r, b.name)), new Date(), '疫苗接种'), '疫苗接种.ics', 'text/calendar;charset=utf-8');
       toast(`导出了 ${rows.length} 针，打开下载的文件就能加进日历`);
+    },
+
+    'stash-use'(el) {
+      const b = kid();
+      const used = Bb.useStash(b, el.dataset.id, Date.now());
+      if (!used) return;
+      saved(`用掉了一袋 ${used.bag.ml} 毫升，记成一次瓶喂`, () => {
+        Bb.removeLog(b, used.log.id);
+        Bb.restoreStash(b, used);
+      });
+    },
+
+    'stash-thaw'(el) {
+      const b = kid();
+      const bag = Bb.thawStash(b, el.dataset.id, Date.now());
+      if (!bag) return;
+      saved('拿去解冻了，解冻后 24 小时内用完', () => { bag.thawedAt = null; });
+    },
+
+    'stash-drop'(el) {
+      const b = kid();
+      const removed = Bb.removeStash(b, el.dataset.id);
+      if (!removed) return;
+      saved(`倒掉了一袋 ${removed.bag.ml} 毫升`, () => Bb.restoreStash(b, removed));
     },
 
     'paper-toggle'(el) {

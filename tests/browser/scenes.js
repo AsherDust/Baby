@@ -129,6 +129,11 @@ function seedScene(scene) {
     log(day, '15:05', 'diaper', { pee: false, poo: true, color: 'green' });
     log(day, '17:30', 'bottle', { ml: small ? 120 : 180, milk: 'formula' });
     if (!small) log(day, '18:10', 'food', { text: '南瓜小米粥', amount: '半碗', recipe: 'millet-pumpkin-congee' });
+    if (small) {
+      log(day, '10:30', 'pump', { left: 70, right: 60 });
+      [['2026-10-10', '21:00', 90, 'fridge'], ['2026-10-12', '10:30', 130, 'fridge'], ['2026-09-20', '15:00', 120, 'freezer'], ['2026-09-28', '15:00', 100, 'freezer']]
+        .forEach(([d, hm, ml, place]) => B.addStash(b, { ml, at: t(d, hm), place }));
+    }
   }
   if (name === 'labor') {
     s.profile.dueDate = '2026-10-19';

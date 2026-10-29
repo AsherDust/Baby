@@ -184,6 +184,37 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await click('#baby-next');
     log(/今天/.test(text($('.day-title'))) && $('#baby-next').disabled, '回到今天');
 
+    // ---- 吸奶和存奶 ----
+    log(!$('.baby-stash'), '没吸过奶时不显示存奶');
+    await click('#log-pump');
+    const uf = sheet().querySelector('form[data-form="baby-log"]');
+    log(uf.dataset.type === 'pump' && uf.elements.store.checked && uf.querySelector('input[name="place"][value="fridge"]').checked, '记吸奶：默认存起来、放冷藏');
+    uf.elements.left.value = '60';
+    uf.elements.right.value = '40';
+    uf.requestSubmit();
+    await wait(40);
+    log(baby().logs.some((l) => l.type === 'pump' && l.left === 60 && l.right === 40) && baby().stash.length === 1 && baby().stash[0].ml === 100 && /存进冷藏了/.test(toastText()), '吸奶记好了，100 毫升存进冷藏', toastText());
+    log(/冷藏 1 袋 100 毫升/.test(text($('.baby-stash .card-meta'))) && /还能放 2 天|前用完/.test(text($('.stash-left'))) && /吸奶 100 毫升/.test(text($('.bsum'))), '存奶卡片：一袋、还能放多久；今天的小结里有吸奶');
+    d.getElementById('stash-ml').value = '80';
+    $('form[data-form="stash-add"] input[name="place"][value="freezer"]').checked = true;
+    $('form[data-form="stash-add"]').requestSubmit();
+    await wait(40);
+    const frozen = baby().stash.find((x) => x.place === 'freezer');
+    log(frozen && frozen.ml === 80 && /冷冻 1 袋 80 毫升/.test(text($('.baby-stash .card-meta'))), '手动存一袋冷冻的');
+    await click(`#stash-thaw-${frozen.id}`);
+    log(baby().stash.find((x) => x.id === frozen.id).thawedAt === fakeNow && /解冻中/.test(text($('.baby-stash'))) && /24 小时内用完/.test(toastText()), '拿去解冻');
+    const fresh = baby().stash.find((x) => x.place === 'fridge');
+    await click(`#stash-use-${fresh.id}`);
+    log(!baby().stash.some((x) => x.id === fresh.id) && baby().logs.some((l) => l.type === 'bottle' && l.milk === 'breast' && l.ml === 100 && l.note === '存奶') && /记成一次瓶喂/.test(toastText()), '用掉一袋：记成一次母乳瓶喂');
+    await click('#toast [data-action="undo"]');
+    log(baby().stash.some((x) => x.id === fresh.id) && !baby().logs.some((l) => l.note === '存奶'), '用掉了也能撤销');
+    w.Baby.app.state.baby.stash.find((x) => x.id === fresh.id).at = fakeNow - 40 * 3600000;
+    await nav('#/');
+    log(/存奶：1 袋快到期了/.test(text($('.panel-today'))), '首页提醒存奶快到期了', text($('.panel-today')).slice(0, 120));
+    await nav('#/baby');
+    await click(`#stash-drop-${frozen.id}`);
+    log(!baby().stash.some((x) => x.id === frozen.id) && /倒掉了一袋 80 毫升/.test(toastText()), '倒掉一袋');
+
     // ---- 成长档案 ----
     await nav('#/baby/growth');
     log($('#growth-chart svg') && $$('#growth-chart .c-pline').length === 5 && $$('#growth-chart circle').length === 1, '生长曲线：5 条百分位线和出生时的点');

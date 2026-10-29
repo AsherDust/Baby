@@ -1725,6 +1725,43 @@ test('儿保体检：产后访视和 42 天检查按天算，之后按月龄到�
   eq(b.exams.d42, undefined);
 });
 
+test('吸奶和存奶：冷藏 2 天、冷冻 3 个月、解冻后 24 小时；快到期和过期；用掉记成一次母乳瓶喂', () => {
+  const b = newborn('2026-09-01');
+  const at = tAt('2026-10-12', '08:00');
+  const f = (left, right) => ({ date: '2026-10-12', time: '08:00', left, right, note: '' });
+  eq(Bb.readLog('pump', f('60', ''), at + 60000), { type: 'pump', start: at, note: '', left: 60, right: 0 });
+  ok(Bb.readLog('pump', f('', ''), at).error && Bb.readLog('pump', f('600', '10'), at).error, '没填或者太多');
+  Bb.addLog(b, Bb.readLog('pump', f('60', '50'), at));
+  const day = Bb.daySummary(b, '2026-10-12', at + 3600000);
+  eq([day.pumps, day.pumpMl, day.feeds], [1, 110, 0], '吸奶不算喂奶');
+  eq(Bb.addStash(b, { ml: 3, at, place: 'fridge' }), null);
+  eq(Bb.addStash(b, { ml: 100, at, place: 'counter' }), null);
+  const fridge = Bb.addStash(b, { ml: '120', at, place: 'fridge' });
+  const freezer = Bb.addStash(b, { ml: 90, at: at - 86400000, place: 'freezer' });
+  let rows = Bb.stashRows(b, at + 3600000);
+  eq(rows.map((r) => [r.ml, r.kind, r.status]), [[90, 'freezer', 'ok'], [120, 'fridge', 'ok']], '先存的在前');
+  eq([rows[1].until, rows[0].until], [at + 2 * 86400000, at - 86400000 + 90 * 86400000]);
+  eq(Bb.stashRows(b, at + 40 * 3600000)[1].status, 'soon', '冷藏的还剩 8 小时');
+  eq(Bb.stashRows(b, at + 49 * 3600000)[1].status, 'expired', '冷藏超过 2 天');
+  eq(Bb.thawStash(b, fridge.id, at), null, '冷藏的不用解冻');
+  Bb.thawStash(b, freezer.id, at + 2 * 3600000);
+  rows = Bb.stashRows(b, at + 22 * 3600000);
+  eq([rows[0].kind, rows[0].until, rows[0].status], ['thawed', at + 26 * 3600000, 'soon'], '解冻后 24 小时内用完');
+  eq(Bb.stashRows(b, at + 27 * 3600000)[0].status, 'expired');
+  const used = Bb.useStash(b, fridge.id, at + 5 * 3600000);
+  eq([used.bag.ml, used.log.type, used.log.milk, used.log.ml, b.stash.length], [120, 'bottle', 'breast', 120, 1]);
+  Bb.removeLog(b, used.log.id);
+  Bb.restoreStash(b, used);
+  eq(b.stash.map((x) => x.ml), [90, 120], '撤销放回原处');
+  const raw = { ...newborn(), stash: [{ id: 'mk-1', ml: '100', at, place: 'fridge', thawedAt: at }, { id: 'mk-2', ml: 1000, at, place: 'freezer' }, { id: 'BAD', ml: 50, at, place: 'fridge' }],
+    logs: [{ id: 'pu-1', type: 'pump', start: at, left: '70', right: 0 }, { id: 'pu-2', type: 'pump', start: at, left: 0, right: 0 }] };
+  const n = Bb.normalize(raw);
+  eq([n.stash, n.logs.map((l) => [l.id, l.left, l.right])], [[{ id: 'mk-1', ml: 100, at, place: 'fridge', thawedAt: null }], [['pu-1', 70, 0]]]);
+  const old = newborn();
+  delete old.stash;
+  eq(Bb.normalize(old).stash, []);
+});
+
 test('最近 7 天：每天的小结，出生前的不算；睡多久的参考按月龄；柱状图带推荐范围', () => {
   eq([0, 3, 4, 11, 12, 35, 36, 71, 72].map(Bb.sleepNeed), [[14, 17], [14, 17], [12, 16], [12, 16], [11, 14], [11, 14], [10, 13], [10, 13], null]);
   const b = newborn('2026-10-08');

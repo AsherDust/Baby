@@ -76,6 +76,8 @@
         const level = Bb.tempLevel(BOOK, l.value, l.site);
         return { icon: A.icon.thermo, name: '体温', text: `${l.value}℃ · ${siteName[l.site]} · ${LEVEL_NAMES[level]}`, warn: level !== 'normal' };
       }
+      case 'pump':
+        return { icon: A.icon.drop, name: '吸奶', text: `${[l.left ? `左 ${l.left}` : '', l.right ? `右 ${l.right}` : ''].filter(Boolean).join(' · ')} · 一共 ${l.left + l.right} 毫升` };
       default:
         return { icon: A.icon.pill, name: '用药', text: `${esc(l.name)}${l.dose ? ` · ${esc(l.dose)}` : ''}` };
     }
@@ -149,6 +151,7 @@
         </div>
       </div>
       <div class="qt-more" role="group" aria-label="记别的">
+        <button type="button" class="chip" id="log-pump" data-action="baby-log" data-type="pump">${A.icon.drop}吸奶</button>
         <button type="button" class="chip" id="log-food" data-action="baby-log" data-type="food">${A.icon.bowl}辅食</button>
         <button type="button" class="chip" id="log-temp" data-action="baby-log" data-type="temp">${A.icon.thermo}体温</button>
         <button type="button" class="chip" id="log-med" data-action="baby-log" data-type="med">${A.icon.pill}用药</button>
@@ -158,7 +161,7 @@
   }
 
   function viewSummary(s) {
-    const feed = [s.breastMin ? `亲喂 ${minText(s.breastMin)}` : '', s.bottleMl ? `瓶喂 ${s.bottleMl} 毫升` : ''].filter(Boolean).join(' · ');
+    const feed = [s.breastMin ? `亲喂 ${minText(s.breastMin)}` : '', s.bottleMl ? `瓶喂 ${s.bottleMl} 毫升` : '', s.pumpMl ? `吸奶 ${s.pumpMl} 毫升` : ''].filter(Boolean).join(' · ');
     return `
       <ul class="bsum">
         <li><span class="bsum-name">喂奶</span><b>${s.feeds}<small>次</small></b><span class="bsum-sub">${feed || '还没记'}</span></li>
@@ -212,8 +215,54 @@
         </header>
         ${s.logs.length ? `<ul class="blog-list">${s.logs.map((l) => viewLogRow(l, now)).join('')}</ul>` : `<p class="food-empty">${isToday ? '点上面的按钮，一下就记好' : '这天没有记录'}</p>`}
       </article>
+      ${isToday ? viewStash(now) : ''}
       ${isToday ? viewTrend(now) : ''}
       <p class="fineprint">${feedingTip()}</p>`;
+  }
+
+  const placeName = Object.fromEntries(Bb.STASH_PLACES.map((p) => [p.id, p.name]));
+
+  /** 这袋还能放多久：过期了 / 今天 21:00 前用完 / 还能放 5 天 */
+  function stashLeft(r, now) {
+    if (r.status === 'expired') return '过期了，倒掉吧';
+    if (r.left < 2 * 86400000) return `${whenText(r.until, now)}前用完`;
+    return `还能放 ${Math.floor(r.left / 86400000)} 天，${D.formatDate(Bb.dayOf(r.until))}前用完`;
+  }
+
+  /** 「存奶」：冰箱里的一袋袋母乳，先吸的在前；吸过奶或者存过才显示 */
+  function viewStash(now) {
+    const b = kid();
+    if (!b.stash.length && !b.logs.some((l) => l.type === 'pump')) return '';
+    const rows = Bb.stashRows(b, now);
+    const sum = (kind) => rows.filter((r) => (kind === 'fridge' ? r.kind !== 'freezer' : r.kind === 'freezer'));
+    const meta = rows.length ? ['fridge', 'freezer'].map((k) => {
+      const list = sum(k);
+      return list.length ? `${placeName[k]} ${list.length} 袋 ${list.reduce((n, r) => n + r.ml, 0)} 毫升` : '';
+    }).filter(Boolean).join(' · ') : '冰箱里还没有存奶';
+    return `
+      <article class="card baby-stash">
+        <header class="card-head"><div><h2 class="card-title">${A.icon.drop}存奶</h2><p class="card-meta">${meta}</p></div></header>
+        ${rows.length ? `<ul class="stash-list">${rows.map((r) => `
+          <li class="stash stash-${r.status}">
+            <span class="stash-ml"><b>${r.ml}</b><small>毫升</small></span>
+            <div class="stash-main">
+              <p class="stash-title">${r.kind === 'thawed' ? '解冻中' : placeName[r.kind]} · ${D.diffDays(Bb.dayOf(r.at), Bb.dayOf(now)) <= 1 ? whenText(r.at, now) : D.formatDate(Bb.dayOf(r.at))} 吸的</p>
+              <p class="stash-left">${stashLeft(r, now)}</p>
+            </div>
+            <div class="stash-actions">
+              ${r.status === 'expired' ? '' : `<button type="button" class="chip" id="stash-use-${r.id}" data-action="stash-use" data-id="${r.id}">用掉</button>`}
+              ${r.kind === 'freezer' && r.status !== 'expired' ? `<button type="button" class="chip" id="stash-thaw-${r.id}" data-action="stash-thaw" data-id="${r.id}">解冻</button>` : ''}
+              <button type="button" class="icon-btn icon-btn-sm" id="stash-drop-${r.id}" data-action="stash-drop" data-id="${r.id}" aria-label="倒掉这袋 ${r.ml} 毫升" title="倒掉">${A.icon.x}</button>
+            </div>
+          </li>`).join('')}</ul>` : ''}
+        <form class="stash-form" data-form="stash-add" novalidate>
+          <input id="stash-ml" name="ml" inputmode="numeric" autocomplete="off" placeholder="毫升" aria-label="这袋多少毫升" data-keep>
+          <div class="seg" role="radiogroup" aria-label="放哪">${Bb.STASH_PLACES.map((p, i) => `<label><input type="radio" name="place" value="${p.id}"${i ? '' : ' checked'}><span>${p.name}</span></label>`).join('')}</div>
+          <button class="btn btn-sm">存一袋</button>
+          <p class="form-error" hidden></p>
+        </form>
+        <p class="fineprint">按中国疾控中心的建议：冷藏（4℃）不超过 2 天，冷冻（-18℃ 以下）不超过 3 个月；冷冻的放冷藏室解冻，解冻后 24 小时内用完，不能再冻。喝剩的不留，不用微波炉热。点「用掉」会记成一次母乳瓶喂。</p>
+      </article>`;
   }
 
   const TRENDS = [['sleep', '睡眠', '小时'], ['feeds', '喂奶', '次'], ['diapers', '尿布', '片']];
@@ -774,6 +823,17 @@
     } else if (next) {
       const when = next.booked ? `约在 ${D.formatDate(next.booked, { weekday: true })}` : next.status === 'due' ? '已经可以打了' : `${D.formatDate(next.due)}起可以打`;
       items.push(todoItem({ icon: A.icon.syringe, title: `下一针：${next.name}第 ${next.dose} 剂`, text: `${when} · <a class="link" href="#/baby/vaccines">疫苗</a>` }));
+    }
+    const stash = Bb.stashRows(b, now).filter((r) => r.status !== 'ok');
+    if (stash.length) {
+      const expired = stash.filter((r) => r.status === 'expired');
+      const first = stash.find((r) => r.status === 'soon');
+      items.push(todoItem({
+        icon: A.icon.drop,
+        alert: expired.length > 0,
+        title: expired.length ? `存奶：${expired.length} 袋过期了` : `存奶：${stash.length} 袋快到期了`,
+        text: `${expired.length ? '过期的倒掉吧' : `${placeName[first.kind] || '解冻的'} ${first.ml} 毫升，${whenText(first.until, now)}前用完`} · <a class="link" href="#/baby">去看看</a>`,
+      }));
     }
     const exams = Bb.examRows(b, BOOK, ui.today);
     const lateExams = exams.filter((r) => r.status === 'late');
