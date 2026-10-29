@@ -551,6 +551,8 @@
         </section>`;
     }).join('');
     const foods = Bb.foodList(FOOD);
+    const feelName = Object.fromEntries(Bb.FEELS.map((f) => [f.id, f.name]));
+    const reacted = foods.filter((n) => b.foodNotes[n] && b.foodNotes[n].feel === 'reaction');
     return `
       <article class="card baby-food-stage">
         ${intro}
@@ -565,10 +567,14 @@
         ${stages}
       </article>
       <article class="card baby-tried">
+        ${reacted.length ? `<p class="food-reacted">${A.icon.alert}<span>有过反应：${reacted.map((n) => `${esc(n)}${b.foodNotes[n].note ? `（${esc(b.foodNotes[n].note)}）` : ''}`).join('、')}。含这些的辅食先不推荐了，问问医生什么时候能再试。</span></p>` : ''}
         <details class="food-tried" id="food-tried"${ui.triedOpen ? ' open' : ''}>
           <summary>吃过的食材<small>${Object.keys(b.tried).length}/${foods.length}</small></summary>
-          <p class="hint">记辅食时会自动勾上；没记的点一下也能勾。</p>
-          <div class="recipe-chips">${foods.map((n) => `<button type="button" class="chip" id="tried-${esc(n)}" data-action="tried-toggle" data-food="${esc(n)}" aria-pressed="${Boolean(b.tried[n])}">${esc(n)}</button>`).join('')}</div>
+          <p class="hint">记辅食时会自动勾上，没记的点一下也能勾；吃过的再点一下，标一标爱不爱吃、有没有反应。</p>
+          <div class="recipe-chips">${foods.map((n) => {
+            const fn = b.foodNotes[n];
+            return `<button type="button" class="chip${fn ? ` chip-feel-${fn.feel}` : ''}" id="tried-${esc(n)}" data-action="${b.tried[n] ? 'tried-open' : 'tried-toggle'}" data-food="${esc(n)}" aria-pressed="${Boolean(b.tried[n])}">${esc(n)}${fn ? `<small>${feelName[fn.feel]}</small>` : ''}</button>`;
+          }).join('')}</div>
         </details>
       </article>
       <p class="fineprint">参考《中国 7～24 月龄婴幼儿喂养指南（2022）》。早产、过敏体质、长得慢的宝宝，什么时候加、加什么听医生的。</p>`;
@@ -576,12 +582,13 @@
 
   function viewFoodRow(r) {
     const fresh = kid() ? Bb.newFoods(FOOD, kid(), r) : [];
+    const bad = kid() ? Bb.reactionsIn(kid(), r) : [];
     const tags = [...r.good.map((g) => tagName[g]), ...r.allergens.map((a) => `含${allergenName[a]}`)];
     return `
       <li class="dish">
         <button type="button" class="dish-open" id="food-${r.id}" data-action="baby-food-open" data-id="${r.id}">
           ${foodDot(r)}
-          <span class="dish-name">${esc(r.name)}${fresh.length ? `<span class="tag tag-next">新：${fresh.map(esc).join('、')}</span>` : ''}</span>
+          <span class="dish-name">${esc(r.name)}${bad.length ? `<span class="tag tag-lv-high">有过反应：${bad.map(esc).join('、')}</span>` : fresh.length ? `<span class="tag tag-next">新：${fresh.map(esc).join('、')}</span>` : ''}</span>
           <span class="dish-meta">${r.minutes} 分钟 · ${tags.join(' · ')}</span>
         </button>
       </li>`;

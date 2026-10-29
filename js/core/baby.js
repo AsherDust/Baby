@@ -9,6 +9,8 @@
   const TYPES = ['breast', 'bottle', 'food', 'sleep', 'diaper', 'temp', 'med'];
   const SIDES = ['left', 'right'];
   const MILKS = [{ id: 'breast', name: '母乳' }, { id: 'formula', name: '配方奶' }];
+  // 吃过的食材标一下：爱吃、不爱吃、有反应（起疹子、吐、拉肚子这些）
+  const FEELS = [{ id: 'like', name: '爱吃' }, { id: 'dislike', name: '不爱吃' }, { id: 'reaction', name: '有反应' }];
   const METRICS = [
     { id: 'weight', name: '体重', unit: 'kg', range: [0.5, 30] },
     { id: 'length', name: '身长', unit: 'cm', range: [30, 130] },
@@ -124,6 +126,7 @@
       milestones: {},
       moments: [],
       tried: {},
+      foodNotes: {},
     };
   }
 
@@ -195,6 +198,16 @@
     return out;
   };
 
+  function foodNotesOf(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const [name, v] of Object.entries(raw)) {
+      if (text(name, 20) !== name || !name || !v || !FEELS.some((f) => f.id === v.feel)) continue;
+      out[name] = { feel: v.feel, note: text(v.note, 40), date: D.isISODate(v.date) ? v.date : null };
+    }
+    return out;
+  }
+
   function normalize(raw) {
     if (!raw || typeof raw !== 'object' || !D.isISODate(raw.birthDate)) return null;
     const logs = (Array.isArray(raw.logs) ? raw.logs : []).map(normalizeLog).filter(Boolean);
@@ -246,6 +259,7 @@
       milestones: datedMap(raw.milestones, isId),
       moments: list(raw.moments, (m) => (m && isId(m.id) && text(m.name, 20) && D.isISODate(m.date) ? { id: m.id, name: text(m.name, 20), date: m.date } : null)),
       tried: datedMap(raw.tried, (k) => text(k, 20) === k && k.length > 0),
+      foodNotes: foodNotesOf(raw.foodNotes),
     };
   }
 
@@ -691,6 +705,15 @@
   /** 这道菜里还没吃过的食材 */
   const newFoods = (food, b, recipe) => recipe.items.map((i) => i[0]).filter((n) => !food.plain.includes(n) && !b.tried[n]);
 
+  /** 这道菜里宝宝吃了有过反应的食材 */
+  const reactionsIn = (b, recipe) => recipe.items.map((i) => i[0]).filter((n) => b.foodNotes[n] && b.foodNotes[n].feel === 'reaction');
+
+  /** 标一下吃得怎么样；feel 为空就是不标了 */
+  function setFoodNote(b, name, feel, note, date) {
+    if (!FEELS.some((f) => f.id === feel)) delete b.foodNotes[name];
+    else b.foodNotes[name] = { feel, note: text(note, 40), date };
+  }
+
   function hash(s) {
     let h = 2166136261;
     for (let i = 0; i < s.length; i += 1) {
@@ -707,7 +730,7 @@
   function foodToday(food, book, b, date) {
     const months = ageOf(b.birthDate, date).months;
     const stage = foodStage(book, Math.max(months, 6));
-    const pool = food.recipes.filter((r) => r.stage <= stage.from)
+    const pool = food.recipes.filter((r) => r.stage <= stage.from && !reactionsIn(b, r).length)
       .sort((x, y) => hash(`${date}/${x.id}`) - hash(`${date}/${y.id}`));
     const recent = Object.values(b.tried).some((d) => D.diffDays(d, date) < 3);
     const iron = Object.keys(b.tried).length < 3;
@@ -742,6 +765,7 @@
     SEXES,
     TYPES,
     MILKS,
+    FEELS,
     METRICS,
     CURVES,
     dayOf,
@@ -795,6 +819,8 @@
     nextPaper,
     togglePaper,
     nextFeed,
+    reactionsIn,
+    setFoodNote,
     milestoneRows,
     addMoment,
     tempLevel,

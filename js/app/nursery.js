@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   // 宝宝的按钮和面板：出生、喂奶睡觉尿布、补记和修改、身长体重、里程碑、疫苗、体温用药、辅食
-  const { dates: D, baby: Bb, babyBook: BOOK, babyFood: FOOD, calendar: Cal, app } = globalThis.Baby;
+  const { dates: D, baby: Bb, babyBook: BOOK, babyFood: FOOD, calendar: Cal, art: A, app } = globalThis.Baby;
   const {
     sheetDialog, settingsDialog, esc, ui, hhmm, render, showDialog, dialogHead, closeDialog, formError, toast, oops, say,
     cheer, persist, download, babyMinText, babyLogInfo, babyFoodDot
@@ -199,6 +199,29 @@
     showDialog(sheetDialog);
   }
 
+  /** 吃过的一样食材：爱吃、不爱吃、有反应，记一句；也能改回没吃过 */
+  function openTriedSheet(name) {
+    const b = kid();
+    if (!b || !b.tried[name]) return;
+    const fn = b.foodNotes[name] || {};
+    sheetDialog.innerHTML = `
+      <form class="dialog-body" data-form="food-feel" data-food="${esc(name)}" novalidate>
+        ${dialogHead(esc(name), `${D.formatDate(b.tried[name], { year: true })}第一次吃`)}
+        <div class="seg seg-wide" role="radiogroup" aria-label="吃得怎么样">${[{ id: '', name: '不标' }, ...Bb.FEELS].map((f) => radio('feel', f.id, f.name, (fn.feel || '') === f.id)).join('')}</div>
+        ${field('记一句 <small>可选</small>', `<input id="feel-note" name="note" maxlength="40" autocomplete="off" placeholder="比如 嘴边起了小红点" value="${esc(fn.note || '')}">`)}
+        <div class="suggest"><span>常见反应：</span>${['起疹子', '嘴边发红', '吐了', '拉肚子'].map((t) => `<button type="button" class="chip" data-action="feel-fill" data-text="${t}">${t}</button>`).join('')}</div>
+        <p class="hint">有反应时先停掉这样食物，问过医生再试；呼吸困难、嘴唇或脸肿起来、一直吐、精神不好，马上去医院。不爱吃的不用硬喂，隔几天换个做法再试试。</p>
+        <p class="form-error" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn btn-quiet" data-action="tried-clear" data-food="${esc(name)}">没吃过</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-ghost" data-action="close-dialog">取消</button>
+          <button class="btn">保存</button>
+        </div>
+      </form>`;
+    showDialog(sheetDialog);
+  }
+
   function openFoodSheet(id) {
     const r = FOOD.recipes.find((x) => x.id === id);
     if (!r) return;
@@ -221,6 +244,7 @@
           <ol class="recipe-steps">${r.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
         </section>
         ${r.tip ? `<p class="recipe-note"><b>小贴士</b>${esc(r.tip)}</p>` : ''}
+        ${b && Bb.reactionsIn(b, r).length ? `<p class="recipe-warn">${A.icon.alert}<span>宝宝吃${Bb.reactionsIn(b, r).map(esc).join('、')}有过反应，这道先别做，问过医生再说。</span></p>` : ''}
         ${fresh.length ? '<p class="hint">第一次吃的食材先单独吃 2～3 天，看看有没有起疹子、呕吐、拉肚子，再加下一样。</p>' : ''}
         ${b && months < r.stage ? `<p class="hint">这道满 ${r.stage} 个月以后再吃。</p>` : ''}
         <div class="dialog-actions">
@@ -340,6 +364,22 @@
       saved(done ? say('vaccine') : booked ? `约好了，${D.formatDate(booked, { weekday: true })}` : say('saved'), () => {
         if (before) b.vaccines[id] = before;
         else delete b.vaccines[id];
+      });
+    },
+
+    'food-feel'(form) {
+      const b = kid();
+      const name = form.dataset.food;
+      if (!b.tried[name]) return;
+      const f = Object.fromEntries(new FormData(form));
+      const before = b.foodNotes[name] ? { ...b.foodNotes[name] } : null;
+      Bb.setFoodNote(b, name, f.feel || '', f.note || '', ui.today);
+      closeDialog(sheetDialog);
+      ui.triedOpen = true;
+      const reaction = b.foodNotes[name] && b.foodNotes[name].feel === 'reaction';
+      saved(reaction ? `记下了，含${name}的辅食先不推荐了` : say('saved'), () => {
+        if (before) b.foodNotes[name] = before;
+        else delete b.foodNotes[name];
       });
     },
 
@@ -638,6 +678,32 @@
       saved(fresh.length ? `记下了。第一次吃${fresh.join('、')}，这两三天留意一下` : `${r.name}记好了`, () => {
         Bb.removeLog(b, e.id);
         b.tried = tried;
+      });
+    },
+
+    'tried-open'(el) {
+      openTriedSheet(el.dataset.food);
+    },
+
+    'feel-fill'(el) {
+      const note = document.getElementById('feel-note');
+      if (note) note.value = el.dataset.text;
+      const reaction = sheetDialog.querySelector('input[name="feel"][value="reaction"]');
+      if (reaction) reaction.checked = true;
+    },
+
+    'tried-clear'(el) {
+      const b = kid();
+      const name = el.dataset.food;
+      const tried = b.tried[name];
+      const note = b.foodNotes[name];
+      delete b.tried[name];
+      delete b.foodNotes[name];
+      closeDialog(sheetDialog);
+      ui.triedOpen = true;
+      saved(`「${name}」改回没吃过了`, () => {
+        if (tried) b.tried[name] = tried;
+        if (note) b.foodNotes[name] = note;
       });
     },
 

@@ -1705,6 +1705,28 @@ test('儿保体检：产后访视和 42 天检查按天算，之后按月龄到�
   eq(b.exams.d42, undefined);
 });
 
+test('辅食反应：标爱吃、不爱吃、有反应；有反应的食材，含它的辅食不再推荐', () => {
+  const b = newborn('2026-03-02');
+  ['强化铁米粉', '猪肉', '南瓜', '胡萝卜', '鸡蛋'].forEach((f) => { b.tried[f] = '2026-09-10'; });
+  const today = '2026-10-12';
+  const hasEgg = (list) => list.some((r) => r.items.some((i) => i[0] === '鸡蛋'));
+  const days = Array.from({ length: 20 }, (_, i) => D.addDays(today, i));
+  ok(days.some((d) => hasEgg(Bb.foodToday(FOOD, BOOKB, b, d))), '没标之前会推荐带鸡蛋的');
+  Bb.setFoodNote(b, '鸡蛋', 'reaction', '嘴边起了小红点', today);
+  ok(days.every((d) => !hasEgg(Bb.foodToday(FOOD, BOOKB, b, d))), '有反应的鸡蛋不再推荐');
+  eq([Bb.reactionsIn(b, FOOD.recipes.find((r) => r.id === 'egg-custard')), Bb.reactionsIn(b, FOOD.recipes.find((r) => r.id === 'pumpkin-puree'))], [['鸡蛋'], []]);
+  eq(b.foodNotes['鸡蛋'], { feel: 'reaction', note: '嘴边起了小红点', date: today });
+  Bb.setFoodNote(b, '南瓜', 'like', '', today);
+  eq(b.foodNotes['南瓜'].feel, 'like');
+  Bb.setFoodNote(b, '南瓜', '', '', today);
+  eq(b.foodNotes['南瓜'], undefined, '不标了就删掉');
+  const raw = { ...newborn(), foodNotes: { 鸡蛋: { feel: 'reaction', note: 'x'.repeat(50), date: 'bad' }, 南瓜: { feel: 'meh' }, '': { feel: 'like' } } };
+  eq(Bb.normalize(raw).foodNotes, { 鸡蛋: { feel: 'reaction', note: 'x'.repeat(40), date: null } });
+  const old = newborn();
+  delete old.foodNotes;
+  eq(Bb.normalize(old).foodNotes, {});
+});
+
 test('下次喂奶：最近 24 小时里间隔的中位数，夜里睡长觉的不算；记得太少、正在亲喂、隔太久了都不估', () => {
   const b = newborn('2026-10-01');
   const bottle = (day, hm) => Bb.addLog(b, { type: 'bottle', start: tAt(day, hm), ml: 90, milk: 'formula', note: '' });

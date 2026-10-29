@@ -92,6 +92,9 @@ function seedScene(scene) {
       ['smile', 'head', 'roll', 'sit'].forEach((id, i) => { b.milestones[id] = ['2026-04-20', '2026-05-10', '2026-07-05', '2026-09-20'][i]; });
       B.addMoment(b, '第一次去公园', '2026-05-01');
       ['强化铁米粉', '猪肉', '南瓜', '胡萝卜', '西兰花', '苹果', '鸡蛋', '牛肉'].forEach((f, i) => { b.tried[f] = Baby.dates.addDays('2026-09-02', i * 3); });
+      B.setFoodNote(b, '鸡蛋', 'reaction', '嘴边起了小红点', '2026-09-21');
+      B.setFoodNote(b, '南瓜', 'like', '', '2026-09-10');
+      B.setFoodNote(b, '西兰花', 'dislike', '吐出来了', '2026-09-15');
     }
     const t = (day, hm) => B.msAt(day, hm);
     const log = (day, hm, type, fields) => B.addLog(b, { type, start: t(day, hm), note: '', ...fields });
