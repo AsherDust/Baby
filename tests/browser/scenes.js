@@ -94,6 +94,8 @@ function seedScene(scene) {
       B.addMoment(b, '第一次去公园', '2026-05-01');
       ['强化铁米粉', '猪肉', '南瓜', '胡萝卜', '西兰花', '苹果', '鸡蛋', '牛肉'].forEach((f, i) => { b.tried[f] = Baby.dates.addDays('2026-09-02', i * 3); });
       B.setFoodNote(b, '鸡蛋', 'reaction', '嘴边起了小红点', '2026-09-21');
+      B.setTooth(b, 'la-r', '2026-09-20');
+      B.setTooth(b, 'la-l', '2026-10-05');
       B.setFoodNote(b, '南瓜', 'like', '', '2026-09-10');
       B.setFoodNote(b, '西兰花', 'dislike', '吐出来了', '2026-09-15');
     }

@@ -380,7 +380,48 @@
         ${list ? `<ul class="gr-list">${list}</ul>` : ''}
         <p class="fineprint">一次的数说明不了太多，沿着自己的线平稳地长最重要。6 个月内每个月量一次，之后 1～3 个月量一次；体检时医生量的也可以记在这里。</p>
       </article>
+      ${viewTeeth()}
       ${viewMilestones()}`;
+  }
+
+  // 牙在图上的位置（占图宽、图高的百分比）：上下两排各 10 颗，从左到右是宝宝的右边到左边，门牙在中间
+  const TOOTH_SIZE = [0, 9, 8.5, 9.5, 11, 12];
+  function toothSpot(r) {
+    const i = r.side === 'r' ? 5 - r.pos : 4 + r.pos;
+    const deg = r.jaw === 'upper' ? 160 - (i * 140) / 9 : 200 + (i * 140) / 9;
+    const rad = (deg * Math.PI) / 180;
+    return { x: 50 + 41 * Math.cos(rad), y: 50 - 43 * Math.sin(rad), size: TOOTH_SIZE[r.pos] };
+  }
+
+  const TOOTH_STATE = { done: '长了', now: '这阵子一般会长', past: '一般已经长了，还没记', later: '还早' };
+
+  /** 「长牙」：一张上下两排的小图，点哪颗记哪天长出来 */
+  function viewTeeth() {
+    const b = kid();
+    const rows = Bb.teethRows(b, BOOK, ui.today);
+    const sum = Bb.teethSummary(rows, b, BOOK, ui.today);
+    const lines = [
+      sum.count ? `长了 <b>${sum.count}</b> 颗，第一颗是 ${D.formatDate(sum.first.date)}（${Bb.ageText(Bb.ageOf(b.birthDate, sum.first.date))}）` : '还没长牙',
+      sum.next ? `接下来一般是${sum.next.kind}（${sum.next.from}～${sum.next.to} 个月）${rows.some((r) => r.status === 'now') ? '，图上虚线圈出来的是这阵子一般会长的' : ''}` : '20 颗乳牙都长齐啦',
+    ];
+    return `
+      <article class="card baby-teeth">
+        <header class="card-head"><div><h2 class="card-title">${A.icon.smile}长牙</h2><p class="card-meta">点一颗，记下哪天看到长出来</p></div></header>
+        <div class="teeth-map">
+          <svg viewBox="0 0 100 80" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M 11.5 28.2 A 41 34.4 0 0 1 88.5 28.2" class="gum"/>
+            <path d="M 11.5 51.8 A 41 34.4 0 0 0 88.5 51.8" class="gum"/>
+          </svg>
+          <span class="jaw-label jaw-upper">上</span><span class="jaw-label jaw-lower">下</span>
+          ${rows.map((r) => {
+            const s = toothSpot(r);
+            return `<button type="button" class="tooth tooth-${r.status}" id="tooth-${r.id}" data-action="tooth-open" data-id="${r.id}" style="left:${s.x.toFixed(1)}%;top:${s.y.toFixed(1)}%;width:${s.size}%" aria-label="${r.name}：${r.date ? `${D.formatDate(r.date)}长的` : TOOTH_STATE[r.status]}" title="${r.name}"></button>`;
+          }).join('')}
+        </div>
+        <p class="teeth-note">${lines.join('；')}。</p>
+        ${sum.late ? '<p class="rec-alert rec-alert-low">满 13 个月还一颗没长，体检时问问医生；有的宝宝 1 岁多才长，多半没事。</p>' : ''}
+        <p class="fineprint">${BOOK.teethTips}萌出时间参考 MSD 诊疗手册，刷牙和看牙按国家卫健委的口腔保健建议。</p>
+      </article>`;
   }
 
   function viewMilestones() {

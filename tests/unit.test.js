@@ -1725,6 +1725,34 @@ test('儿保体检：产后访视和 42 天检查按天算，之后按月龄到�
   eq(b.exams.d42, undefined);
 });
 
+test('长牙：20 颗，按月龄标出这阵子会长的；记下第一颗时里程碑跟着记；满 13 个月还没长算晚', () => {
+  const b = newborn('2026-01-15');
+  let rows = Bb.teethRows(b, BOOKB, '2026-08-20');
+  eq([rows.length, new Set(rows.map((r) => r.id)).size, rows.find((r) => r.id === 'ua-l').name], [20, 20, '上中切牙（左）']);
+  eq(rows.filter((r) => r.status === 'now').map((r) => r.id), ['la-r', 'la-l'], '7 个月：下中切牙');
+  let sum = Bb.teethSummary(rows, b, BOOKB, '2026-08-20');
+  eq([sum.count, sum.first, sum.next.kind, sum.late], [0, null, '下中切牙', false]);
+  eq(Bb.setTooth(b, 'la-r', '2026-08-10'), null);
+  eq(b.milestones.tooth, '2026-08-10', '第一颗牙记上里程碑');
+  Bb.setTooth(b, 'la-l', '2026-08-01');
+  eq(b.milestones.tooth, '2026-08-01', '里程碑跟着最早的那颗');
+  rows = Bb.teethRows(b, BOOKB, '2026-08-20');
+  sum = Bb.teethSummary(rows, b, BOOKB, '2026-08-20');
+  eq([sum.count, sum.first.id, sum.next.kind], [2, 'la-l', '上中切牙']);
+  Bb.setTooth(b, 'la-l', null);
+  eq(b.milestones.tooth, '2026-08-10');
+  Bb.setTooth(b, 'la-r', null);
+  eq(b.milestones.tooth, undefined, '都改回没长，里程碑也拿掉');
+  b.milestones.tooth = '2026-07-01';
+  Bb.setTooth(b, 'la-r', '2026-08-10');
+  eq(b.milestones.tooth, '2026-07-01', '自己记的里程碑更早，不改');
+  Bb.setTooth(b, 'la-r', null);
+  eq(Bb.teethSummary(Bb.teethRows(b, BOOKB, '2027-02-20'), b, BOOKB, '2027-02-20').late, false, '记过长牙的里程碑就不算晚');
+  delete b.milestones.tooth;
+  eq(Bb.teethSummary(Bb.teethRows(b, BOOKB, '2027-02-20'), b, BOOKB, '2027-02-20').late, true, '满 13 个月还一颗没长');
+  eq(Bb.normalize({ ...newborn(), teeth: { 'la-r': '2026-09-01', 'xx-r': '2026-09-01', 'ua-l': 'soon' } }).teeth, { 'la-r': '2026-09-01' });
+});
+
 test('哄睡声音：四种都在 -1～1、最响 0.9，同一个种子一样；嘘嘘声一阵一阵；棕色最低沉；WAV 文件头', () => {
   const Nz = globalThis.Baby.noise;
   eq(Nz.KINDS.map((k) => k.id), ['white', 'pink', 'brown', 'shush']);

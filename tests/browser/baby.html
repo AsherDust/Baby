@@ -407,6 +407,23 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(/平均每天换/.test(text($('.trend-note'))), '切到尿布', text($('.trend-note')));
     await nav('#/');
 
+    // ---- 长牙 ----
+    await nav('#/baby/growth');
+    log($$('.teeth-map .tooth').length === 20 && $$('.tooth-done').length === 2 && /长了 2 颗，第一颗是 9月20日/.test(text($('.teeth-note'))) && /接下来一般是上中切牙/.test(text($('.teeth-note'))), '长牙：20 颗，长了下面两颗门牙，接下来一般是上中切牙', text($('.teeth-note')));
+    log(/长出第一颗牙/.test(text($('#ms-tooth'))) && /9月20日/.test(text($('#ms-tooth'))), '里程碑「长出第一颗牙」跟着记上了');
+    await click('#tooth-ua-r');
+    const tf = sheet().querySelector('form[data-form="tooth"]');
+    log(/一般 8～12 个月长/.test(text(sheet())), '点一颗，写着一般几个月长');
+    tf.elements.date.value = '2026-10-10';
+    tf.requestSubmit();
+    await wait(40);
+    log(baby().teeth['ua-r'] === '2026-10-10' && /长了 3 颗/.test(toastText()) && $('#tooth-ua-r.tooth-done'), '记下第三颗', toastText());
+    await click('#tooth-la-r');
+    await click('#sheet-dialog [data-action="tooth-clear"]');
+    log(!baby().teeth['la-r'] && baby().milestones.tooth === '2026-10-05', '最早那颗改回没长，里程碑跟着改到下一颗');
+    await click('#toast [data-action="undo"]');
+    log(baby().teeth['la-r'] === '2026-09-20' && baby().milestones.tooth === '2026-09-20', '撤销');
+
     // ---- 就诊小结（宝宝） ----
     await nav('#/tools/report');
     log(/豆豆的就诊小结/.test(text($('#report'))) && $$('#report .rp-charts svg').length === 2 && /维生素 D/.test(text($('#report'))) && /吃了有反应：鸡蛋（嘴边起了小红点）/.test(text($('#report'))) && /国家免疫规划疫苗打了 10\//.test(text($('#report'))), '宝宝的就诊小结：生长、最近 7 天、用药、疫苗体检、辅食反应', text($('#report')).slice(0, 160));

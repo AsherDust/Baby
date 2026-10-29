@@ -135,6 +135,7 @@
       tried: {},
       foodNotes: {},
       stash: [],
+      teeth: {},
     };
   }
 
@@ -274,6 +275,7 @@
       moments: list(raw.moments, (m) => (m && isId(m.id) && text(m.name, 20) && D.isISODate(m.date) ? { id: m.id, name: text(m.name, 20), date: m.date } : null)),
       tried: datedMap(raw.tried, (k) => text(k, 20) === k && k.length > 0),
       foodNotes: foodNotesOf(raw.foodNotes),
+      teeth: datedMap(raw.teeth, (k) => /^[ul][a-e]-[rl]$/.test(k)),
       stash: list(raw.stash, (m) => {
         const ml = m ? Math.round(toNumber(m.ml)) : 0;
         if (!m || !isId(m.id) || !isTime(m.at) || !STASH_PLACES.some((p) => p.id === m.place) || !(ml >= STASH_ML[0] && ml <= STASH_ML[1])) return null;
@@ -748,6 +750,40 @@
     return before;
   }
 
+  // ---------- 长牙 ----------
+
+  /** 20 颗乳牙：{ id, jaw, pos, side, name, from, to, date, status }；status done 长了 / now 这阵子一般会长 / past 一般已经长了 / later */
+  function teethRows(b, book, today) {
+    const months = ageOf(b.birthDate, today).months;
+    return book.teeth.flatMap(([id, jaw, pos, name, from, to]) => ['r', 'l'].map((side) => {
+      const key = `${id}-${side}`;
+      const date = b.teeth[key] || null;
+      let status = 'later';
+      if (date) status = 'done';
+      else if (months >= to) status = 'past';
+      else if (months >= from) status = 'now';
+      return { id: key, jaw, pos, side, name: `${name}（${side === 'r' ? '右' : '左'}）`, kind: name, from, to, date, status };
+    }));
+  }
+
+  /** 长了几颗、第一颗、接下来一般长哪种、算不算出牙晚 */
+  function teethSummary(rows, b, book, today) {
+    const done = rows.filter((r) => r.date).sort((x, y) => (x.date < y.date ? -1 : 1));
+    const next = rows.filter((r) => !r.date).sort((x, y) => x.from - y.from || x.to - y.to)[0] || null;
+    return { count: done.length, first: done[0] || null, next, late: !done.length && !b.milestones.tooth && ageOf(b.birthDate, today).months >= book.teethLate };
+  }
+
+  /** 记一颗（date 为空就是改回还没长）；里程碑「长出第一颗牙」跟着最早长的那颗；返回原来的日子 */
+  function setTooth(b, id, date) {
+    const before = b.teeth[id] || null;
+    if (date) b.teeth[id] = date;
+    else delete b.teeth[id];
+    const dates = Object.values(b.teeth).sort();
+    if (dates.length && (!b.milestones.tooth || dates[0] < b.milestones.tooth || b.milestones.tooth === before)) b.milestones.tooth = dates[0];
+    else if (!dates.length && before && b.milestones.tooth === before) delete b.milestones.tooth;
+    return before;
+  }
+
   // ---------- 里程碑 ----------
 
   /** 预设的里程碑：done 记过了 / now 多数宝宝这阵子会 / soon 还早 / past 一般已经会了，还没记 */
@@ -921,6 +957,9 @@
     useStash,
     reactionsIn,
     setFoodNote,
+    teethRows,
+    teethSummary,
+    setTooth,
     milestoneRows,
     addMoment,
     tempLevel,

@@ -158,6 +158,25 @@
     showDialog(sheetDialog);
   }
 
+  function openToothSheet(id) {
+    const b = kid();
+    const r = Bb.teethRows(b, BOOK, ui.today).find((x) => x.id === id);
+    if (!r) return;
+    sheetDialog.innerHTML = `
+      <form class="dialog-body" data-form="tooth" data-id="${id}" novalidate>
+        ${dialogHead(r.name, `一般 ${r.from}～${r.to} 个月长`)}
+        ${field('哪天看到长出来的', `<input type="date" name="date" min="${b.birthDate}" max="${ui.today}" value="${r.date || ui.today}">`)}
+        <p class="form-error" hidden></p>
+        <div class="dialog-actions">
+          ${r.date ? `<button type="button" class="btn btn-quiet" data-action="tooth-clear" data-id="${id}">还没长</button>` : ''}
+          <span class="spacer"></span>
+          <button type="button" class="btn btn-ghost" data-action="close-dialog">取消</button>
+          <button class="btn">记下</button>
+        </div>
+      </form>`;
+    showDialog(sheetDialog);
+  }
+
   function openVaccineSheet(id) {
     const r = Bb.vaccineRows(kid(), BOOK, ui.today).find((x) => x.id === id);
     if (!r) return;
@@ -395,6 +414,23 @@
       saved(reaction ? `记下了，含${name}的辅食先不推荐了` : say('saved'), () => {
         if (before) b.foodNotes[name] = before;
         else delete b.foodNotes[name];
+      });
+    },
+
+    tooth(form) {
+      const b = kid();
+      const date = form.elements.date.value;
+      if (!D.isISODate(date) || date > ui.today || date < b.birthDate) return formError(form, '选一下哪天，不能早于出生、晚于今天');
+      const id = form.dataset.id;
+      const milestone = b.milestones.tooth;
+      const first = !Object.keys(b.teeth).length;
+      const before = Bb.setTooth(b, id, date);
+      closeDialog(sheetDialog);
+      if (first) cheer(document.querySelector('.baby-teeth'));
+      saved(first ? '第一颗牙！记下了' : `记下了，长了 ${Object.keys(b.teeth).length} 颗`, () => {
+        Bb.setTooth(b, id, before);
+        if (milestone) b.milestones.tooth = milestone;
+        else delete b.milestones.tooth;
       });
     },
 
@@ -726,6 +762,21 @@
       saved(fresh.length ? `记下了。第一次吃${fresh.join('、')}，这两三天留意一下` : `${r.name}记好了`, () => {
         Bb.removeLog(b, e.id);
         b.tried = tried;
+      });
+    },
+
+    'tooth-open'(el) {
+      openToothSheet(el.dataset.id);
+    },
+
+    'tooth-clear'(el) {
+      const b = kid();
+      const milestone = b.milestones.tooth;
+      const before = Bb.setTooth(b, el.dataset.id, null);
+      closeDialog(sheetDialog);
+      saved('改回还没长了', () => {
+        Bb.setTooth(b, el.dataset.id, before);
+        if (milestone) b.milestones.tooth = milestone;
       });
     },
 
