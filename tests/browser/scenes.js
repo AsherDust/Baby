@@ -4,7 +4,7 @@
 function seedScene(name) {
   if (name === 'empty') return null;
   const M = Baby.model;
-  const s = M.createState({ dueDate: '2027-01-29', preWeight: 52, nickname: '豆豆' });
+  const s = M.createState({ dueDate: '2027-01-29', preWeight: 52, height: 160, nickname: '豆豆' });
   [['2026-06-12', 52.4], ['2026-06-26', 52.1], ['2026-07-10', 52.6], ['2026-07-24', 53.0], ['2026-08-07', 53.6],
    ['2026-08-21', 54.1], ['2026-09-04', 54.6], ['2026-09-18', 55.2], ['2026-10-02', 55.7], ['2026-10-09', 55.9]]
     .forEach(([d, k]) => M.upsertWeight(s, d, k));
@@ -39,7 +39,7 @@ function seedScene(name) {
     { id: 'j7', date: '2026-09-18', time: '22:10', mood: 'low', text: '腰酸得睡不着，翻来覆去。' },
   ]);
   if (name === 'checkup-day') M.upsertWeight(s, '2026-10-13', 56.1);
-  if (name === 'fresh') { s.meds = []; s.weights = []; s.journal = []; s.checkups = Baby.content.defaultCheckups(); s.profile.preWeight = null; s.profile.nickname = ''; }
+  if (name === 'fresh') { s.meds = []; s.weights = []; s.journal = []; s.checkups = Baby.content.defaultCheckups(); s.profile.preWeight = null; s.profile.height = null; s.profile.nickname = ''; }
   if (name === 'late' || name === 'bag-done') {
     s.profile.dueDate = '2026-11-30';
     s.checkups.forEach((c) => { c.date = null; c.time = ''; c.done = c.target < 231; });

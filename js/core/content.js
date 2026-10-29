@@ -404,6 +404,17 @@
     'mood-anxious': ['记下了，担心的事可以问问医生', '抱抱你，一步一步来'],
   };
 
+  // 孕期体重增长推荐值：WS/T 801—2022《妊娠期妇女体重增长推荐值标准》，单胎自然妊娠。
+  // 按孕前 BMI 分四类（below 是这一类的上限，不含）；孕早期（不到 14 周）都是 0～2 kg，
+  // total 是整个孕期的总增长范围，weekly 是孕中晚期每周的增长范围
+  const WEIGHT_GAIN = [
+    { id: 'under', name: '低体重', below: 18.5, total: [11, 16], weekly: [0.37, 0.56] },
+    { id: 'normal', name: '正常体重', below: 24, total: [8, 14], weekly: [0.26, 0.48] },
+    { id: 'over', name: '超重', below: 28, total: [7, 11], weekly: [0.22, 0.37] },
+    { id: 'obese', name: '肥胖', below: Infinity, total: [5, 9], weekly: [0.15, 0.3] },
+  ];
+  const EARLY_GAIN = [0, 2];
+
   /** 按名称和别名搜索，level 为 'all' 时不过滤 */
   function searchFoods(query, level = 'all') {
     const q = String(query ?? '').trim().toLowerCase();
@@ -422,6 +433,8 @@
     GLUCOSE_SLOTS,
     MOM,
     CHEERS,
+    WEIGHT_GAIN,
+    EARLY_GAIN,
     babyAt,
     tipAt,
     momAt,

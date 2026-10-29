@@ -251,10 +251,15 @@
           <input name="preWeight" inputmode="decimal" autocomplete="off" placeholder="例如 52.5" value="${p.preWeight != null ? kg(p.preWeight) : ''}">
         </label>
         <label class="field">
-          <span>宝宝小名 <small>可选</small></span>
-          <input name="nickname" maxlength="12" autocomplete="off" placeholder="例如 豆豆" value="${esc(p.nickname || '')}">
+          <span>身高 <small>可选，cm</small></span>
+          <input name="height" inputmode="decimal" autocomplete="off" placeholder="例如 160" value="${p.height != null ? p.height : ''}">
         </label>
-      </div>`;
+      </div>
+      <p class="hint">填上孕前体重和身高，体重曲线上会画出孕期该长多少。</p>
+      <label class="field">
+        <span>宝宝小名 <small>可选</small></span>
+        <input name="nickname" maxlength="12" autocomplete="off" placeholder="例如 豆豆" value="${esc(p.nickname || '')}">
+      </label>`;
   }
 
   function drawCharts() {
@@ -266,6 +271,7 @@
         weights: app.state.weights,
         dueDate: app.state.profile.dueDate,
         preWeight: app.state.profile.preWeight,
+        plan: app.state.baby ? null : M.gainPlan(app.state.profile),
         today: ui.today,
         width,
         height: width < 420 ? 200 : 260,

@@ -45,6 +45,7 @@ iframe.onload = async () => {
     $('[data-action="apply-lmp"]').click();
     log(f.elements.dueDate.value === '2027-01-29', '末次月经推算预产期', f.elements.dueDate.value);
     f.elements.preWeight.value = '52';
+    f.elements.height.value = '160';
     f.elements.nickname.value = '豆<img src=x>';
     f.requestSubmit();
     log(/24/.test($('.week-big')?.textContent || ''), '提交后进入首页，显示孕 24 周');
@@ -54,7 +55,7 @@ iframe.onload = async () => {
     q.elements.kg.value = '56.2';
     q.requestSubmit();
     log(state().weights.length === 1 && state().weights[0].kg === 56.2, '首屏快速记体重');
-    log(/体重记好了/.test($('.panel-today').textContent), '记完后首屏显示已记录');
+    log(/体重记好了/.test($('.panel-today').textContent) && /孕期累计 \+4\.2 kg，在推荐范围内/.test($('.panel-today').textContent), '记完后首屏显示已记录，还说了在不在推荐范围里');
 
     log($$('.tabbar .tab').map((t) => t.textContent.trim()).join(' ') === '今天 记录 心情 产检 工具' && $('.tab[aria-current="page"]').textContent.includes('今天'), '有 5 个主菜单，「心情」在中间，当前是「今天」');
     log(!$('.card-weight') && !$('.card-checkups') && !$('.card-bag') && $('.card-mom'), '首页只放今天的内容，不再罗列全部');
@@ -68,6 +69,7 @@ iframe.onload = async () => {
     af.requestSubmit();
     log(state().weights.map((x) => x.date).join() === '2026-10-05,2026-10-12', '补记其它日期');
     log(!!$('#weight-chart svg') && $$('#weight-chart circle').length === 2, '画出体重曲线');
+    log($('.gain-plan.gain-ok') && /在推荐范围内/.test($('.gain-plan').textContent) && /BMI 20\.3，属于正常体重/.test($('.gain-plan').textContent) && $('#weight-chart .c-gain'), '按孕前 BMI 画出推荐范围，说明现在在范围里', $('.gain-plan')?.textContent);
     af = $('form[data-form="add-weight"]');
     af.elements.kg.value = 'abc';
     af.requestSubmit();
@@ -143,9 +145,13 @@ iframe.onload = async () => {
     sf.requestSubmit();
     log(sd.open && !sf.querySelector('.form-error').hidden, '设置里校验预产期');
     sf.elements.dueDate.value = '2027-02-05';
+    sf.elements.height.value = '一米六';
+    sf.requestSubmit();
+    log(sd.open && /身高/.test(sf.querySelector('.form-error').textContent), '身高填错了会提示');
+    sf.elements.height.value = '1.6';
     sf.requestSubmit();
     log(!sd.open && state().profile.dueDate === '2027-02-05' && /^\s*23/.test($('.week-big').textContent), '改预产期后孕周跟着变', $('.week-big').textContent);
-    log(state().profile.nickname === '豆<img src=x>' && state().profile.preWeight === 52, '设置保存时保留小名和孕前体重');
+    log(state().profile.nickname === '豆<img src=x>' && state().profile.preWeight === 52 && state().profile.height === 160, '设置保存时保留小名、孕前体重和身高（1.6 米记成 160 厘米）');
 
     $('[data-action="open-settings"]').click();
     sd.querySelector('[data-action="export-backup"]').click();

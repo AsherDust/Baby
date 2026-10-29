@@ -6,8 +6,8 @@
 
   const f1 = (n) => n.toFixed(1);
 
-  /** 体重曲线（SVG 字符串）：横轴是孕周，纵轴是千克 */
-  function weight({ weights, dueDate, preWeight, today, width, height }) {
+  /** 体重曲线（SVG 字符串）：横轴是孕周，纵轴是千克；plan 是 M.gainPlan 的结果，适用时画出推荐范围 */
+  function weight({ weights, dueDate, preWeight, plan = null, today, width, height }) {
     if (!weights.length) return '';
     const pad = { l: 40, r: 18, t: 24, b: 30 };
     const iw = width - pad.l - pad.r;
@@ -22,8 +22,15 @@
     if (minGA >= 0) w0 = Math.max(0, w0);
     if (w1 - w0 < 8) w1 = w0 + 8;
 
+    // 推荐范围画到 42 周为止：[孕周, 下限, 上限]
+    const band = [];
+    if (plan && plan.applies && preWeight != null) {
+      for (let w = Math.max(w0, 0); w <= Math.min(w1, 42); w += 1) band.push([w, ...M.gainRange(plan, w * 7).map((g) => preWeight + g)]);
+    }
+
     const vals = pts.map((p) => p.kg);
     if (preWeight != null) vals.push(preWeight);
+    if (band.length > 1) vals.push(...band.map((b) => b[2]));
     let y0 = Math.floor(Math.min(...vals) - 0.5);
     let y1 = Math.ceil(Math.max(...vals) + 0.5);
     if (y1 - y0 < 4) {
@@ -43,6 +50,11 @@
       const y = f1(sy(v));
       out.push(`<line x1="${pad.l}" x2="${width - pad.r}" y1="${y}" y2="${y}" class="c-grid"/>`);
       out.push(`<text x="${pad.l - 10}" y="${y}" dy="0.35em" text-anchor="end" class="c-label">${v}</text>`);
+    }
+
+    if (band.length > 1) {
+      const edge = (i) => band.map((b) => `${f1(sx(b[0] * 7))} ${f1(sy(b[i]))}`);
+      out.push(`<path d="M${edge(2).join(' L')} L${edge(1).reverse().join(' L')} Z" class="c-gain"/>`);
     }
 
     const maxLabels = Math.max(2, Math.floor(iw / 48));
@@ -80,7 +92,7 @@
     const anchor = lx > width - pad.r - 24 ? 'end' : lx < pad.l + 24 ? 'start' : 'middle';
     out.push(`<text x="${f1(lx)}" y="${f1(labelY)}" text-anchor="${anchor}" class="c-last-label">${M.formatKg(pts[pts.length - 1].kg)}</text>`);
 
-    return `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="体重变化曲线">
+    return `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="体重变化曲线${band.length > 1 ? '，浅绿色是推荐范围' : ''}">
       <defs>
         <linearGradient id="c-fill" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0" stop-color="#E9A93C" stop-opacity="0.34"/>

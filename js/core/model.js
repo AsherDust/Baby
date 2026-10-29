@@ -11,6 +11,11 @@
   const VERSION = 1;
   const KG_MIN = 25;
   const KG_MAX = 250;
+  const CM_MIN = 100;
+  const CM_MAX = 220;
+  // 体重增长推荐值标准不适用于身高低于 140 cm、孕前体重高于 125 kg 的人
+  const GAIN_CM_MIN = 140;
+  const GAIN_KG_MAX = 125;
   const BAG_NAME_MAX = 30;
   const MED_NAME_MAX = 30;
 
@@ -74,6 +79,22 @@
     return kg >= KG_MIN && kg <= KG_MAX ? kg : null;
   }
 
+  /** 160 / "160cm" / "1.6" / "1.65米" → 厘米数；不合理的返回 null */
+  function parseHeight(input) {
+    if (typeof input === 'number') return input >= CM_MIN && input <= CM_MAX ? Math.round(input * 10) / 10 : null;
+    let s = String(input ?? '').trim().replace(/[,，]/, '.').replace(/\s*(cm|厘米|公分)$/i, '');
+    let factor = 1;
+    if (/(m|米)$/i.test(s)) {
+      s = s.replace(/\s*(m|米)$/i, '');
+      factor = 100;
+    }
+    if (!/^\d{1,3}(\.\d{1,2})?$/.test(s)) return null;
+    let cm = Number(s) * factor;
+    if (cm < 3) cm *= 100;
+    cm = Math.round(cm * 10) / 10;
+    return cm >= CM_MIN && cm <= CM_MAX ? cm : null;
+  }
+
   function formatKg(kg) {
     return Math.abs(kg * 10 - Math.round(kg * 10)) < 1e-6 ? kg.toFixed(1) : kg.toFixed(2);
   }
@@ -97,6 +118,7 @@
       profile: {
         dueDate: profile.dueDate,
         preWeight: profile.preWeight ?? null,
+        height: profile.height ?? null,
         nickname: text(profile.nickname, 12),
       },
       prefs: { glucoseAfter: 2, since: D.isISODate(today) ? today : null, lastBackup: null, backupNudged: null, installHintHidden: false, storyCardHidden: null },
@@ -295,6 +317,7 @@
       profile: {
         dueDate: p.dueDate,
         preWeight: p.preWeight == null ? null : parseKg(p.preWeight),
+        height: p.height == null ? null : parseHeight(p.height),
         nickname: text(p.nickname, 12),
       },
       prefs: {
@@ -347,6 +370,42 @@
       todayEntry: latest && latest.date === today ? latest : null,
       daysSinceLast: latest ? D.diffDays(latest.date, today) : null,
     };
+  }
+
+  /**
+   * 按孕前 BMI 该长多少：没填孕前体重或身高是 null；标准不适用时 { applies: false }；
+   * 否则 { applies: true, bmi, id, name, total, weekly }
+   */
+  function gainPlan(profile) {
+    const { preWeight: kg, height: cm } = profile;
+    if (kg == null || cm == null) return null;
+    if (cm < GAIN_CM_MIN || kg > GAIN_KG_MAX) return { applies: false };
+    const bmi = Math.round((kg / (cm / 100) ** 2) * 10) / 10;
+    return { applies: true, bmi, ...C.WEIGHT_GAIN.find((g) => bmi < g.below) };
+  }
+
+  /**
+   * 孕龄这天累计长多少算在范围里 [下限, 上限]（千克）：孕早期 0～2 kg，
+   * 14 周起两头各自匀速长到 40 周时的总范围，之后不再变
+   */
+  function gainRange(plan, days) {
+    const [e0, e1] = C.EARLY_GAIN;
+    const t = Math.min(1, Math.max(0, (days / 7 - 14) / 26));
+    return [round2(e0 + (plan.total[0] - e0) * t), round2(e1 + (plan.total[1] - e1) * t)];
+  }
+
+  /** 最近一次体重和推荐范围比：{ plan, gain, range, level: low / ok / high, weeks }；算不了或宝宝已经出生是 null */
+  function gainStatus(state, today) {
+    if (state.baby) return null;
+    const plan = gainPlan(state.profile);
+    const latest = weightSummary(state, today).latest;
+    if (!plan || !plan.applies || !latest) return null;
+    const days = D.gestation(state.profile.dueDate, latest.date).days;
+    if (days < 0) return null;
+    const gain = round2(latest.kg - state.profile.preWeight);
+    const range = gainRange(plan, days);
+    const level = gain > range[1] ? 'high' : gain < range[0] ? 'low' : 'ok';
+    return { plan, gain, range, level, weeks: Math.floor(days / 7) };
   }
 
   // ---- 产检 ----
@@ -1088,6 +1147,7 @@
   Baby.model = {
     round2,
     parseKg,
+    parseHeight,
     formatKg,
     formatKgDiff,
     dueDateError,
@@ -1096,6 +1156,9 @@
     upsertWeight,
     removeWeight,
     weightSummary,
+    gainPlan,
+    gainRange,
+    gainStatus,
     checkupStatus,
     scheduleRows,
     nextCheckup,

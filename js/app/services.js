@@ -154,7 +154,10 @@
     const preRaw = String(f.get('preWeight') || '').trim();
     const preWeight = preRaw ? M.parseKg(preRaw) : null;
     if (preRaw && preWeight == null) return { error: '孕前体重填个数字就好，例如 52.5' };
-    return { profile: { dueDate, preWeight, nickname: String(f.get('nickname') || '').trim().slice(0, 12) } };
+    const heightRaw = String(f.get('height') || '').trim();
+    const height = heightRaw ? M.parseHeight(heightRaw) : null;
+    if (heightRaw && height == null) return { error: '身高填厘米数就好，例如 160' };
+    return { profile: { dueDate, preWeight, height, nickname: String(f.get('nickname') || '').trim().slice(0, 12) } };
   }
 
   function saveWeight(date, raw, inputsToClear) {

@@ -16,6 +16,17 @@
 .c-pt { fill: var(--card); stroke: var(--honey-2); stroke-width: 2; }
 .c-pt-last { fill: var(--honey); stroke: var(--bright); stroke-width: 2.5; }
 .c-last-label { font-family: var(--num); font-size: 15px; font-weight: 700; fill: var(--honey-deep); }
+.c-gain { fill: var(--leaf); opacity: 0.16; }
+
+.gain-plan { margin: 0 0 16px; padding: 10px 14px; border-radius: 14px; background: var(--leaf-soft); color: var(--leaf-deep); font-size: 13.5px; }
+.gain-plan p { margin: 0; }
+.gain-plan p + p { margin-top: 6px; }
+.gain-high { background: var(--honey-glow); color: var(--warn-ink); }
+.gain-low { background: var(--sky-soft); color: var(--sky-deep); }
+.gain-about { font-size: 12.5px; }
+.gain-key { display: inline-block; width: 16px; height: 10px; margin-right: 6px; border-radius: 3px; background: var(--leaf); opacity: 0.35; vertical-align: 0; }
+.gain-missing { margin: 0 0 16px; font-size: 13px; color: var(--ink-2); }
+.gain-missing .link { margin-left: 6px; }
 
 .weight-form { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; }
 .weight-form .btn { height: 42px; }

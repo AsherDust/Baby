@@ -14,11 +14,13 @@
 //   ios    假装是 iPhone：safari / wechat / app（从主屏幕图标打开）
 //   hour   假装现在几点，例如 21 看晚上首页的故事卡片
 //   story / reading  今晚读哪篇（例如 prose-07）、假装朗读暂停在第几段（从 0 数）
+//   profile 改几项资料（JSON），例如 {"preWeight":48} 看体重长得偏快的样子
 const p = new URLSearchParams(location.search);
 const scenario = p.get('s') || 'empty';
 const today = p.get('today') || '2026-10-12';
 localStorage.clear();
 const seeded = seedScene(scenario);
+if (seeded && p.get('profile')) Object.assign(seeded.profile, JSON.parse(p.get('profile')));
 if (seeded) localStorage.setItem('pregnancy-desk:v1', JSON.stringify(seeded));
 const w = p.get('w');
 document.write(`<iframe src="../../index.html?today=${today}#/${p.get('r') || ''}" style="width:${w ? `${w}px` : '100%'}"></iframe>`);

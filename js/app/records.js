@@ -4,6 +4,30 @@
   const { dates: D, content: C, model: M, art: A, app } = globalThis.Baby;
   const { WEIGHTS_SHOWN, esc, kg, kgDiff, clamp01, hhmm, ui } = app;
 
+  const GAIN_HEAD = { ok: '在推荐范围内', high: '比推荐长得快', low: '比推荐长得慢' };
+  const num1 = (n) => String(Math.round(n * 10) / 10);
+
+  /** 体重卡片上的推荐范围：现在长得怎么样，按孕前 BMI 整个孕期该长多少；宝宝出生后不显示 */
+  function viewGainPlan(today) {
+    if (app.state.baby) return '';
+    const plan = M.gainPlan(app.state.profile);
+    if (!plan) {
+      return `<p class="gain-missing">在设置里填上孕前体重和身高，就能看到孕期该长多少、现在长得怎么样。<button type="button" class="link" data-action="open-settings">去填</button></p>`;
+    }
+    if (!plan.applies) return '<p class="gain-missing">身高不到 140 厘米或孕前体重超过 125 千克时，国家的推荐值不适用，孕期长多少听医生的。</p>';
+    const st = M.gainStatus(app.state, today);
+    const advice = st && {
+      ok: '',
+      high: '少喝甜饮料，少吃油炸和甜点，主食换一部分粗粮，每天走一走；下次产检问问医生。',
+      low: st.weeks < 14 ? '孕早期吐得厉害时，体重掉一点很常见；一直吃不下东西，要告诉医生。' : '三餐吃够主食和鱼禽蛋肉，再加一两顿加餐；下次产检问问医生。',
+    }[st.level];
+    return `
+      <div class="gain-plan${st ? ` gain-${st.level}` : ''}">
+        ${st ? `<p><b>${GAIN_HEAD[st.level]}</b>：孕 ${st.weeks} 周累计长 ${num1(st.range[0])}～${num1(st.range[1])} kg 合适，${st.gain >= 0 ? `现在长了 ${kg(st.gain)} kg` : `现在比孕前轻了 ${kg(-st.gain)} kg`}。${advice}</p>` : ''}
+        <p class="gain-about"><span class="gain-key" aria-hidden="true"></span>孕前 BMI ${plan.bmi}，属于${plan.name}：整个孕期建议长 ${num1(plan.total[0])}～${num1(plan.total[1])} kg，孕中晚期每周 ${plan.weekly[0]}～${plan.weekly[1]} kg。曲线上浅绿色的一片是推荐范围。</p>
+      </div>`;
+  }
+
   function viewWeights(today) {
     const ws = M.weightSummary(app.state, today);
     const list = app.state.weights.slice().reverse();
@@ -33,6 +57,7 @@
             <p class="card-meta">${meta}</p>
           </div>
         </header>
+        ${viewGainPlan(today)}
         <div class="weight-layout">
           <div class="weight-chart-box">
             ${list.length
@@ -47,7 +72,7 @@
             </form>
             ${rows ? `<ul class="weight-list">${rows}</ul>` : ''}
             ${list.length > WEIGHTS_SHOWN ? `<button type="button" class="link link-more" data-action="toggle-weights">${ui.showAllWeights ? '收起' : `显示全部 ${list.length} 条`}</button>` : ''}
-            ${app.state.profile.preWeight == null ? '<p class="fineprint">在设置里填上孕前体重，就能看到孕期一共长了多少。</p>' : ''}
+            ${!app.state.baby && M.gainPlan(app.state.profile)?.applies ? '<p class="fineprint">推荐值按《妊娠期妇女体重增长推荐值标准》（WS/T 801—2022），算的是单胎；双胎或者有妊娠期并发症的，听医生的。</p>' : ''}
           </div>
         </div>
       </article>`;

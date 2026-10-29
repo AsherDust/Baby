@@ -118,7 +118,7 @@
           ${todoMood(today)}
           ${todoMeal(now)}
           ${todoKicks(ga, now)}
-          ${todoWeight(M.weightSummary(app.state, today))}
+          ${todoWeight(M.weightSummary(app.state, today), M.gainStatus(app.state, today))}
           ${todoCheckup(M.nextCheckup(rows))}
           ${todoBag(ga)}
           <li class="todo-item">
@@ -132,10 +132,16 @@
       </article>`;
   }
 
-  function todoWeight(ws) {
+  const GAIN_NOTE = {
+    ok: '，在推荐范围内',
+    high: '，比推荐长得快 · <a class="link" href="#/records/weight">看看</a>',
+    low: '，比推荐长得慢 · <a class="link" href="#/records/weight">看看</a>',
+  };
+
+  function todoWeight(ws, gain) {
     if (ws.todayEntry) {
       const parts = [ws.previous ? `比 ${D.formatDate(ws.previous.date)} ${kgDiff(ws.change)} kg` : '第一条记录，之后就能看到变化啦'];
-      if (ws.gain != null) parts.push(`孕期累计 ${kgDiff(ws.gain)} kg`);
+      if (ws.gain != null) parts.push(`孕期累计 ${kgDiff(ws.gain)} kg${gain ? GAIN_NOTE[gain.level] : ''}`);
       return `
         <li class="todo-item is-done">
           <span class="todo-icon">${A.icon.check}</span>

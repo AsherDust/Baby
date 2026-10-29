@@ -164,6 +164,56 @@ test('体重小结：变化、累计增重、今天是否已记', () => {
   eq([noPre.latest, noPre.gain, noPre.daysSinceLast], [null, null, null]);
 });
 
+test('解析身高输入：厘米、米都认', () => {
+  eq(['160', '160cm', ' 160 厘米', '1.6', '1.65m', '1.58米', '165.5', 158].map(M.parseHeight), [160, 160, 160, 160, 165, 158, 165.5, 158]);
+  eq(['', 'abc', '90', '250', '2.5', '1.6.5', '16', null].map(M.parseHeight), [null, null, null, null, null, null, null, null]);
+});
+
+test('孕期该长多少：按孕前 BMI 分四类，孕早期 0～2 kg，40 周时到总范围', () => {
+  eq(M.gainPlan({ preWeight: null, height: 160 }), null);
+  eq(M.gainPlan({ preWeight: 52, height: null }), null);
+  eq(M.gainPlan({ preWeight: 52, height: 139 }), { applies: false });
+  eq(M.gainPlan({ preWeight: 126, height: 170 }), { applies: false });
+  const cat = (kg, cm) => { const p = M.gainPlan({ preWeight: kg, height: cm }); return [p.bmi, p.id]; };
+  eq(cat(52, 160), [20.3, 'normal']);
+  eq([cat(47.2, 160), cat(47.3, 160)], [[18.4, 'under'], [18.5, 'normal']]);
+  eq([cat(61.3, 160), cat(61.4, 160)], [[23.9, 'normal'], [24, 'over']]);
+  eq([cat(71.5, 160), cat(71.7, 160)], [[27.9, 'over'], [28, 'obese']]);
+  const plan = M.gainPlan({ preWeight: 52, height: 160 });
+  eq([plan.name, plan.total, plan.weekly], ['正常体重', [8, 14], [0.26, 0.48]]);
+  eq([0, 70, 98].map((d) => M.gainRange(plan, d)), [[0, 2], [0, 2], [0, 2]]);
+  eq(M.gainRange(plan, 189), [4, 8]);
+  eq([M.gainRange(plan, 280), M.gainRange(plan, 294)], [[8, 14], [8, 14]]);
+  // 两头匀速长，每周长的落在标准给的孕中晚期每周范围里
+  for (const g of C.WEIGHT_GAIN) {
+    const p = { applies: true, ...g };
+    const [lo1, hi1] = M.gainRange(p, 98);
+    const [lo2, hi2] = M.gainRange(p, 280);
+    ok((lo2 - lo1) / 26 >= g.weekly[0] && (hi2 - hi1) / 26 <= g.weekly[1], `${g.id} 每周长的不在标准范围里`);
+  }
+});
+
+test('体重和推荐范围比：偏快、正常、偏慢；孕前的、没填身高、宝宝出生后都不算', () => {
+  const s = M.createState({ dueDate: DUE, preWeight: 52, height: 160 });
+  eq(M.gainStatus(s, '2026-10-12'), null);
+  M.upsertWeight(s, '2026-04-01', 51.5);
+  eq(M.gainStatus(s, '2026-10-12'), null, '孕前称的不算');
+  M.upsertWeight(s, '2026-10-12', 56.2);
+  const st = M.gainStatus(s, '2026-10-12');
+  eq([st.level, st.gain, st.range, st.weeks], ['ok', 4.2, [3.21, 6.81], 24]);
+  M.upsertWeight(s, '2026-10-12', 59.5);
+  eq(M.gainStatus(s, '2026-10-12').level, 'high');
+  M.upsertWeight(s, '2026-10-12', 54.5);
+  eq(M.gainStatus(s, '2026-10-12').level, 'low');
+  M.upsertWeight(s, '2026-06-01', 51.2);
+  eq([M.gainStatus(s, '2026-06-01').level, M.gainStatus(s, '2026-06-01').weeks], ['low', 5], '孕早期比孕前轻了');
+  s.profile.height = null;
+  eq(M.gainStatus(s, '2026-10-12'), null);
+  s.profile.height = 160;
+  s.baby = {};
+  eq(M.gainStatus(s, '2026-10-12'), null, '宝宝出生后不再比');
+});
+
 test('预产期校验', () => {
   eq(M.dueDateError(DUE, '2026-10-12'), null);
   ok(M.dueDateError('', '2026-10-12'));
@@ -681,7 +731,8 @@ test('normalize：拒绝没有预产期的数据，清理坏字段', () => {
     ],
     notified: { k: '2026-10-12', bad: 1 },
   });
-  eq(s.profile, { dueDate: DUE, preWeight: null, nickname: '一个特别特别特别长的小名' });
+  eq(s.profile, { dueDate: DUE, preWeight: null, height: null, nickname: '一个特别特别特别长的小名' });
+  eq([M.normalize({ profile: { dueDate: DUE, height: '1.6' } }).profile.height, M.normalize({ profile: { dueDate: DUE, height: 30 } }).profile.height], [160, null]);
   eq(s.weights, [{ date: '2026-10-12', kg: 57 }]);
   eq(s.checkups.map((c) => [c.id, c.time]), [['a', '']]);
   eq(s.notified, { k: '2026-10-12' });
@@ -1697,6 +1748,11 @@ test('体重曲线：空数据不画，有数据时点数正确且没有 NaN', (
   ok(svg.includes('孕前 52.0') && svg.includes('今天'));
   const single = Chart.weight({ weights: weights.slice(0, 1), dueDate: DUE, preWeight: null, today: '2026-10-12', width: 300, height: 180 });
   ok(single.includes('<circle') && !single.includes('NaN'));
+  ok(!svg.includes('c-gain'), '没给 plan 不画推荐范围');
+  const plan = M.gainPlan({ preWeight: 52, height: 160 });
+  const banded = Chart.weight({ weights, dueDate: DUE, preWeight: 52, plan, today: '2026-10-12', width: 500, height: 200 });
+  ok(banded.includes('class="c-gain"') && !banded.includes('NaN') && banded.includes('浅绿色是推荐范围'), '画出推荐范围');
+  ok(!Chart.weight({ weights, dueDate: DUE, preWeight: 52, plan: { applies: false }, today: '2026-10-12', width: 500, height: 200 }).includes('c-gain'));
 });
 
 test('生长曲线：五条百分位线和两层底色，宝宝的点连成线，没有 NaN', () => {
