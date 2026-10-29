@@ -449,6 +449,23 @@
     };
   }
 
+  // 每天睡多久的参考（含白天小睡）：4 个月以下按美国国家睡眠基金会，4 个月到 5 岁按美国睡眠医学会（美国儿科学会认可）
+  const SLEEP_NEED = [[4, [14, 17]], [12, [12, 16]], [36, [11, 14]], [72, [10, 13]]];
+
+  /** 这个月龄每天一般睡几小时 [少, 多]；6 岁以后是 null */
+  function sleepNeed(months) {
+    const hit = SLEEP_NEED.find(([to]) => months < to);
+    return hit ? hit[1] : null;
+  }
+
+  /** 最近 7 天（含今天）每天的小结，出生前的日子不算；has 是这天有没有记过东西 */
+  function weekSummary(b, today, now) {
+    return Array.from({ length: 7 }, (_, i) => D.addDays(today, i - 6)).filter((d) => d >= b.birthDate).map((date) => {
+      const s = daySummary(b, date, now);
+      return { date, ...s, has: s.logs.length > 0 || s.sleepMin > 0 };
+    });
+  }
+
   // ---------- 身长体重头围、WHO 百分位 ----------
 
   function growthError(b, f, today) {
@@ -819,6 +836,8 @@
     nextPaper,
     togglePaper,
     nextFeed,
+    sleepNeed,
+    weekSummary,
     reactionsIn,
     setFoodNote,
     milestoneRows,

@@ -101,6 +101,17 @@ function seedScene(scene) {
     const log = (day, hm, type, fields) => B.addLog(b, { type, start: t(day, hm), note: '', ...fields });
     const day = '2026-10-12';
     const prev = '2026-10-11';
+    // 前 6 天也记了一些，「最近 7 天」才有东西看；前一天的喂奶都在 19 点前，不影响估下次喂奶
+    const naps = small
+      ? [['00:30', '05:00'], ['06:30', '08:20'], ['09:40', '11:30'], ['13:10', '15:00'], ['16:30', '17:20'], ['19:40', '23:30']]
+      : [['00:00', '06:30'], ['09:30', '11:00'], ['14:00', '15:30'], ['20:00', '23:50']];
+    for (let i = 6; i >= 1; i -= 1) {
+      const d = Baby.dates.addDays(day, -i);
+      (i === 1 ? naps.slice(0, -1) : naps).forEach(([a, z], k) => log(d, a, 'sleep', { end: t(d, z) - ((i + k) % 3) * 10 * MIN }));
+      ['05:20', '08:40', '12:20', '15:40', '18:30'].slice(0, i === 1 ? 4 : 5).forEach((hm, k) => log(d, hm, k % 2 ? 'bottle' : 'breast',
+        k % 2 ? { ml: small ? 100 : 160, milk: 'formula' } : { left: 540, right: 480, end: t(d, hm) + 17 * MIN, side: null, since: null }));
+      ['06:00', '10:00', '13:30', '17:00', '21:00'].slice(0, 4 + (i % 2)).forEach((hm, k) => log(d, hm, 'diaper', { pee: true, poo: k === 1, color: k === 1 ? 'yellow' : '' }));
+    }
     log(prev, '22:40', 'sleep', { end: t(day, '01:10') });
     log(day, '01:20', 'breast', { left: 600, right: 420, end: t(day, '01:37'), side: null, since: null });
     log(day, '01:45', 'diaper', { pee: true, poo: false, color: '' });

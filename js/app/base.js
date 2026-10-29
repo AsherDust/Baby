@@ -94,6 +94,7 @@
     // 宝宝页：日常看哪天（0 是今天，-1 是昨天），成长曲线看哪一项
     babyDay: 0,
     growthMetric: 'weight',
+    trendMetric: 'sleep',
     triedOpen: false,
     vaccinesDoneOpen: false,
     examsDoneOpen: false,

@@ -340,6 +340,15 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(sheet().open && text(sheet().querySelector('h2')) === expect[0] && sheet().querySelector('[data-action="baby-food-log"]'), '点菜名直接看做法，能记一笔');
     await click('#sheet-dialog [data-action="close-dialog"]');
 
+    // ---- 最近 7 天 ----
+    await nav('#/baby');
+    log($('.baby-trend') && $$('#trend-chart rect.c-bar').length >= 1 && $('#trend-chart .c-need') && /平均每天睡/.test(text($('.trend-note'))) && /7 个月的宝宝一般每天睡 12～16 小时/.test(text($('.trend-note'))), '最近 7 天：睡眠的柱子和该睡多久的范围', text($('.trend-note')));
+    await click('#trend-feeds');
+    log(/平均每天喂/.test(text($('.trend-note'))) && !$('#trend-chart .c-need') && w.Baby.app.ui.trendMetric === 'feeds', '切到喂奶');
+    await click('#trend-diapers');
+    log(/平均每天换/.test(text($('.trend-note'))), '切到尿布', text($('.trend-note')));
+    await nav('#/');
+
     // ---- 产后心情关怀 ----
     for (let i = 0; i < 5; i += 1) w.Baby.journal.add(w.Baby.app.state, { date: w.Baby.dates.addDays(TODAY, -i), mood: 'low', text: '' }, TODAY, Date.now());
     w.Baby.app.render();

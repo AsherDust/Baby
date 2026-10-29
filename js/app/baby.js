@@ -212,7 +212,69 @@
         </header>
         ${s.logs.length ? `<ul class="blog-list">${s.logs.map((l) => viewLogRow(l, now)).join('')}</ul>` : `<p class="food-empty">${isToday ? '点上面的按钮，一下就记好' : '这天没有记录'}</p>`}
       </article>
+      ${isToday ? viewTrend(now) : ''}
       <p class="fineprint">${feedingTip()}</p>`;
+  }
+
+  const TRENDS = [['sleep', '睡眠', '小时'], ['feeds', '喂奶', '次'], ['diapers', '尿布', '片']];
+  const trendMetric = () => (TRENDS.some(([id]) => id === ui.trendMetric) ? ui.trendMetric : 'sleep');
+
+  /** 「最近 7 天」：每天睡了多久、喂了几次、换了几片尿布，图在 drawTrend 里画 */
+  function viewTrend(now) {
+    const all = Bb.weekSummary(kid(), ui.today, now).filter((d) => d.has);
+    // 今天还没过完，有前几天的就只算前几天
+    const past = all.filter((d) => d.date !== ui.today);
+    const days = past.length ? past : all;
+    const span = past.length ? `前 ${past.length} 天` : '今天到现在';
+    const metric = trendMetric();
+    const avg = (f) => days.reduce((s, d) => s + f(d), 0) / days.length;
+    const age = ageNow();
+    let note;
+    if (!days.length) {
+      note = '记上几天，这里就能看出每天睡了多久、喂了几次、换了几片尿布。';
+    } else if (metric === 'sleep') {
+      const mins = Math.round(avg((d) => d.sleepMin));
+      const need = Bb.sleepNeed(age.months);
+      const where = need ? (mins < need[0] * 60 ? '，比一般少一些' : mins > need[1] * 60 ? '，比一般多一些' : '，在一般的范围里') : '';
+      note = `${span}平均每天睡 <b>${minText(mins)}</b>${where}。${need ? `${age.months < 4 ? '4 个月以下' : Bb.ageText({ ...age, rest: 0 })}的宝宝一般每天睡 ${need[0]}～${need[1]} 小时（含白天小睡），图上浅绿色的就是这个范围。` : ''}`;
+    } else if (metric === 'feeds') {
+      const breast = Math.round(avg((d) => d.breastMin));
+      const ml = Math.round(avg((d) => d.bottleMl));
+      note = `${span}平均每天喂 <b>${Math.round(avg((d) => d.feeds) * 10) / 10}</b> 次${breast ? `，亲喂一共 ${minText(breast)}` : ''}${ml ? `，瓶喂一共 ${ml} 毫升` : ''}。按需喂就好，每个宝宝的节奏不一样。`;
+    } else {
+      const pee = Math.round(avg((d) => d.pee) * 10) / 10;
+      note = `${span}平均每天换 <b>${Math.round(avg((d) => d.diapers) * 10) / 10}</b> 片，其中有尿的 ${pee} 片、有便便的 ${Math.round(avg((d) => d.poo) * 10) / 10} 片。${age.days >= 7 && age.months < 6 ? '出生一周后，吃够奶的宝宝一般每天有 6 片以上湿的尿布。' : ''}`;
+    }
+    return `
+      <article class="card baby-trend">
+        <header class="card-head"><h2 class="card-title">${A.icon.bars}最近 7 天</h2></header>
+        <div class="recipe-chips" role="group" aria-label="看哪一项">
+          ${TRENDS.map(([id, name, unit]) => `<button type="button" class="chip" id="trend-${id}" data-action="trend-metric" data-metric="${id}" aria-pressed="${metric === id}">${name}<small>${unit}</small></button>`).join('')}
+        </div>
+        <div class="chart chart-trend" id="trend-chart"></div>
+        <p class="trend-note">${note}${days.length ? `只算记下来的，没记全的那几天会偏少${past.length ? '；今天还没过完，不算进平均' : ''}。` : ''}</p>
+      </article>`;
+  }
+
+  function drawTrend() {
+    const box = document.getElementById('trend-chart');
+    if (!box || !app.state || !kid()) return;
+    const metric = trendMetric();
+    const bars = Bb.weekSummary(kid(), ui.today, Date.now()).map((d) => {
+      const today = d.date === ui.today;
+      const label = today ? '今天' : `周${D.weekday(d.date)}`;
+      const value = metric === 'sleep' ? Math.round(d.sleepMin / 6) / 10 : metric === 'feeds' ? d.feeds : d.diapers;
+      return { label, value, text: String(value), today };
+    });
+    const [, name, unit] = TRENDS.find(([id]) => id === metric);
+    const width = Math.max(260, Math.round(box.clientWidth));
+    box.innerHTML = Chart.bars({
+      bars,
+      band: metric === 'sleep' ? Bb.sleepNeed(ageNow().months) : null,
+      width,
+      height: width < 420 ? 190 : 220,
+      label: `最近 7 天每天的${name}（${unit}）`,
+    });
   }
 
   function viewGrowth() {
@@ -779,7 +841,7 @@
   }
 
   Object.assign(app, {
-    viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, babyMinText: minText, babyLogInfo: logInfo,
+    viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, drawTrend, babyMinText: minText, babyLogInfo: logInfo,
     babyFoodDot: foodDot, viewWeaningTool: viewFood
   });
 })();

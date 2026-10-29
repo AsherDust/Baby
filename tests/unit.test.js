@@ -1725,6 +1725,20 @@ test('儿保体检：产后访视和 42 天检查按天算，之后按月龄到�
   eq(b.exams.d42, undefined);
 });
 
+test('最近 7 天：每天的小结，出生前的不算；睡多久的参考按月龄；柱状图带推荐范围', () => {
+  eq([0, 3, 4, 11, 12, 35, 36, 71, 72].map(Bb.sleepNeed), [[14, 17], [14, 17], [12, 16], [12, 16], [11, 14], [11, 14], [10, 13], [10, 13], null]);
+  const b = newborn('2026-10-08');
+  Bb.addLog(b, { type: 'sleep', start: tAt('2026-10-10', '22:00'), end: tAt('2026-10-11', '06:00'), note: '' });
+  Bb.addLog(b, { type: 'bottle', start: tAt('2026-10-12', '09:00'), ml: 90, milk: 'formula', note: '' });
+  Bb.addLog(b, { type: 'diaper', start: tAt('2026-10-12', '09:30'), pee: true, poo: false, color: '', note: '' });
+  const week = Bb.weekSummary(b, '2026-10-12', tAt('2026-10-12', '12:00'));
+  eq(week.map((d) => [d.date, d.has, d.sleepMin, d.feeds, d.diapers]), [
+    ['2026-10-08', false, 0, 0, 0], ['2026-10-09', false, 0, 0, 0], ['2026-10-10', true, 120, 0, 0], ['2026-10-11', true, 360, 0, 0], ['2026-10-12', true, 0, 1, 1],
+  ]);
+  const svg = Chart.bars({ bars: [{ label: '周一', value: 13.5, text: '13.5' }, { label: '今天', value: 0, text: '0', today: true }], band: [14, 17], width: 320, height: 190, label: '睡眠' });
+  ok(svg.includes('class="c-need"') && (svg.match(/<rect[^>]*class="c-bar/g) || []).length === 1 && svg.includes('13.5') && !svg.includes('NaN'), '一根柱子、一条推荐范围');
+});
+
 test('辅食反应：标爱吃、不爱吃、有反应；有反应的食材，含它的辅食不再推荐', () => {
   const b = newborn('2026-03-02');
   ['强化铁米粉', '猪肉', '南瓜', '胡萝卜', '鸡蛋'].forEach((f) => { b.tried[f] = '2026-09-10'; });

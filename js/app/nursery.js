@@ -681,6 +681,12 @@
       });
     },
 
+    'trend-metric'(el) {
+      ui.trendMetric = el.dataset.metric;
+      ui.focusNext = el.id;
+      render();
+    },
+
     'tried-open'(el) {
       openTriedSheet(el.dataset.food);
     },

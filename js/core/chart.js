@@ -189,5 +189,36 @@
     return `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${label}">${out.join('')}</svg>`;
   }
 
-  Baby.chart = { weight, bp, growth };
+  /**
+   * 最近几天的柱状图（SVG 字符串）：bars 是 [{ label, value, text, today }]，text 是柱子上写的数；
+   * band 是推荐范围 [低, 高]，画成一条浅绿色的带子
+   */
+  function bars({ bars: list, band = null, width, height, label }) {
+    const pad = { l: 34, r: 10, t: 22, b: 26 };
+    const iw = width - pad.l - pad.r;
+    const ih = height - pad.t - pad.b;
+    const top = Math.max(1, ...list.map((b) => b.value), band ? band[1] : 0);
+    const yStep = [1, 2, 4, 5, 10, 20, 50, 100, 200, 500].find((s) => top / s <= 5) || 1000;
+    const y1 = Math.ceil(top / yStep) * yStep;
+    const sy = (v) => pad.t + ((y1 - v) / y1) * ih;
+    const slot = iw / list.length;
+    const out = [];
+    for (let v = 0; v <= y1 + 1e-9; v += yStep) {
+      const y = f1(sy(v));
+      out.push(`<line x1="${pad.l}" x2="${width - pad.r}" y1="${y}" y2="${y}" class="c-grid"/>`);
+      out.push(`<text x="${pad.l - 8}" y="${y}" dy="0.35em" text-anchor="end" class="c-label">${v}</text>`);
+    }
+    if (band) out.push(`<rect x="${pad.l}" y="${f1(sy(band[1]))}" width="${f1(iw)}" height="${f1(sy(band[0]) - sy(band[1]))}" class="c-need"/>`);
+    list.forEach((b, i) => {
+      const cx = pad.l + slot * (i + 0.5);
+      const w = Math.min(34, slot * 0.56);
+      const y = sy(b.value);
+      if (b.value > 0) out.push(`<rect x="${f1(cx - w / 2)}" y="${f1(y)}" width="${f1(w)}" height="${f1(pad.t + ih - y)}" rx="4" class="c-bar${b.today ? ' c-bar-today' : ''}"><title>${b.label} ${b.text}</title></rect>`);
+      if (b.value > 0) out.push(`<text x="${f1(cx)}" y="${f1(y - 6)}" text-anchor="middle" class="c-bar-label">${b.text}</text>`);
+      out.push(`<text x="${f1(cx)}" y="${height - 8}" text-anchor="middle" class="c-label${b.today ? ' c-today-label' : ''}">${b.label}</text>`);
+    });
+    return `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${label}">${out.join('')}</svg>`;
+  }
+
+  Baby.chart = { weight, bp, growth, bars };
 })();

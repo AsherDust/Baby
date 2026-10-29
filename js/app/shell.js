@@ -6,7 +6,7 @@
     root, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES, subName, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds,
     viewMom, viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
     viewFoodTool, viewRecipesTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby,
-    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, viewWeaningTool, viewPapersTool, viewPelvicTool
+    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, drawTrend, viewWeaningTool, viewPapersTool, viewPelvicTool
   } = app;
   const Bb = globalThis.Baby.baby;
   const BOOK = globalThis.Baby.babyBook;
@@ -286,6 +286,7 @@
       bpBox.innerHTML = Chart.bp({ records: app.state.bp, width, height: width < 420 ? 180 : 220 });
     }
     drawGrowth();
+    drawTrend();
   }
 
   // ---------- 计时、朗读时屏幕常亮 ----------
