@@ -62,7 +62,7 @@ iframe.onload = async () => {
     // ---- 数胎动 ----
     log(!$('.tool-menu'), '首页不再罗列小工具');
     await nav('#/tools');
-    log($$('.tool-menu .tool').length === 10 && $$('.tool-menu .tool').map((t) => t.dataset.tool).join() === 'kicks,contractions,food,recipes,weaning,papers,pelvic,bag,weeks,story', '工具菜单有 10 个');
+    log($$('.tool-menu .tool').length === 11 && $$('.tool-menu .tool').map((t) => t.dataset.tool).join() === 'kicks,contractions,food,recipes,weaning,papers,pelvic,report,bag,weeks,story', '工具菜单有 11 个');
     log(/今天还没数/.test(text('.tool[data-tool="kicks"]')), '数胎动：今天还没数');
     await nav('#/');
     log(/数胎动/.test(text('.panel-today')) && $('.panel-today [data-action="start-kicks"]'), '33 周时「今天该记」里有数胎动');

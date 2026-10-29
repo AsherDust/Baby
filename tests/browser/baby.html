@@ -64,6 +64,13 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(sheet().open && sheet().querySelectorAll('.recipe-steps li').length > 0 && !sheet().querySelector('[data-action="baby-food-log"]'), '打开做法看看，还不能记吃了');
     log(sheet().querySelector('h2 .dish-dot') && text(sheet().querySelector('h2')) === '猪肉泥', '做法的标题前也有小圆点');
     await click('#sheet-dialog [data-action="close-dialog"]');
+    await nav('#/tools/report');
+    const rp = () => text($('#report'));
+    log(/孕期就诊小结/.test(rp()) && $('#report .rp-chart svg') && $$('#report .rp-table')[0].querySelectorAll('tbody tr').length === 7 && $$('#report .rp-high').length >= 2 && /复合维生素/.test(rp()) && /双顶径 BPD\s*62\.4 mm/.test(rp()), '孕期的就诊小结：体重曲线、血压（偏高的标红）、血糖、用药、B 超', rp().slice(0, 120));
+    let printed = 0;
+    w.print = () => { printed += 1; };
+    await click('#report-print');
+    log(printed === 1, '点「打印或存成 PDF」调出打印');
     await nav('#/tools/papers');
     log(text($('.page-title')) === '办证清单' && $$('.paper').length === 8 && $$('.paper input:disabled').length === 8 && /出生一件事/.test(text($('.papers-intro'))) && /先办好「出生医学证明」/.test(text($('.paper-waiting'))), '孕期先看办证清单：上海的「出生一件事」，出生后才能勾');
     await nav('#/');
@@ -282,7 +289,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await nav('#/checkups/schedule');
     log(text($('.tab[aria-current="page"]')) === '记录' && $('.seg-tab[aria-current="page"]').getAttribute('href') === '#/checkups/schedule', '产检页亮的是「记录」');
     await nav('#/tools');
-    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,weaning,papers,pelvic,story', '工具页收起数胎动、宫缩、待产包、每周变化');
+    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,weaning,papers,pelvic,report,story', '工具页收起数胎动、宫缩、待产包、每周变化');
     await nav('#/tools/pelvic');
     log(/剖宫产都可以轻轻地开始练/.test(text($('.fineprint'))) && /恶露干净后/.test(text($('.fineprint'))), '产后的盆底练习：顺产剖宫产都能开始，6 周后去做盆底评估');
 
@@ -347,6 +354,11 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(/平均每天喂/.test(text($('.trend-note'))) && !$('#trend-chart .c-need') && w.Baby.app.ui.trendMetric === 'feeds', '切到喂奶');
     await click('#trend-diapers');
     log(/平均每天换/.test(text($('.trend-note'))), '切到尿布', text($('.trend-note')));
+    await nav('#/');
+
+    // ---- 就诊小结（宝宝） ----
+    await nav('#/tools/report');
+    log(/豆豆的就诊小结/.test(text($('#report'))) && $$('#report .rp-charts svg').length === 2 && /维生素 D/.test(text($('#report'))) && /吃了有反应：鸡蛋（嘴边起了小红点）/.test(text($('#report'))) && /国家免疫规划疫苗打了 10\//.test(text($('#report'))), '宝宝的就诊小结：生长、最近 7 天、用药、疫苗体检、辅食反应', text($('#report')).slice(0, 160));
     await nav('#/');
 
     // ---- 产后心情关怀 ----

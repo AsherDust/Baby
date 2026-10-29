@@ -1,0 +1,50 @@
+/* 就诊小结：屏幕上是一张卡片，打印时只留这一页，黑字白底 */
+
+.rp-actions { display: grid; gap: 12px; margin: 0 0 16px; padding: 14px 16px; border-radius: 18px; background: var(--honey-glow); color: var(--warn-ink); font-size: 13.5px; }
+.rp-actions p { display: flex; align-items: flex-start; gap: 8px; margin: 0; }
+.rp-actions svg { flex: none; width: 17px; height: 17px; margin-top: 2px; }
+.report { padding: 22px 22px 18px; }
+.rp-head { padding-bottom: 12px; border-bottom: 2px solid var(--line-strong); }
+.rp-head h1 { margin: 0; font-family: var(--serif); font-size: 22px; }
+.rp-head p { margin: 4px 0 0; font-size: 13px; color: var(--ink-3); }
+.rp-part { padding: 14px 0; border-bottom: 1px dashed var(--line); }
+.rp-part h2 { margin: 0 0 8px; font-size: 16px; }
+.rp-part p { margin: 0 0 8px; font-size: 14px; }
+.rp-note { font-size: 12.5px !important; color: var(--ink-3); }
+.rp-empty { color: var(--ink-3); }
+.rp-kv, .rp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.rp-kv th { width: 7.5em; padding: 4px 8px 4px 0; text-align: left; font-weight: 400; color: var(--ink-3); vertical-align: top; }
+.rp-kv td { padding: 4px 0; }
+.rp-table th { padding: 6px 6px 6px 0; border-bottom: 1px solid var(--line-strong); text-align: left; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.rp-table td { padding: 6px 6px 6px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; vertical-align: top; }
+.rp-high td, td.rp-high, .rp-high-text { color: var(--red); font-weight: 600; }
+td.rp-low { color: var(--sky-deep); font-weight: 600; }
+.rp-list { display: grid; gap: 4px; margin: 0; padding-left: 20px; font-size: 14px; }
+.rp-chart { margin: 8px 0 0; }
+.rp-chart svg { width: 100%; height: auto; }
+.rp-chart figcaption { font-size: 12.5px; color: var(--ink-3); }
+.rp-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.rp-foot { margin: 12px 0 0; font-size: 12.5px; color: var(--ink-3); }
+
+@media print {
+  @page { margin: 12mm; }
+  :root { color-scheme: light; }
+  html, body { background: #FFFFFF !important; }
+  body * { visibility: hidden; }
+  #report, #report * { visibility: visible; }
+  #report { position: absolute; top: 0; left: 0; right: 0; margin: 0; padding: 0; border: 0; box-shadow: none; background: #FFFFFF; color: #000000; font-size: 10.5pt; }
+  .rp-head { padding-bottom: 6pt; }
+  .rp-head h1 { font-size: 17pt; }
+  .rp-part { padding: 7pt 0; }
+  .rp-part h2 { margin-bottom: 4pt; font-size: 12pt; break-after: avoid; }
+  .rp-part p, .rp-list { font-size: 10pt; }
+  .rp-kv, .rp-table { font-size: 9.5pt; }
+  .rp-kv th, .rp-kv td { padding: 1.5pt 6pt 1.5pt 0; }
+  .rp-table th, .rp-table td { padding: 2.5pt 6pt 2.5pt 0; }
+  .rp-table tr, .rp-chart { break-inside: avoid; }
+  .rp-chart { max-width: 150mm; }
+  .rp-charts { grid-template-columns: 1fr 1fr; }
+  .rp-head h1, .rp-part h2, .rp-table td, .rp-kv td, .rp-list { color: #000000; }
+  .rp-note, .rp-head p, .rp-kv th, .rp-foot, .rp-empty { color: #444444 !important; }
+  .rp-high td, td.rp-high, .rp-high-text { color: #B00020; }
+}

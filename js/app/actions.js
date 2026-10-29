@@ -216,6 +216,10 @@
       render();
     },
 
+    'print-report'() {
+      window.print();
+    },
+
     'pelvic-hold'(el) {
       const hold = Number(el.dataset.hold);
       if (!M.PELVIC_HOLDS.includes(hold)) return;

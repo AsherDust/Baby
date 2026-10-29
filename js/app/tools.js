@@ -37,6 +37,7 @@
         ${tile('weaning', A.icon.spoon, weaningStatus())}
         ${tile('papers', A.icon.docCheck, papersStatus())}
         ${tile('pelvic', A.icon.breath, pelvicStatus())}
+        ${tile('report', A.icon.notes, { text: born ? '看病、儿保时给医生看：生长、吃睡、体温、疫苗' : '产检时给医生看：体重、血压血糖、用药、B 超' })}
         ${born ? '' : tile('bag', A.icon.suitcase, { text: bag.total ? `已备好 ${bag.done}/${bag.total}` : '清单空了，去加几样' })}
         ${born ? '' : tile('weeks', A.icon.book, { text: `现在是第 ${Math.max(ga.weeks, 0)} 周，看看宝宝和妈妈的变化` })}
         ${tile('story', A.icon.moon, storyStatus(now))}
