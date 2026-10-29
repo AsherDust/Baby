@@ -6,7 +6,7 @@
     root, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES, subName, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds,
     viewMom, viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
     viewFoodTool, viewRecipesTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby,
-    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, viewWeaningTool, viewPapersTool
+    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, viewWeaningTool, viewPapersTool, viewPelvicTool
   } = app;
   const Bb = globalThis.Baby.baby;
   const BOOK = globalThis.Baby.babyBook;
@@ -200,6 +200,7 @@
       recipes: () => viewRecipesTool(route),
       weaning: () => viewWeaningTool(),
       papers: () => viewPapersTool(),
+      pelvic: () => viewPelvicTool(),
       bag: () => viewBag(ga),
       weeks: () => viewWeeks(ga),
       story: () => viewStoryTool(now),
@@ -295,7 +296,7 @@
   let wakeBusy = false;
   async function syncWakeLock() {
     if (!('wakeLock' in navigator) || wakeBusy) return;
-    const busy = () => (!app.state.baby && M.keepScreenOn(app.state, Date.now(), currentRoute().sub === 'contractions')) || Boolean(ui.reading && ui.reading.playing);
+    const busy = () => (!app.state.baby && M.keepScreenOn(app.state, Date.now(), currentRoute().sub === 'contractions')) || Boolean(ui.reading && ui.reading.playing) || Boolean(ui.pelvic);
     const want = Boolean(app.state) && !document.hidden && busy();
     if (want === Boolean(wakeLock)) return;
     wakeBusy = true;

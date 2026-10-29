@@ -2,7 +2,7 @@
   'use strict';
   // 「工具」页：工具目录、数胎动、宫缩计时、能不能吃、待产包（孕期食谱在 recipes.js）
   const { dates: D, content: C, model: M, baby: Bb, babyBook: BB, babyFood: FOOD, art: A, app } = globalThis.Baby;
-  const { subName, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, pad2, hhmm, ui, storyStatus, recipeStatus } = app;
+  const { subName, BAG_REMIND_FROM, BAG_READY_BY, KICKS_FROM, TERM_FROM, esc, pad2, hhmm, ui, storyStatus, recipeStatus, afterRender } = app;
 
   /** 今天（按真实时钟）数完的几次，新的在前 */
   function todayKicks(now) {
@@ -36,6 +36,7 @@
         ${tile('recipes', A.icon.pot, recipeStatus(now))}
         ${tile('weaning', A.icon.spoon, weaningStatus())}
         ${tile('papers', A.icon.docCheck, papersStatus())}
+        ${tile('pelvic', A.icon.breath, pelvicStatus())}
         ${born ? '' : tile('bag', A.icon.suitcase, { text: bag.total ? `已备好 ${bag.done}/${bag.total}` : '清单空了，去加几样' })}
         ${born ? '' : tile('weeks', A.icon.book, { text: `现在是第 ${Math.max(ga.weeks, 0)} 周，看看宝宝和妈妈的变化` })}
         ${tile('story', A.icon.moon, storyStatus(now))}
@@ -50,6 +51,123 @@
     const picks = Bb.foodToday(FOOD, BB, b, ui.today);
     return { text: picks.length ? `今天可以做：${esc(picks.map((r) => r.name).join('、'))}` : '按月龄推荐营养全面的辅食' };
   }
+
+  // ---------- 盆底练习 ----------
+
+  const PELVIC_WORDS = { squeeze: '收紧', relax: '放松', rest: '歇一下' };
+
+  function pelvicStatus() {
+    if (ui.pelvic) return { live: true, text: '正在练 · 回来接着练' };
+    const n = app.state.pelvic.days[ui.today] || 0;
+    return { text: n ? `今天练了 ${n}/${M.PELVIC_GOAL} 组` : `一组两三分钟，每天 ${M.PELVIC_GOAL} 组` };
+  }
+
+  /** 慢收缩 · 第 3/10 次 / 接下来快收缩 */
+  function pelvicPart(step) {
+    if (step.part === 'rest') return '接下来快收缩：收紧 1 秒，放松 2 秒';
+    return `${step.part === 'slow' ? '慢收缩' : '快收缩'} · 第 ${step.rep}/${M.PELVIC_REPS} 次`;
+  }
+
+  function viewPelvicTool() {
+    const p = app.state.pelvic;
+    const born = Boolean(app.state.baby);
+    if (ui.pelvic) {
+      return `
+        <article class="card tool-card pelvic-live">
+          <div class="pelvic-stage" aria-live="polite">
+            <span class="pelvic-ring" id="pelvic-ring" aria-hidden="true"></span>
+            <p class="pelvic-word" id="pelvic-word">准备</p>
+            <p class="pelvic-left" id="pelvic-left"></p>
+          </div>
+          <p class="pelvic-part" id="pelvic-part"></p>
+          <div class="bag-progress pelvic-bar" aria-hidden="true"><i id="pelvic-bar" style="width:0%"></i></div>
+          <p class="hint">正常呼吸，别憋气；只收盆底肌，肚子、屁股和大腿放松。</p>
+          <button type="button" class="btn btn-ghost btn-block" data-action="pelvic-stop">先停下</button>
+        </article>`;
+    }
+    const today = p.days[ui.today] || 0;
+    const week = M.pelvicWeek(app.state, ui.today);
+    return `
+      <article class="card tool-card">
+        <p class="tool-lead">盆底肌托着膀胱、子宫和直肠，怀孕和生孩子都会让它变松。常练能减少漏尿，产后也恢复得快。</p>
+        <ol class="pelvic-how">
+          <li><b>找到它：</b>像憋住小便、忍住放屁那样，把肛门和阴道往上提，用力的就是盆底肌。</li>
+          <li><b>慢收缩：</b>收紧 ${p.hold} 秒，再放松 ${p.hold} 秒，做 ${M.PELVIC_REPS} 次。刚开始收不了这么久，就选短一点。</li>
+          <li><b>快收缩：</b>快速收紧 1 秒，马上放松，做 ${M.PELVIC_REPS} 次。</li>
+          <li>一组两三分钟，每天 ${M.PELVIC_GOAL} 组；躺着、坐着、站着都能练。</li>
+        </ol>
+        <div class="pelvic-holds">
+          <span>慢收缩每次收紧</span>
+          <div class="recipe-chips" role="group" aria-label="慢收缩每次收紧几秒">
+            ${M.PELVIC_HOLDS.map((h) => `<button type="button" class="chip" id="pelvic-hold-${h}" data-action="pelvic-hold" data-hold="${h}" aria-pressed="${p.hold === h}">${h} 秒</button>`).join('')}
+          </div>
+        </div>
+        <button type="button" class="btn btn-block" id="pelvic-start" data-action="pelvic-start">开始一组</button>
+        <p class="hint">正常呼吸，别憋气；肚子、屁股和大腿放松；别在小便时憋尿练。</p>
+      </article>
+      <article class="card pelvic-week">
+        <header class="card-head">
+          <div>
+            <h2 class="card-title">${A.icon.breath}今天练了 ${today}/${M.PELVIC_GOAL} 组</h2>
+            <p class="card-meta">${today >= M.PELVIC_GOAL ? '今天的练够了' : '有空就练一组，等车、喂奶的时候也行'}</p>
+          </div>
+        </header>
+        <ol class="pelvic-days">${week.map((d) => `
+          <li class="${d.sets >= M.PELVIC_GOAL ? 'is-full' : d.sets ? 'is-some' : ''}">
+            <span class="pelvic-dots" aria-hidden="true">${Array.from({ length: M.PELVIC_GOAL }, (_, i) => `<i${i < d.sets ? ' class="on"' : ''}></i>`).join('')}</span>
+            <small>${d.date === ui.today ? '今天' : `周${D.weekday(d.date)}`}</small>
+            <span class="sr-only">${d.sets} 组</span>
+          </li>`).join('')}
+        </ol>
+      </article>
+      <p class="fineprint">${born
+        ? '顺产、剖宫产都可以轻轻地开始练，插着导尿管的等拔了以后。产后 6 周、恶露干净后，可以去医院做一次盆底评估，在医生指导下系统地练。'
+        : '孕期练之前问问医生；有阴道出血、破水、先兆流产、宫颈机能不全、28 周后还是前置胎盘这些情况的先别练。'}漏尿、下坠感或者疼，去医院的盆底康复门诊。练法参考中华医学会的科普、《妊娠期及产后盆底肌训练临床实践指南（2026）》和英国 NHS 的建议。</p>`;
+  }
+
+  /** 练的时候每 0.25 秒更新圆圈、倒数和第几次；练完一组记下来 */
+  function paintPelvic(now) {
+    const s = ui.pelvic;
+    if (!s) return;
+    if (app.currentRoute().sub !== 'pelvic') return stopPelvic();
+    const at = M.pelvicAt(s.hold, (now - s.start) / 1000);
+    if (at.done) return finishPelvic();
+    const ring = document.getElementById('pelvic-ring');
+    if (!ring) return;
+    if (at.index !== s.index) {
+      s.index = at.index;
+      ring.style.setProperty('--len', `${at.step.to - at.step.from}s`);
+      ring.className = `pelvic-ring is-${at.step.phase}`;
+      if (at.step.phase === 'squeeze') navigator.vibrate?.(30);
+    }
+    document.getElementById('pelvic-word').textContent = PELVIC_WORDS[at.step.phase];
+    document.getElementById('pelvic-left').textContent = at.left;
+    document.getElementById('pelvic-part').textContent = pelvicPart(at.step);
+    const total = M.pelvicSteps(s.hold).slice(-1)[0].to;
+    document.getElementById('pelvic-bar').style.width = `${Math.min(100, ((now - s.start) / 10 / total)).toFixed(1)}%`;
+  }
+
+  function startPelvic() {
+    stopPelvic();
+    ui.pelvic = { start: Date.now(), hold: app.state.pelvic.hold, index: -1, timer: setInterval(() => paintPelvic(Date.now()), 250) };
+  }
+
+  function stopPelvic() {
+    if (!ui.pelvic) return;
+    clearInterval(ui.pelvic.timer);
+    ui.pelvic = null;
+  }
+
+  function finishPelvic() {
+    stopPelvic();
+    const n = M.addPelvicSet(app.state, ui.today);
+    app.persist();
+    app.render();
+    app.toast(app.say(n === M.PELVIC_GOAL ? 'pelvicGoal' : 'pelvicDone'));
+    if (n === M.PELVIC_GOAL) app.cheer(document.getElementById('pelvic-start'));
+  }
+
+  afterRender.push(() => paintPelvic(Date.now()));
 
   function papersStatus() {
     const b = app.state.baby;
@@ -363,6 +481,6 @@
 
   Object.assign(app, {
     todayKicks, kickResult, bagTiming, viewToolMenu, viewKicksTool, viewContractionsTool, viewFoodTool,
-    viewFoodResults, paintClocks, viewBag, viewPapersTool
+    viewFoodResults, paintClocks, viewBag, viewPapersTool, viewPelvicTool, startPelvic, stopPelvic
   });
 })();

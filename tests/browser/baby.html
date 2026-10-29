@@ -282,7 +282,9 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await nav('#/checkups/schedule');
     log(text($('.tab[aria-current="page"]')) === '记录' && $('.seg-tab[aria-current="page"]').getAttribute('href') === '#/checkups/schedule', '产检页亮的是「记录」');
     await nav('#/tools');
-    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,weaning,papers,story', '工具页收起数胎动、宫缩、待产包、每周变化');
+    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,weaning,papers,pelvic,story', '工具页收起数胎动、宫缩、待产包、每周变化');
+    await nav('#/tools/pelvic');
+    log(/剖宫产都可以轻轻地开始练/.test(text($('.fineprint'))) && /恶露干净后/.test(text($('.fineprint'))), '产后的盆底练习：顺产剖宫产都能开始，6 周后去做盆底评估');
 
     // ---- 刷新、清除 ----
     await new Promise((r) => { iframe.onload = r; w.location.reload(); });

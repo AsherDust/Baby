@@ -214,6 +214,26 @@ test('体重和推荐范围比：偏快、正常、偏慢；孕前的、没填�
   eq(M.gainStatus(s, '2026-10-12'), null, '宝宝出生后不再比');
 });
 
+test('盆底练习：一组的步骤和时长、练到哪一步了，每天几组只留最近 60 天', () => {
+  const steps = M.pelvicSteps(5);
+  eq([steps.length, steps[0], steps[1].phase, steps[20].part, steps[steps.length - 1].to], [41, { part: 'slow', phase: 'squeeze', rep: 1, from: 0, to: 5 }, 'relax', 'rest', 133]);
+  eq(M.pelvicSteps(3).slice(-1)[0].to, 93);
+  eq([M.pelvicAt(5, 0).step.phase, M.pelvicAt(5, 4.2).left, M.pelvicAt(5, 5).step.phase, M.pelvicAt(5, 5).step.rep], ['squeeze', 1, 'relax', 1]);
+  eq(M.pelvicAt(5, 101).step.part, 'rest');
+  const q = M.pelvicAt(5, 103.5);
+  eq([q.step.part, q.step.phase, q.step.rep, q.left], ['quick', 'squeeze', 1, 1]);
+  eq([M.pelvicAt(5, 132.9).done, M.pelvicAt(5, 133).done], [false, true]);
+  const s = M.createState({ dueDate: DUE });
+  eq(s.pelvic, { hold: 5, days: {} });
+  eq([M.addPelvicSet(s, '2026-10-12'), M.addPelvicSet(s, '2026-10-12')], [1, 2]);
+  eq(M.pelvicWeek(s, '2026-10-12').map((d) => d.sets), [0, 0, 0, 0, 0, 0, 2]);
+  for (let i = 0; i < 70; i += 1) s.pelvic.days[D.addDays('2026-07-01', i)] = 1;
+  M.addPelvicSet(s, '2026-10-12');
+  eq([Object.keys(s.pelvic.days).length, s.pelvic.days['2026-10-12'], s.pelvic.days['2026-07-01']], [60, 3, undefined]);
+  eq(M.normalize({ ...s, pelvic: { hold: 7, days: { '2026-10-12': 2, bad: 3, '2026-10-11': -1, '2026-10-10': 1.5 } } }).pelvic, { hold: 5, days: { '2026-10-12': 2 } });
+  eq(M.normalize({ profile: { dueDate: DUE } }).pelvic, { hold: 5, days: {} }, '老数据没有这一项');
+});
+
 test('预产期校验', () => {
   eq(M.dueDateError(DUE, '2026-10-12'), null);
   ok(M.dueDateError('', '2026-10-12'));

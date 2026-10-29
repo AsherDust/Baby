@@ -191,6 +191,39 @@
 .bag-item.is-done .bag-note { color: var(--ink-3); }
 .bag-item .icon-btn-sm { color: var(--icon-faint); }
 
+/* ---------- 盆底练习 ---------- */
+
+.pelvic-how { display: grid; gap: 8px; margin: 0 0 16px; padding-left: 20px; font-size: 14px; color: var(--ink-2); }
+.pelvic-how b { color: var(--ink); }
+.pelvic-holds { display: grid; gap: 8px; margin: 0 0 16px; font-size: 13.5px; color: var(--ink-2); }
+.pelvic-live { text-align: center; }
+.pelvic-stage { position: relative; display: grid; place-items: center; width: 220px; height: 220px; margin: 8px auto 12px; }
+.pelvic-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--honey-glow) 0%, var(--honey-soft) 70%, rgba(233, 169, 60, 0.35) 100%);
+  box-shadow: 0 0 0 10px var(--glow-honey);
+  transform: scale(0.62);
+  transition: transform var(--len, 1s) ease-in-out;
+}
+.pelvic-ring.is-squeeze { transform: scale(1); }
+.pelvic-word { position: relative; margin: 0; font-family: var(--serif); font-size: 30px; font-weight: 700; color: var(--honey-deep); }
+.pelvic-left { position: relative; margin: 2px 0 0; font-family: var(--num); font-size: 22px; color: var(--ink-2); }
+.pelvic-part { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+.pelvic-bar { margin: 0 0 12px; }
+.pelvic-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 0; padding: 0; list-style: none; text-align: center; }
+.pelvic-days li { display: grid; gap: 6px; justify-items: center; padding: 8px 0; border-radius: 12px; background: var(--paper-2); }
+.pelvic-days li.is-full { background: var(--leaf-soft); }
+.pelvic-days small { font-size: 12px; color: var(--ink-2); }
+.pelvic-dots { display: flex; gap: 3px; }
+.pelvic-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); }
+.pelvic-dots i.on { background: var(--honey); }
+.pelvic-days li.is-full .pelvic-dots i.on { background: var(--leaf); }
+@media (prefers-reduced-motion: reduce) {
+  .pelvic-ring { transition: none; }
+}
+
 /* ---------- 办证清单 ---------- */
 
 .papers-intro { margin: 0 0 12px; padding: 10px 14px; border-radius: 14px; background: var(--honey-glow); color: var(--warn-ink); font-size: 13.5px; }

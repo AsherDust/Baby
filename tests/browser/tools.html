@@ -62,7 +62,7 @@ iframe.onload = async () => {
     // ---- 数胎动 ----
     log(!$('.tool-menu'), '首页不再罗列小工具');
     await nav('#/tools');
-    log($$('.tool-menu .tool').length === 9 && $$('.tool-menu .tool').map((t) => t.dataset.tool).join() === 'kicks,contractions,food,recipes,weaning,papers,bag,weeks,story', '工具菜单有 9 个');
+    log($$('.tool-menu .tool').length === 10 && $$('.tool-menu .tool').map((t) => t.dataset.tool).join() === 'kicks,contractions,food,recipes,weaning,papers,pelvic,bag,weeks,story', '工具菜单有 10 个');
     log(/今天还没数/.test(text('.tool[data-tool="kicks"]')), '数胎动：今天还没数');
     await nav('#/');
     log(/数胎动/.test(text('.panel-today')) && $('.panel-today [data-action="start-kicks"]'), '33 周时「今天该记」里有数胎动');
@@ -223,6 +223,32 @@ iframe.onload = async () => {
     w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(old));
     await reload();
     log(/今天还没数/.test(text('.tool[data-tool="kicks"]')), '没有这两项的老数据也能打开');
+
+    // ---- 盆底练习 ----
+    await nav('#/tools/pelvic');
+    log(text('.page-title') === '盆底练习' && /慢收缩：收紧 5 秒/.test(text('.pelvic-how')) && $('#pelvic-hold-5[aria-pressed="true"]') && /先别练/.test(text('.fineprint')), '盆底练习：怎么练，默认收紧 5 秒，孕期先问医生');
+    click('#pelvic-hold-3');
+    log(state().pelvic.hold === 3 && /收紧 3 秒/.test(text('.pelvic-how')), '选收紧 3 秒');
+    fakeNow = T + 200 * MIN;
+    click('#pelvic-start');
+    await wait(300);
+    log($('.pelvic-live') && text('#pelvic-word') === '收紧' && /慢收缩 · 第 1\/10 次/.test(text('#pelvic-part')) && text('#pelvic-left') === '3' && $('#pelvic-ring.is-squeeze'), '开始一组：收紧，倒数 3 秒', `${text('#pelvic-word')} ${text('#pelvic-part')} ${text('#pelvic-left')}`);
+    fakeNow += 4000;
+    await wait(300);
+    log(text('#pelvic-word') === '放松' && $('#pelvic-ring.is-relax'), '3 秒后放松');
+    fakeNow += 57000;
+    await wait(300);
+    log(/接下来快收缩/.test(text('#pelvic-part')), '慢收缩做完，歇一下准备快收缩', text('#pelvic-part'));
+    fakeNow += 40000;
+    await wait(400);
+    log(!$('.pelvic-live') && state().pelvic.days['2026-10-12'] === 1 && /练完一组|一组练好了/.test(toastText()) && /今天练了 1\/3 组/.test(text('.pelvic-week')), '练完一组记下来', toastText());
+    click('#pelvic-start');
+    await wait(100);
+    click('[data-action="pelvic-stop"]');
+    log(!$('.pelvic-live') && state().pelvic.days['2026-10-12'] === 1 && /这组不算/.test(toastText()), '中途停下，这组不算');
+    await nav('#/tools');
+    log(/今天练了 1\/3 组/.test(text('[data-tool="pelvic"]')), '工具页那一格写着今天练了几组');
+    fakeNow = null;
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }

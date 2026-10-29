@@ -6,7 +6,7 @@
     settingsDialog, checkupDialog, medDialog, sheetDialog, notifyPermission, JOURNAL_SHOWN, ui, render, go, closeDialog,
     openGlucoseSheet, openUltrasoundSheet, openJournalSheet, openSettings, openCheckupDialog, openMedDialog, formError,
     toast, oops, say, cheer, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose,
-    checkNotifications, storyActions, recipeActions, babyForms, babyActions
+    checkNotifications, storyActions, recipeActions, babyForms, babyActions, startPelvic, stopPelvic
   } = app;
 
   const submitButton = (form) => form.querySelector('button:not([type="button"])');
@@ -214,6 +214,26 @@
     'journal-more'() {
       ui.journalShown += JOURNAL_SHOWN;
       render();
+    },
+
+    'pelvic-hold'(el) {
+      const hold = Number(el.dataset.hold);
+      if (!M.PELVIC_HOLDS.includes(hold)) return;
+      app.state.pelvic.hold = hold;
+      persist();
+      ui.focusNext = el.id;
+      render();
+    },
+
+    'pelvic-start'() {
+      startPelvic();
+      render();
+    },
+
+    'pelvic-stop'() {
+      stopPelvic();
+      render();
+      toast('先停下了，这组不算；有空再练');
     },
 
     'mood-care-hide'() {

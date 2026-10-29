@@ -41,6 +41,7 @@ function seedScene(scene) {
     { id: 'j6', date: '2026-09-25', time: '16:20', mood: 'happy', text: '大排畸顺利通过，医生说豆豆很配合，一下就拍好了。' },
     { id: 'j7', date: '2026-09-18', time: '22:10', mood: 'low', text: '腰酸得睡不着，翻来覆去。' },
   ]);
+  [['2026-10-06', 3], ['2026-10-07', 2], ['2026-10-08', 3], ['2026-10-10', 1], ['2026-10-11', 3], ['2026-10-12', 1]].forEach(([d, n]) => { s.pelvic.days[d] = n; });
   if (name === 'checkup-day') M.upsertWeight(s, '2026-10-13', 56.1);
   if (name === 'fresh') { s.meds = []; s.weights = []; s.journal = []; s.checkups = Baby.content.defaultCheckups(); s.profile.preWeight = null; s.profile.height = null; s.profile.nickname = ''; }
   if (name === 'late' || name === 'bag-done') {

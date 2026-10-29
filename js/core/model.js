@@ -42,6 +42,13 @@
   const GLUCOSE_RANGE = [1, 33.3];
   const GLUCOSE_LOW = 3.3;
 
+  // 盆底肌练习：一组是慢收缩 10 次（收紧 hold 秒、放松一样久）、歇 3 秒，再快收缩 10 次（收紧 1 秒、放松 2 秒）；
+  // 每天 3 组，练了几组只留最近 60 天
+  const PELVIC_HOLDS = [3, 5, 8, 10];
+  const PELVIC_REPS = 10;
+  const PELVIC_GOAL = 3;
+  const PELVIC_KEEP = 60;
+
   const round2 = (n) => Math.round(n * 100) / 100;
   const isClock = (t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
   const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -134,6 +141,7 @@
       stories: St.empty(),
       journal: [],
       meals: R.empty(),
+      pelvic: { hold: 5, days: {} },
       baby: null,
       notified: {},
     };
@@ -280,6 +288,15 @@
     return out;
   }
 
+  function normalizePelvic(raw) {
+    const p = raw && typeof raw === 'object' ? raw : {};
+    const days = {};
+    const dated = Object.entries(p.days && typeof p.days === 'object' ? p.days : {})
+      .filter(([d, n]) => D.isISODate(d) && Number.isInteger(n) && n > 0 && n <= 50).sort(([a], [b]) => (a < b ? -1 : 1));
+    for (const [d, n] of dated.slice(-PELVIC_KEEP)) days[d] = n;
+    return { hold: PELVIC_HOLDS.includes(p.hold) ? p.hold : 5, days };
+  }
+
   /** 校验并补齐从存储或备份读出来的数据；没有有效预产期就返回 null */
   function normalize(raw) {
     if (!raw || typeof raw !== 'object') return null;
@@ -341,6 +358,7 @@
       stories: St.normalize(raw.stories),
       journal: J.normalize(raw.journal),
       meals: R.normalize(raw.meals),
+      pelvic: normalizePelvic(raw.pelvic),
       baby: B.normalize(raw.baby),
       notified,
     };
@@ -407,6 +425,48 @@
     const range = gainRange(plan, days);
     const level = gain > range[1] ? 'high' : gain < range[0] ? 'low' : 'ok';
     return { plan, gain, range, level, weeks: Math.floor(days / 7) };
+  }
+
+  // ---- 盆底肌练习 ----
+
+  /** 一组里的每一步（秒）：{ part: slow / quick / rest, phase: squeeze / relax / rest, rep, from, to } */
+  function pelvicSteps(hold) {
+    const steps = [];
+    let t = 0;
+    const add = (part, phase, rep, len) => { steps.push({ part, phase, rep, from: t, to: t + len }); t += len; };
+    for (let i = 1; i <= PELVIC_REPS; i += 1) {
+      add('slow', 'squeeze', i, hold);
+      add('slow', 'relax', i, hold);
+    }
+    add('rest', 'rest', 0, 3);
+    for (let i = 1; i <= PELVIC_REPS; i += 1) {
+      add('quick', 'squeeze', i, 1);
+      add('quick', 'relax', i, 2);
+    }
+    return steps;
+  }
+
+  /** 开始后过了 elapsed 秒练到哪了：{ index, step, left 这一步还剩几秒, done } */
+  function pelvicAt(hold, elapsed) {
+    const steps = pelvicSteps(hold);
+    const index = steps.findIndex((s) => elapsed < s.to);
+    if (index < 0) return { index: steps.length, step: null, left: 0, done: true };
+    return { index, step: steps[index], left: Math.ceil(steps[index].to - elapsed), done: false };
+  }
+
+  /** 练完一组记一下；顺手只留最近 60 天 */
+  function addPelvicSet(state, today) {
+    state.pelvic.days[today] = (state.pelvic.days[today] || 0) + 1;
+    state.pelvic = normalizePelvic(state.pelvic);
+    return state.pelvic.days[today];
+  }
+
+  /** 最近 7 天每天练了几组，最后一天是今天 */
+  function pelvicWeek(state, today) {
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = D.addDays(today, i - 6);
+      return { date, sets: state.pelvic.days[date] || 0 };
+    });
   }
 
   // ---- 产检 ----
@@ -1160,6 +1220,13 @@
     gainPlan,
     gainRange,
     gainStatus,
+    PELVIC_HOLDS,
+    PELVIC_REPS,
+    PELVIC_GOAL,
+    pelvicSteps,
+    pelvicAt,
+    addPelvicSet,
+    pelvicWeek,
     checkupStatus,
     scheduleRows,
     nextCheckup,
