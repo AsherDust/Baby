@@ -21,7 +21,7 @@
     checkups: { name: '产检', subs: ['schedule', 'ultrasound'] },
     // 宝宝出生后底部的「产检」换成「宝宝」，产检收进「记录」里
     baby: { name: '宝宝', subs: ['', 'growth', 'vaccines', 'exams', 'health', 'food'] },
-    tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'recipes', 'weaning', 'papers', 'pelvic', 'report', 'bag', 'weeks', 'story'] },
+    tools: { name: '工具', subs: ['', 'kicks', 'contractions', 'food', 'recipes', 'weaning', 'papers', 'pelvic', 'report', 'noise', 'bag', 'weeks', 'story'] },
   };
   const TABS = { pregnant: ['today', 'records', 'journal', 'checkups', 'tools'], baby: ['today', 'records', 'journal', 'baby', 'tools'] };
   // 有的页面里还分几页，地址里多一段，例如 #/tools/recipes/shop
@@ -41,6 +41,7 @@
     papers: '办证清单',
     pelvic: '盆底练习',
     report: '就诊小结',
+    noise: '哄睡声音',
     bag: '待产包包',
     weeks: '每周变化',
     story: '睡前故事',
@@ -96,6 +97,11 @@
     babyDay: 0,
     growthMetric: 'weight',
     trendMetric: 'sleep',
+    // 哄睡声音：放哪种、多久后停、音量，noiseOn 是正在放的 { until }
+    noiseKind: 'white',
+    noiseMinutes: 30,
+    noiseVolume: 0.6,
+    noiseOn: null,
     triedOpen: false,
     vaccinesDoneOpen: false,
     examsDoneOpen: false,

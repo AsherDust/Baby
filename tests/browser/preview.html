@@ -33,6 +33,8 @@ document.querySelector('iframe').addEventListener('load', (e) => {
     for (const [k, v] of Object.entries(props)) Object.defineProperty(fw.navigator, k, { value: v, configurable: true });
     fw.dispatchEvent(new fw.StorageEvent('storage', { key: 'pregnancy-desk:v1' }));
   }
+  // mute=1：假装声音放得出来（无头浏览器不让自动放声音），截哄睡声音正在放的样子
+  if (p.get('mute')) fw.HTMLMediaElement.prototype.play = () => Promise.resolve();
   if (p.get('hour')) {
     const [y, m, day] = today.split('-').map(Number);
     const at = new Date(y, m - 1, day, Number(p.get('hour'))).getTime();

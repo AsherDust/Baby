@@ -1725,6 +1725,31 @@ test('儿保体检：产后访视和 42 天检查按天算，之后按月龄到�
   eq(b.exams.d42, undefined);
 });
 
+test('哄睡声音：四种都在 -1～1、最响 0.9，同一个种子一样；嘘嘘声一阵一阵；棕色最低沉；WAV 文件头', () => {
+  const Nz = globalThis.Baby.noise;
+  eq(Nz.KINDS.map((k) => k.id), ['white', 'pink', 'brown', 'shush']);
+  for (const k of Nz.KINDS) {
+    const s = Nz.samples(k.id, { seconds: 2 });
+    let peak = 0;
+    for (const v of s) peak = Math.max(peak, Math.abs(v));
+    ok(s.length === Nz.RATE * 2 && Math.abs(peak - 0.9) < 1e-6 && s.every((v) => v >= -1 && v <= 1), `${k.id} 的范围`);
+  }
+  eq(Array.from(Nz.samples('white', { seconds: 0.01 })), Array.from(Nz.samples('white', { seconds: 0.01 })), '同一个种子一样');
+  ok(Nz.samples('white', { seconds: 0.01, seed: 1 })[5] !== Nz.samples('white', { seconds: 0.01, seed: 2 })[5], '换个种子不一样');
+  const sh = Nz.samples('shush', { seconds: 2 });
+  const R = Nz.RATE;
+  const rms = (a, b) => { let t = 0; for (let i = a; i < b; i += 1) t += sh[i] ** 2; return Math.sqrt(t / (b - a)); };
+  ok(rms(Math.round(0.5 * R), Math.round(0.9 * R)) > 4 * rms(Math.round(1.5 * R), Math.round(1.9 * R)), '「嘘」的时候响，中间轻');
+  const rough = (s) => { let t = 0; for (let i = 1; i < s.length; i += 1) t += Math.abs(s[i] - s[i - 1]); return t / s.length; };
+  const [white, pink, brown] = ['white', 'pink', 'brown'].map((k) => rough(Nz.samples(k, { seconds: 1 })));
+  ok(brown < pink && pink < white, `棕色比粉红低沉、粉红比白噪音柔和 ${brown} ${pink} ${white}`);
+  const w = Nz.wav(new Float32Array([0, 0.5, -1, 2]), 22050);
+  const tag = (a, b) => String.fromCharCode(...w.slice(a, b));
+  const dv = new DataView(w.buffer);
+  eq([tag(0, 4), tag(8, 12), tag(36, 40), dv.getUint32(24, true), dv.getUint32(40, true), dv.getInt16(46, true), dv.getInt16(48, true), dv.getInt16(50, true), w.length],
+    ['RIFF', 'WAVE', 'data', 22050, 8, 16384, -32767, 32767, 52]);
+});
+
 test('吸奶和存奶：冷藏 2 天、冷冻 3 个月、解冻后 24 小时；快到期和过期；用掉记成一次母乳瓶喂', () => {
   const b = newborn('2026-09-01');
   const at = tAt('2026-10-12', '08:00');

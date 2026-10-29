@@ -67,6 +67,10 @@
       e.target.dataset.manual = '1';
       e.target.classList.remove('is-filled');
     }
+    if (e.target.id === 'noise-volume') {
+      app.setNoiseVolume(Number(e.target.value));
+      return;
+    }
     if (e.target.id === 'recipe-q') {
       ui.recipeQuery = e.target.value;
       document.getElementById('recipe-results').innerHTML = viewLibraryResults();

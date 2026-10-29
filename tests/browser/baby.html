@@ -215,6 +215,26 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await click(`#stash-drop-${frozen.id}`);
     log(!baby().stash.some((x) => x.id === frozen.id) && /倒掉了一袋 80 毫升/.test(toastText()), '倒掉一袋');
 
+    // ---- 哄睡声音 ----
+    let plays = 0;
+    w.HTMLMediaElement.prototype.play = function () { plays += 1; return Promise.resolve(); };
+    w.HTMLMediaElement.prototype.pause = function () {};
+    await nav('#/tools/noise');
+    log(text($('.page-title')) === '哄睡声音' && $$('.noise-kind').length === 4 && $('#noise-white[aria-pressed="true"]') && $('#noise-timer-30[aria-pressed="true"]') && /2 米/.test(text($('.fineprint'))), '哄睡声音：四种声音，默认白噪音、30 分钟，提醒放远一点');
+    await click('#noise-pink');
+    await click('#noise-timer-15');
+    blobs.length = 0;
+    await click('#noise-start');
+    const on = w.Baby.app.ui.noiseOn;
+    log(plays === 1 && on && on.until === fakeNow + 15 * 60000 && /正在放粉红噪音/.test(text($('.noise-now'))) && blobs[0] && blobs[0].type === 'audio/wav' && blobs[0].size === 44 + 4 * 22050 * 2, '放粉红噪音，15 分钟后停；声音是现场生成的 WAV', `${plays} ${blobs[0] && blobs[0].size}`);
+    await click('#noise-brown');
+    log(plays === 2 && w.Baby.app.ui.noiseOn.until === on.until && /正在放棕色噪音/.test(text($('.noise-now'))), '换成棕色噪音接着放，时间不重新算');
+    await nav('#/');
+    log(/棕色噪音 · 还剩/.test(text($('.live-bar'))), '在别的页面也挂着');
+    later(16);
+    await wait(1200);
+    log(!w.Baby.app.ui.noiseOn && /时间到了/.test(toastText()), '时间到了自动停', toastText());
+
     // ---- 成长档案 ----
     await nav('#/baby/growth');
     log($('#growth-chart svg') && $$('#growth-chart .c-pline').length === 5 && $$('#growth-chart circle').length === 1, '生长曲线：5 条百分位线和出生时的点');
@@ -320,7 +340,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await nav('#/checkups/schedule');
     log(text($('.tab[aria-current="page"]')) === '记录' && $('.seg-tab[aria-current="page"]').getAttribute('href') === '#/checkups/schedule', '产检页亮的是「记录」');
     await nav('#/tools');
-    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,weaning,papers,pelvic,report,story', '工具页收起数胎动、宫缩、待产包、每周变化');
+    log($$('.tool').map((t) => t.dataset.tool).join() === 'food,recipes,weaning,papers,pelvic,noise,report,story', '工具页收起数胎动、宫缩、待产包、每周变化');
     await nav('#/tools/pelvic');
     log(/剖宫产都可以轻轻地开始练/.test(text($('.fineprint'))) && /恶露干净后/.test(text($('.fineprint'))), '产后的盆底练习：顺产剖宫产都能开始，6 周后去做盆底评估');
 

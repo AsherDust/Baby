@@ -6,7 +6,7 @@
     root, SECTIONS, TABS, SUB_VIEWS, SUB_NAMES, subName, esc, kg, isStandalone, isIOS, ui, afterRender, greeting, viewWeights, viewMeds,
     viewMom, viewWeeks, viewBp, viewGlucose, viewUltrasounds, viewCheckups, viewToolMenu, viewKicksTool, viewContractionsTool,
     viewFoodTool, viewRecipesTool, paintClocks, viewBag, viewStoryTool, viewStoryCard, viewSafety, viewBanner, viewWeek, viewBaby,
-    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, drawTrend, viewWeaningTool, viewPapersTool, viewPelvicTool, viewReportTool
+    viewToday, viewJournalPage, viewBabyPage, viewBornCard, viewBabyBanner, viewBabyHero, babyLive, drawGrowth, drawTrend, viewWeaningTool, viewPapersTool, viewPelvicTool, viewReportTool, viewNoiseTool
   } = app;
   const Bb = globalThis.Baby.baby;
   const BOOK = globalThis.Baby.babyBook;
@@ -130,7 +130,7 @@
     if (contraction && route.sub !== 'contractions') {
       items.push(`<a class="live live-alert" href="#/tools/contractions">${A.icon.timer}<span>宫缩计时中 · <b data-since="${contraction.start}"></b></span>${A.icon.chevronRight}</a>`);
     }
-    items.push(...babyLive(route));
+    items.push(...babyLive(route), ...app.noiseLive(route));
     return items.length ? `<div class="live-bar">${items.join('')}</div>` : '';
   }
 
@@ -202,6 +202,7 @@
       papers: () => viewPapersTool(),
       pelvic: () => viewPelvicTool(),
       report: () => viewReportTool(),
+      noise: () => viewNoiseTool(),
       bag: () => viewBag(ga),
       weeks: () => viewWeeks(ga),
       story: () => viewStoryTool(now),

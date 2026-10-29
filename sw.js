@@ -1,7 +1,7 @@
 // 先走网络拿最新的，没网或网太慢时用上次缓存的，这样装到主屏幕后离线也能打开
 // 故事正文（data/stories/*.json）不预先下载，打开过一次的会照常存进缓存
 // 文件挪了位置或改了名字时把版本号加一，旧缓存会整个删掉；index.html 里加了文件也要加进这里，单元测试会查
-const CACHE = 'pregnancy-desk-v5';
+const CACHE = 'pregnancy-desk-v6';
 const FILES = [
   './',
   'index.html',
@@ -32,6 +32,7 @@ const FILES = [
   'js/core/storage.js',
   'js/core/calendar.js',
   'js/core/chart.js',
+  'js/core/noise.js',
   'js/app/art.js',
   'js/app/base.js',
   'js/app/records.js',
@@ -43,6 +44,7 @@ const FILES = [
   'js/app/today.js',
   'js/app/baby.js',
   'js/app/report.js',
+  'js/app/noise.js',
   'js/app/shell.js',
   'js/app/sheets.js',
   'js/app/services.js',
