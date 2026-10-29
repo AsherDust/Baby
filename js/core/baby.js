@@ -295,6 +295,27 @@
     return { left: e.left + (e.side === 'left' ? extra : 0), right: e.right + (e.side === 'right' ? extra : 0) };
   }
 
+  // 下次喂奶按最近 24 小时里两次喂奶的间隔估；隔了 5 小时以上的多半是夜里睡长觉，不算进来
+  const FEED_WINDOW = 24 * 3600000;
+  const FEED_GAP_MAX = 5 * 3600000;
+  const FEED_STALE = 8 * 3600000;
+
+  /**
+   * 大约什么时候会饿：{ at（到 5 分钟）, gap 间隔的中位数（分钟）, due 已经到点了 }；
+   * 正在亲喂、最近记得太少、上次喂已经过去 8 小时以上时是 null
+   */
+  function nextFeed(b, now) {
+    if (running(b, 'breast')) return null;
+    const starts = b.logs.filter((l) => (l.type === 'breast' || l.type === 'bottle') && l.start <= now && l.start > now - FEED_WINDOW).map((l) => l.start);
+    const gaps = starts.slice(1).map((t, i) => t - starts[i]).filter((g) => g > 0 && g <= FEED_GAP_MAX).sort((x, y) => x - y);
+    const last = starts[starts.length - 1];
+    if (gaps.length < 2 || now - last > FEED_STALE) return null;
+    const half = gaps.length >> 1;
+    const mid = gaps.length % 2 ? gaps[half] : (gaps[half - 1] + gaps[half]) / 2;
+    const at = Math.round((last + mid) / 300000) * 300000;
+    return { at, gap: Math.round(mid / 60000), due: at <= now };
+  }
+
   function startSleep(b, now) {
     return running(b, 'sleep') || insert(b, { id: newId('sl'), type: 'sleep', start: now, end: null, note: '' });
   }
@@ -773,6 +794,7 @@
     paperRows,
     nextPaper,
     togglePaper,
+    nextFeed,
     milestoneRows,
     addMoment,
     tempLevel,

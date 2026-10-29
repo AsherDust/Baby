@@ -18,6 +18,16 @@
   const ageNow = () => Bb.ageOf(kid().birthDate, ui.today);
   const sexName = (b) => (b.sex === 'boy' ? '男宝' : '女宝');
 
+  /** 按最近的间隔估一下下次喂奶；只是参考 */
+  function viewNextFeed(now) {
+    const n = Bb.nextFeed(kid(), now);
+    if (!n) return '';
+    return `
+      <p class="next-feed">${n.due ? '按最近的间隔，<b>差不多该饿了</b>' : `下次大约 <b>${hhmm(n.at)}</b>`}
+        <small>最近大约 ${minText(n.gap)}喂一次，饿了就喂</small>
+      </p>`;
+  }
+
   /** 45 分钟 / 1 小时 20 分 */
   function minText(min) {
     if (min < 60) return `${min} 分钟`;
@@ -192,7 +202,7 @@
           <button type="button" class="icon-btn" id="baby-next" data-action="baby-day" data-step="1" aria-label="后一天"${isToday ? ' disabled' : ''}>${A.icon.chevronRight}</button>
         </header>
         ${viewSummary(s)}
-        ${isToday && s.lastFeed ? `<p class="last-feed">上次喂奶：<b>${agoText(s.lastFeed, now)}</b></p>` : ''}
+        ${isToday && s.lastFeed ? `<p class="last-feed">上次喂奶：<b>${agoText(s.lastFeed, now)}</b></p>${viewNextFeed(now)}` : ''}
         ${isToday ? viewQuick() : ''}
       </article>
       <article class="card baby-tl" aria-label="${label}的记录">
@@ -643,7 +653,7 @@
         <article class="panel panel-baby-now">
           <p class="eyebrow">今天</p>
           ${viewSummary(s)}
-          ${s.lastFeed ? `<p class="last-feed">上次喂奶：<b>${agoText(s.lastFeed, now)}</b></p>` : ''}
+          ${s.lastFeed ? `<p class="last-feed">上次喂奶：<b>${agoText(s.lastFeed, now)}</b></p>${viewNextFeed(now)}` : ''}
           ${viewQuick()}
         </article>
         ${viewBabyTodo(now)}

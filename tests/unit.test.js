@@ -1705,6 +1705,24 @@ test('儿保体检：产后访视和 42 天检查按天算，之后按月龄到�
   eq(b.exams.d42, undefined);
 });
 
+test('下次喂奶：最近 24 小时里间隔的中位数，夜里睡长觉的不算；记得太少、正在亲喂、隔太久了都不估', () => {
+  const b = newborn('2026-10-01');
+  const bottle = (day, hm) => Bb.addLog(b, { type: 'bottle', start: tAt(day, hm), ml: 90, milk: 'formula', note: '' });
+  bottle('2026-10-12', '05:40');
+  bottle('2026-10-12', '09:00');
+  eq(Bb.nextFeed(b, tAt('2026-10-12', '10:00')), null, '只有一个间隔');
+  Bb.addLog(b, { type: 'breast', start: tAt('2026-10-12', '12:30'), end: tAt('2026-10-12', '12:45'), left: 450, right: 450, side: null, since: null, note: '' });
+  eq(Bb.nextFeed(b, tAt('2026-10-12', '13:00')), { at: tAt('2026-10-12', '15:55'), gap: 205, due: false });
+  eq(Bb.nextFeed(b, tAt('2026-10-12', '16:10')).due, true);
+  bottle('2026-10-12', '22:00');
+  eq(Bb.nextFeed(b, tAt('2026-10-12', '22:30')).at, tAt('2026-10-13', '01:25'), '9 个半小时的那次不算');
+  eq(Bb.nextFeed(b, tAt('2026-10-13', '07:30')), null, '8 小时以上没记，估不准');
+  Bb.addLog(b, { type: 'food', start: tAt('2026-10-12', '22:10'), text: '米粉', amount: '', recipe: '', note: '' });
+  eq(Bb.nextFeed(b, tAt('2026-10-12', '22:30')).at, tAt('2026-10-13', '01:25'), '辅食不算喂奶');
+  Bb.startBreast(b, 'left', tAt('2026-10-12', '23:00'));
+  eq(Bb.nextFeed(b, tAt('2026-10-12', '23:05')), null, '正在喂');
+});
+
 test('出生后要办的事：按上海的顺序，前面没办的先等着；少儿住院互助基金 2 个月内，育儿补贴第二年年底前', () => {
   const ids = BOOKB.papers.map((p) => p.id);
   eq(ids, ['cert', 'hukou', 'insure', 'fund', 'card', 'vax', 'subsidy', 'maternity']);

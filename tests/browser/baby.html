@@ -315,6 +315,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(baby().tried['香蕉'] === TODAY && $('#food-tried').open, '自己勾上吃过的食材，面板保持展开');
     await nav('#/');
     const expect = w.Baby.baby.foodToday(w.Baby.babyFood, w.Baby.babyBook, baby(), TODAY).map((r) => r.name);
+    log(/下次大约 21:25/.test(text($('.panel-baby-now .next-feed'))) && /最近大约 3 小时 55 分喂一次，饿了就喂/.test(text($('.next-feed'))), '按最近的间隔估下次喂奶：大约 21:25', text($('.panel-baby-now')));
     const chips = $$('.panel-today .meal-chip[data-action="baby-food-open"]');
     log(expect.length && chips.map(text).join() === expect.join() && chips.every((c) => c.querySelector('.dish-dot')), '首页「今天的辅食」是带小圆点的菜名', chips.map(text).join());
     await click(`#${chips[0].id}`);
