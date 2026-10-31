@@ -2419,6 +2419,69 @@ test('云同步：只传变了的文件，某个月的记录全删了就删掉�
   ok(Sy.hash('a') !== Sy.hash('b') && Sy.hash('蜜罐') === Sy.hash('蜜罐'), '指纹');
 });
 
+// 同步的总表（merge.js 的 SCHEMA）：一个字段一行，[路径, 怎么办]
+const schemaLeaves = (schema, prefix = '') => Object.entries(schema)
+  .flatMap(([k, p]) => (typeof p === 'object' ? schemaLeaves(p, `${prefix}${k}.`) : [[`${prefix}${k}`, p]]));
+const dataPaths = (v, schema, prefix = '') => Object.keys(v).flatMap((k) => (schema && typeof schema[k] === 'object' && v[k] && typeof v[k] === 'object'
+  ? dataPaths(v[k], schema[k], `${prefix}${k}.`) : [`${prefix}${k}`]));
+const setPath = (o, path, value) => {
+  const keys = path.split('.');
+  keys.slice(0, -1).reduce((x, k) => x[k], o)[keys[keys.length - 1]] = value;
+};
+
+test('同步的总表：数据里每个字段都写在表里，表里写的数据里都有', () => {
+  const s = viaFile(fullState());
+  const inData = dataPaths(s, Mg.SCHEMA).sort();
+  const inSchema = schemaLeaves(Mg.SCHEMA).map(([p]) => p).sort();
+  eq(inData.filter((p) => !inSchema.includes(p)), [], '数据里有、表里没写（新加的字段要在 SCHEMA 里写明同步不同步）');
+  eq(inSchema.filter((p) => !inData.includes(p)), [], '表里写了、数据里没有');
+});
+
+test('同步的总表：表里说要同步的，合并时都有合法；合法也都在表里', () => {
+  const leaves = schemaLeaves(Mg.SCHEMA);
+  const POLICIES = ['list', 'map', 'flat', 'field', 'max', 'meta', 'device'];
+  eq(leaves.filter(([, p]) => !POLICIES.includes(p)), [], '没见过的写法');
+  const by = (pred) => leaves.filter(([path, p]) => pred(path, p)).map(([path]) => path).sort();
+  const S = Mg.STRATEGIES;
+  eq(by((path, p) => p === 'list' && !path.includes('.')), [...S.list].sort(), '孕期的记录');
+  eq(by((path, p) => p === 'list' && path.startsWith('baby.')), [...S['baby.list']].sort(), '宝宝的记录');
+  eq(by((path, p) => p === 'map'), [...S['baby.map']].sort(), '宝宝的 { 编号: 值 }');
+  eq(by((path, p) => p === 'flat'), [...S.flat].sort(), '拍平了合的');
+  eq(by((path, p) => p === 'max'), [...S.max].sort(), '取多的');
+  eq([...new Set(by((path, p) => p === 'field').map((path) => path.split('.')[0]))].sort(), [...S.field].sort(), '按改的时间一项一项合的');
+});
+
+test('同步的总表：每台设备自己的东西一样都不上传，新手机恢复时都用初始值', () => {
+  const s = viaFile(fullState());
+  const device = schemaLeaves(Mg.SCHEMA).filter(([, p]) => p === 'device').map(([path]) => path);
+  ok(device.length >= 10, `只有 ${device.length} 项`);
+  device.forEach((path) => setPath(s, path, `私有-${path}`));
+  const parts = Sy.split(s);
+  eq(Object.values(parts).filter((t) => t.includes('私有-')).length, 0, '上传的文件里一样都没有');
+  const fresh = M.createState(s.profile, '2026-10-12');
+  const restored = Mg.withDevice(s, fresh);
+  eq(device.filter((path) => path.split('.').reduce((x, k) => x[k], restored) !== path.split('.').reduce((x, k) => x[k], fresh)), [], '恢复时都换成初始值');
+  schemaLeaves(Mg.SCHEMA).filter(([, p]) => p === 'field').forEach(([path]) => {
+    const t = viaFile(fullState());
+    setPath(t, path, `共用-${path}`);
+    ok(Sy.split(t)['main.json'].includes(`共用-${path}`), `${path} 要上传`);
+  });
+});
+
+test('合并：盆底肌每次憋几秒按后改的', () => {
+  const t0 = Date.now() - 60e3;
+  const base = viaFile(M.createState({ dueDate: DUE }));
+  const mine = viaFile(base);
+  const dad = viaFile(base);
+  Mg.track(mine, t0);
+  Mg.track(dad, t0);
+  dad.pelvic.hold = 8;
+  Mg.track(dad, t0 + 1000);
+  const r = Mg.merge(mine, viaFile(dad));
+  eq([r.state.pelvic.hold, statOf(r, '盆底肌每次憋几秒').updated], [8, 1]);
+  eq(Sy.changes(Sy.split(dad), { 'main.json': { hash: Sy.fingerprint('main.json', Sy.split(mine)['main.json']) } }).upload, ['main.json'], '改了要传');
+});
+
 test('云同步：每台设备自己的东西不上传，云端只有要同步的', () => {
   const s = viaFile(fullState());
   Object.assign(s.prefs, { glucoseAfter: 1, installHintHidden: true, lastBackup: '2026-10-01', storyCardHidden: '2026-10-11' });

@@ -30,42 +30,23 @@
    * 不然拉完云端以后总觉得「变了」，又传一次
    */
   function fingerprint(name, text) {
-    const Mg = Baby.merge;
     const raw = JSON.parse(text);
-    if (name === MAIN) {
-      raw.prefs = Mg.pickKeys(raw.prefs, Mg.SHARED_PREFS);
-      raw.stories = Mg.pickKeys(raw.stories, Mg.SHARED_STORIES);
-      delete raw.notified;
-    }
-    return hash(JSON.stringify(Mg.canon(raw)));
+    return hash(JSON.stringify(Baby.merge.canon(name === MAIN ? Baby.merge.shareable(raw) : raw)));
   }
 
   /** 新手机从云端恢复：每台设备自己的东西用这台的初始值（和新建记录时一样），只带共用的那几项（以前传上去的文件里可能还有别的） */
   function forThisDevice(remote, today) {
-    const Mg = Baby.merge;
-    const fresh = Baby.model.createState(remote.profile, today);
-    return Baby.model.normalize({
-      ...remote,
-      prefs: { ...fresh.prefs, ...Mg.pickKeys(remote.prefs, Mg.SHARED_PREFS) },
-      stories: { ...fresh.stories, ...Mg.pickKeys(remote.stories, Mg.SHARED_STORIES) },
-      notified: {},
-    });
+    return Baby.model.normalize(Baby.merge.withDevice(remote, Baby.model.createState(remote.profile, today)));
   }
 
   /**
-   * 拆成 { 文件名: 明文 }。每台设备自己的东西不上传：设置、睡前故事只留共用的几项，弹过的提醒不要。
-   * 拉下来时缺的这些由校验补成默认值，合并时本来就留本机的
+   * 拆成 { 文件名: 明文 }。只传要同步的（哪些要同步见 core/merge.js 的 SCHEMA）；
+   * 拉下来时缺的每台设备自己的东西由校验补成默认值，合并时本来就留本机的
    */
   function split(state) {
-    const Mg = Baby.merge;
     const logs = state.baby ? state.baby.logs : [];
-    const main = {
-      ...state,
-      prefs: Mg.pickKeys(state.prefs, Mg.SHARED_PREFS),
-      stories: Mg.pickKeys(state.stories, Mg.SHARED_STORIES),
-      ...(state.baby ? { baby: { ...state.baby, logs: [] } } : {}),
-    };
-    delete main.notified;
+    const main = Baby.merge.shareable(state);
+    if (main.baby) main.baby = { ...main.baby, logs: [] };
     const parts = { [MAIN]: JSON.stringify({ app: Baby.storage.APP, ...main }) };
     const months = {};
     for (const l of logs) (months[monthOf(l.start)] = months[monthOf(l.start)] || []).push(l);

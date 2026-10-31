@@ -14,6 +14,74 @@
 
   const byId = (x) => x.id;
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+  /**
+   * 每样数据在两台手机之间怎么办，只在这里定，别处都从这张表推出来：
+   *   list    一条条的记录，按编号合（下面 LISTS、BABY_LISTS 写编号怎么取）
+   *   map     { 编号: 值 }，按改的时间合（BABY_MAPS）
+   *   flat    藏在别的结构里的集合、对照表，拍平了按 map 合（FLAT）
+   *   field   单个值，按改的时间
+   *   max     每天的次数，取多的
+   *   meta    合并自己要用的：版本、删过的标记、改过的时间
+   *   device  每台设备自己的：不上传，合并时留本机的，新手机从云端恢复时用初始值
+   * 加了新字段要在这里写上，没写的不上传；单元测试会查有没有漏写、和下面的合法对不对得上
+   */
+  const SCHEMA = {
+    version: 'meta',
+    profile: { dueDate: 'field', preWeight: 'field', height: 'field', nickname: 'field' },
+    prefs: { glucoseAfter: 'field', since: 'device', lastBackup: 'device', backupNudged: 'device', installHintHidden: 'device', storyCardHidden: 'device', moodCareHidden: 'device' },
+    weights: 'list',
+    checkups: 'list',
+    bag: 'list',
+    meds: 'list',
+    kicks: 'list',
+    contractions: 'list',
+    bp: 'list',
+    glucose: 'list',
+    ultrasounds: 'list',
+    stories: { tonight: 'device', done: 'device', favorites: 'flat', blocked: 'flat', lang: 'device', rate: 'device', voices: 'device', big: 'device' },
+    journal: 'list',
+    meals: { days: 'flat', favorites: 'flat', avoid: 'flat', bought: 'flat' },
+    pelvic: { hold: 'field', days: 'max' },
+    baby: {
+      name: 'field', sex: 'field', birthDate: 'field', birthTime: 'field',
+      logs: 'list', growth: 'list', moments: 'list', extraVaccines: 'list', stash: 'list',
+      vaccines: 'map', exams: 'map', papers: 'map', milestones: 'map', teeth: 'map', tried: 'map', foodNotes: 'map',
+      removed: 'meta', edits: 'meta',
+    },
+    removed: 'meta',
+    edits: 'meta',
+    notified: 'device',
+  };
+  const pickKeys = (o, keys) => Object.fromEntries(keys.map((k) => [k, (o || {})[k]]));
+  const fieldsOf = (group) => Object.keys(SCHEMA[group]).filter((k) => SCHEMA[group][k] === 'field');
+
+  /** 去掉每台设备自己的东西和表里没写的，剩下的才上传、才算「变没变」 */
+  function shareable(state) {
+    const walk = (v, schema) => {
+      const out = {};
+      for (const [k, policy] of Object.entries(schema)) {
+        if (policy === 'device' || !has(v, k)) continue;
+        out[k] = typeof policy === 'object' && v[k] && typeof v[k] === 'object' ? walk(v[k], policy) : v[k];
+      }
+      return out;
+    };
+    return walk(state, SCHEMA);
+  }
+
+  /** 每台设备自己的东西换成 fresh 里的（新手机从云端恢复时用这台的初始值） */
+  function withDevice(state, fresh) {
+    const walk = (v, f, schema) => {
+      const out = { ...v };
+      for (const [k, policy] of Object.entries(schema)) {
+        if (policy === 'device') out[k] = f[k];
+        else if (typeof policy === 'object' && out[k] && f[k]) out[k] = walk(out[k], f[k], policy);
+      }
+      return out;
+    };
+    return walk(state, fresh, SCHEMA);
+  }
+
   // 每样记录放在哪、编号怎么取、合并时叫什么；记「改过」、记「删过」、合并都按这张表
   const LISTS = [
     ['weight', 'weights', '体重', (w) => w.date],
@@ -43,14 +111,10 @@
     ['tried', 'tried', '吃过的食材'],
     ['food', 'foodNotes', '辅食的标记'],
   ];
-  const profileOf = (p) => ({ dueDate: p.dueDate, preWeight: p.preWeight, height: p.height, nickname: p.nickname });
-  const birthOf = (b) => ({ name: b.name, sex: b.sex, birthDate: b.birthDate, birthTime: b.birthTime });
-  // 设置、睡前故事里两台手机共用的几项；其余的设置、弹过的提醒、故事读到哪是每台设备自己的：
-  // 合并时留本机的，判断要不要上传时不算（core/sync.js），新手机从云端恢复时也不跟着拿
-  const SHARED_PREFS = ['glucoseAfter'];
-  const SHARED_STORIES = ['favorites', 'blocked'];
-  const pickKeys = (o, keys) => Object.fromEntries(keys.map((k) => [k, (o || {})[k]]));
-  const sharedPrefs = (p) => pickKeys(p, SHARED_PREFS);
+  // 按改的时间一项一项合的单个值：顶层这几组共用一套「改过的时间」，宝宝的在宝宝那份里
+  const FIELD_GROUPS = ['profile', 'prefs', 'pelvic'];
+  const topFields = (s) => Object.assign({}, ...FIELD_GROUPS.map((g) => pickKeys(s[g], fieldsOf(g))));
+  const birthOf = (b) => pickKeys(b, fieldsOf('baby'));
 
   // 藏在别的结构里、两台手机要同步的几样：拍平成 { 编号: 值 }，记改过的时间、合并都和疫苗那些一样，
   // 去掉的也会跟着去掉（只取并集的话，一台取消了收藏，另一台合并回来又加上了）
@@ -59,6 +123,7 @@
   const splitKey = (k) => [k.slice(0, k.indexOf('/')), k.slice(k.indexOf('/') + 1)];
   const FLAT = [
     {
+      path: 'meals.days',
       tag: 'menu',
       label: '食谱里换过的菜',
       get: (s) => Object.fromEntries(Object.entries(s.meals.days).flatMap(([day, picks]) => Object.entries(picks).map(([slot, id]) => [`${day}/${slot}`, id]))),
@@ -71,6 +136,7 @@
       },
     },
     {
+      path: 'meals.bought',
       tag: 'bought',
       label: '买菜清单',
       get: (s) => setOf(Object.entries(s.meals.bought).flatMap(([day, names]) => names.map((n) => `${day}/${n}`))),
@@ -84,10 +150,10 @@
         for (const day of Object.keys(s.meals.bought)) s.meals.bought[day] = keepOrder(old[day] || [], setOf(s.meals.bought[day]));
       },
     },
-    { tag: 'fav', label: '收藏的菜', get: (s) => setOf(s.meals.favorites), put: (s, m) => { s.meals.favorites = keepOrder(s.meals.favorites, m); } },
-    { tag: 'avoid', label: '忌口', get: (s) => setOf(s.meals.avoid), put: (s, m) => { s.meals.avoid = keepOrder(s.meals.avoid, m); } },
-    { tag: 'story-fav', label: '收藏的故事', get: (s) => setOf(s.stories.favorites), put: (s, m) => { s.stories.favorites = keepOrder(s.stories.favorites, m); } },
-    { tag: 'story-block', label: '不想听的故事', get: (s) => setOf(s.stories.blocked), put: (s, m) => { s.stories.blocked = keepOrder(s.stories.blocked, m); } },
+    { path: 'meals.favorites', tag: 'fav', label: '收藏的菜', get: (s) => setOf(s.meals.favorites), put: (s, m) => { s.meals.favorites = keepOrder(s.meals.favorites, m); } },
+    { path: 'meals.avoid', tag: 'avoid', label: '忌口', get: (s) => setOf(s.meals.avoid), put: (s, m) => { s.meals.avoid = keepOrder(s.meals.avoid, m); } },
+    { path: 'stories.favorites', tag: 'story-fav', label: '收藏的故事', get: (s) => setOf(s.stories.favorites), put: (s, m) => { s.stories.favorites = keepOrder(s.stories.favorites, m); } },
+    { path: 'stories.blocked', tag: 'story-block', label: '不想听的故事', get: (s) => setOf(s.stories.blocked), put: (s, m) => { s.stories.blocked = keepOrder(s.stories.blocked, m); } },
   ];
 
   // 同一条记录刚记下时和存过一遍再读出来，字段的顺序、空着的字段可能不一样，指纹不能跟着变
@@ -169,7 +235,7 @@
     return out;
   }
   function topShape(s) {
-    const out = shapeOf(s, LISTS, [], { ...profileOf(s.profile), ...sharedPrefs(s.prefs) });
+    const out = shapeOf(s, LISTS, [], topFields(s));
     for (const f of FLAT) out[f.tag] = { full: true, each: new Map(Object.entries(f.get(s)).map(([k, v]) => [k, JSON.stringify(v)])) };
     return out;
   }
@@ -362,12 +428,14 @@
     const ctx = { stats: [], notes: [], removed: { mine: out.removed, other: theirs.removed }, edits: { mine: out.edits, other: theirs.edits } };
 
     const due = out.profile.dueDate !== theirs.profile.dueDate;
-    const taken = fields(out.profile, theirs.profile, Object.keys(profileOf(out.profile)), ['preWeight', 'height', 'nickname'], ctx);
+    const taken = fields(out.profile, theirs.profile, fieldsOf('profile'), ['preWeight', 'height', 'nickname'], ctx);
     tally(ctx.stats, '预产期和资料', { ...counts(), updated: taken.length }, '项');
     if (due) ctx.notes.push(`两边的预产期不一样，用的是${taken.includes('dueDate') ? '对方后来改的' : '这台手机上的'}`);
 
-    const prefs = fields(out.prefs, theirs.prefs, Object.keys(sharedPrefs(out.prefs)), [], ctx);
+    const prefs = fields(out.prefs, theirs.prefs, fieldsOf('prefs'), [], ctx);
     tally(ctx.stats, '餐后测血糖的时间', { ...counts(), updated: prefs.length }, '项');
+    const hold = fields(out.pelvic, theirs.pelvic, fieldsOf('pelvic'), [], ctx);
+    tally(ctx.stats, '盆底肌每次憋几秒', { ...counts(), updated: hold.length }, '项');
 
     for (const [tag, field, label, key = byId] of LISTS) out[field] = list(out[field], theirs[field], tag, label, key, ctx, FILLS[tag]);
 
@@ -400,5 +468,15 @@
     };
   }
 
-  Baby.merge = { SHARED_PREFS, SHARED_STORIES, pickKeys, canon, sign, drop, clean, cleanEdits, track, merge };
+  // 给单元测试查表和合法对不对得上
+  const STRATEGIES = {
+    list: LISTS.map((x) => x[1]),
+    'baby.list': BABY_LISTS.map((x) => `baby.${x[1]}`),
+    'baby.map': BABY_MAPS.map((x) => `baby.${x[1]}`),
+    flat: FLAT.map((f) => f.path),
+    max: ['pelvic.days'],
+    field: [...FIELD_GROUPS, 'baby'],
+  };
+
+  Baby.merge = { SCHEMA, STRATEGIES, shareable, withDevice, canon, sign, drop, clean, cleanEdits, track, merge };
 })();
