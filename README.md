@@ -60,7 +60,7 @@ sh tests/browser/run.sh   # page tests in headless Chrome
 sh tests/browser/shot.sh today 390x844 's=main&w=390' 2   # screenshot to /tmp/baby-shots/today.png
 ```
 
-When adding a script or stylesheet, list it in both `index.html` and `FILES` in `sw.js`; the unit tests fail if the two drift apart. When adding a field to the saved data, say how it syncs in `SCHEMA` in `js/core/merge.js` (merged entry by entry, by edit time, or kept on this device only). Fields not listed there are never uploaded, and the unit tests fail if a field is missing from the table or the table promises a merge that is not implemented. After moving or renaming files, bump `CACHE` in `sw.js` so old caches are dropped.
+When adding a script or stylesheet, list it in both `index.html` and `FILES` in `sw.js`; the unit tests fail if the two drift apart. When adding a field to the saved data, say how it syncs in `SCHEMA` in `js/core/merge.js` (merged entry by entry, by edit time, or kept on this device only). Fields not listed there are still uploaded and restored, but two phones cannot merge them, so the unit tests fail if a field is missing from the table or the table promises a merge that is not implemented. After moving or renaming files, bump `CACHE` in `sw.js` so old caches are dropped.
 
 ## Content
 

@@ -2468,6 +2468,17 @@ test('同步的总表：每台设备自己的东西一样都不上传，新手�
   });
 });
 
+test('同步的总表：表里没写的字段照样上传，新手机恢复时也带着', () => {
+  const s = viaFile(fullState());
+  s.newThing = { a: 1 };
+  s.prefs.newPref = '新设置';
+  s.baby.newBabyThing = 'x';
+  const main = JSON.parse(Sy.split(s)['main.json']);
+  eq([main.newThing, main.prefs.newPref, main.baby.newBabyThing, 'installHintHidden' in main.prefs], [{ a: 1 }, '新设置', 'x', false]);
+  const restored = Mg.withDevice(s, M.createState(s.profile, '2026-10-12'));
+  eq([restored.newThing, restored.prefs.newPref], [{ a: 1 }, '新设置']);
+});
+
 test('合并：盆底肌每次憋几秒按后改的', () => {
   const t0 = Date.now() - 60e3;
   const base = viaFile(M.createState({ dueDate: DUE }));

@@ -24,7 +24,8 @@
    *   max     每天的次数，取多的
    *   meta    合并自己要用的：版本、删过的标记、改过的时间
    *   device  每台设备自己的：不上传，合并时留本机的，新手机从云端恢复时用初始值
-   * 加了新字段要在这里写上，没写的不上传；单元测试会查有没有漏写、和下面的合法对不对得上
+   * 加了新字段要在这里写上。没写的照样上传、新手机恢复时也带着，只是两台手机合并时不知道怎么合，留本机的；
+   * 单元测试会查有没有漏写、和下面的合法对不对得上
    */
   const SCHEMA = {
     version: 'meta',
@@ -56,13 +57,14 @@
   const pickKeys = (o, keys) => Object.fromEntries(keys.map((k) => [k, (o || {})[k]]));
   const fieldsOf = (group) => Object.keys(SCHEMA[group]).filter((k) => SCHEMA[group][k] === 'field');
 
-  /** 去掉每台设备自己的东西和表里没写的，剩下的才上传、才算「变没变」 */
+  /** 去掉每台设备自己的东西，剩下的才上传、才算「变没变」；表里没写的照样上传 */
   function shareable(state) {
     const walk = (v, schema) => {
       const out = {};
-      for (const [k, policy] of Object.entries(schema)) {
-        if (policy === 'device' || !has(v, k)) continue;
-        out[k] = typeof policy === 'object' && v[k] && typeof v[k] === 'object' ? walk(v[k], policy) : v[k];
+      for (const k of Object.keys(v)) {
+        const policy = schema[k];
+        if (policy === 'device') continue;
+        out[k] = policy && typeof policy === 'object' && v[k] && typeof v[k] === 'object' ? walk(v[k], policy) : v[k];
       }
       return out;
     };
