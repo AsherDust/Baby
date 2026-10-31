@@ -568,6 +568,14 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
         d.getElementById('g-weight').value = '8.1';
         await send($('form[data-form="baby-growth"]'));
       }],
+      ['同一天再记一次身长体重（换掉早上那条）', async () => {
+        d.getElementById('g-weight').value = '8.3';
+        await send($('form[data-form="baby-growth"]'));
+      }, async () => {
+        await nav('#/baby/growth');
+        d.getElementById('g-weight').value = '8.1';
+        await send($('form[data-form="baby-growth"]'));
+      }],
       ['记下会爬', async () => {
         await click('#ms-crawl');
         await send(inSheet('form[data-form="milestone"]'));

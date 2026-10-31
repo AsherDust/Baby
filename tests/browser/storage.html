@@ -59,6 +59,25 @@ const deleteMonth = async (m) => {
   q.onerror = () => { done = true; };
   await pump(() => done);
 };
+// 像别的标签页那样把一个月写进 IndexedDB，再在目录里记上新的指纹
+const putMonth = async (m, list) => {
+  const json = JSON.stringify(list);
+  let done = false;
+  const q = indexedDB.open('honey-pot', 1);
+  q.onsuccess = () => {
+    const tx = q.result.transaction('months', 'readwrite');
+    tx.objectStore('months').put(json, m);
+    tx.oncomplete = () => {
+      q.result.close();
+      done = true;
+    };
+  };
+  q.onerror = () => { done = true; };
+  await pump(() => done);
+  const index = JSON.parse(localStorage.getItem(MONTHS));
+  index[m] = `${json.length}:${Baby.util.hash(json)}`;
+  localStorage.setItem(MONTHS, JSON.stringify(index));
+};
 const bumpVersion = async () => {
   let done = false;
   const q = indexedDB.open('honey-pot', 2);
@@ -156,6 +175,12 @@ function seed() {
     await pump(() => a.Baby.storage.writing() === 0 && !localStorage.getItem(PENDING));
     await wait(50);
     log(typeof b.Baby.app.ui.undo === 'function', '暂存挪进 IndexedDB 时，那个标签页不用重读，撤销还能点');
+    const sep = a.Baby.app.state.baby.logs.filter((l) => monthOf(l.start) === '2026-09');
+    const other = { id: 'di-other', type: 'diaper', start: sep[0].start + 3600000, note: '', pee: true, poo: false, color: '' };
+    await putMonth('2026-09', [...sep, other].sort((x, y) => x.start - y.start));
+    await pump(() => b.Baby.app.state.baby.logs.some((l) => l.id === 'di-other') && a.Baby.app.state.baby.logs.some((l) => l.id === 'di-other'));
+    log(b.Baby.app.state.baby.logs.some((l) => l.id === 'di-other') && a.Baby.app.state.baby.logs.some((l) => l.id === 'di-other'),
+      '别的标签页写进 IndexedDB 的九月，这边不认得：取回来再换上');
     await close(tabB);
 
     // ---- 删光一个月：目录和 IndexedDB 里那个月都去掉 ----
