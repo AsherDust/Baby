@@ -443,9 +443,8 @@
     },
 
     'clear-contractions'() {
-      const before = app.state.contractions;
-      if (!before.length) return;
-      app.state.contractions = [];
+      if (!app.state.contractions.length) return;
+      const before = M.clearContractions(app.state);
       persist();
       render();
       toast('宫缩记录清空了', () => { app.state.contractions = before; });

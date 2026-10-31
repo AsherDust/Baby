@@ -193,10 +193,13 @@
   }
 
   /** 记下删掉了哪条 */
-  function drop(store, key, item) {
-    store[key] = { on: D.today(), sig: sign(item) };
+  function drop(store, key, item, now = Date.now()) {
+    store[key] = { on: D.today(), at: now, sig: sign(item) };
     cap(store, KEEP_REMOVED, (v) => v.on);
   }
+
+  // 删的时间；以前的标记只记了哪天，按那天一早算（撤销、重记在同一天的话，算后来的）
+  const removedAt = (t) => (Number.isFinite(t.at) ? t.at : new Date(`${t.on}T00:00:00`).getTime());
 
   /** 读存储和备份时清理删过的标记：格式不对的、半年以前的不要 */
   function clean(raw, today = D.today()) {
@@ -204,7 +207,9 @@
     if (!raw || typeof raw !== 'object') return out;
     const since = D.addDays(today, -KEEP_DAYS);
     for (const [k, v] of Object.entries(raw)) {
-      if (k.length <= 80 && v && D.isISODate(v.on) && v.on >= since && /^[0-9a-f]{8}$/.test(v.sig)) out[k] = { on: v.on, sig: v.sig };
+      if (k.length <= 80 && v && D.isISODate(v.on) && v.on >= since && /^[0-9a-f]{8}$/.test(v.sig)) {
+        out[k] = { on: v.on, sig: v.sig, ...(Number.isFinite(v.at) ? { at: v.at } : {}) };
+      }
     }
     return out;
   }
@@ -256,12 +261,15 @@
     cap(store, KEEP_EDITS, (v) => v);
   }
 
-  // 删过的标记只留真的不在了的：撤销删除以后这条又在了，标记就去掉。云同步不下载没变的文件，靠的就是这一点
-  function clearStale(removed, shape) {
+  // 删过的标记只留真的不在了的：撤销删除、原样重记以后这条又在了，标记去掉，再记下这会儿算改过——
+  // 另一台手机上还有删的时候留的标记，比这个时间早，就不会把它又删掉。云同步不下载没变的文件，也靠这一点
+  function clearStale(removed, shape, edits, now) {
     for (const k of Object.keys(removed)) {
       const cut = k.indexOf(':');
       const group = shape[k.slice(0, cut)];
-      if (group && group.each.has(k.slice(cut + 1))) delete removed[k];
+      if (!group || !group.each.has(k.slice(cut + 1))) continue;
+      delete removed[k];
+      edits[k] = Math.max(edits[k] || 0, now);
     }
   }
 
@@ -273,8 +281,8 @@
     const b = state.baby;
     const baby = b ? babyShape(b) : null;
     seen.set(state, { top, baby, b });
-    clearStale(state.removed, top);
-    if (b) clearStale(b.removed, baby);
+    clearStale(state.removed, top, state.edits, now);
+    if (b) clearStale(b.removed, baby, b.edits, now);
     if (!prev) return;
     stamp(state.edits, prev.top, top, now);
     if (b) stamp(b.edits, prev.b === b ? prev.baby : {}, baby, now);
@@ -284,7 +292,7 @@
 
   function union(a, b) {
     const out = { ...a };
-    for (const [k, v] of Object.entries(b)) if (!out[k] || out[k].on < v.on) out[k] = v;
+    for (const [k, v] of Object.entries(b)) if (!out[k] || removedAt(out[k]) < removedAt(v)) out[k] = v;
     return out;
   }
 
@@ -300,14 +308,24 @@
   };
   const counts = () => ({ added: 0, updated: 0, dropped: 0, kept: 0 });
 
-  /** 两边都有、内容不一样：后改的那边算；都没记时间就交给 fill 补空着的，其余以这台为准。返回要不要换成对方的 */
+  // 云同步时分不出先后的：两台按同一个规则选（比内容），不然各留各的，每次同步都来回提交
+  const firstOf = (a, b) => JSON.stringify(canon(b)) < JSON.stringify(canon(a));
+
+  /**
+   * 两边都有、内容不一样：后改的那边算；分不出先后时，云同步两台选同一个，
+   * 合并家人的文件交给 fill 补空着的、其余以这台为准。返回要不要换成对方的
+   */
   function pick(a, b, id, ctx, n, fill) {
     if (same(a, b)) return false;
     const mine = ctx.edits.mine[id] || 0;
     const theirs = ctx.edits.other[id] || 0;
-    if (theirs > mine) {
+    if (theirs > mine || (theirs === mine && ctx.converge && firstOf(a, b))) {
       n.updated += 1;
       return true;
+    }
+    if (theirs === mine && ctx.converge) {
+      n.kept += 1;
+      return false;
     }
     if (!mine && fill) fill(a, b);
     if (!same(a, b)) n.kept += 1;
@@ -322,8 +340,9 @@
     const n = counts();
     const otherKeys = new Set(other.map(key));
     const out = mine.filter((x) => {
-      const t = ctx.removed.other[`${tag}:${key(x)}`];
-      if (t && !otherKeys.has(key(x)) && t.sig === sign(x)) {
+      const id = `${tag}:${key(x)}`;
+      const t = ctx.removed.other[id];
+      if (t && !otherKeys.has(key(x)) && t.sig === sign(x) && removedAt(t) > (ctx.edits.mine[id] || 0)) {
         n.dropped += 1;
         return false;
       }
@@ -338,7 +357,7 @@
         continue;
       }
       const t = ctx.removed.mine[id];
-      if (t && t.sig === sign(x)) continue;
+      if (t && t.sig === sign(x) && removedAt(t) > (ctx.edits.other[id] || 0)) continue;
       at.set(k, out.length);
       out.push(x);
       n.added += 1;
@@ -369,17 +388,20 @@
   }
 
   /**
-   * 预产期、宝宝的名字这些一项一项比：后改的那边算；都没记时间的，这边空着就用那边的。
-   * 返回换成对方的有哪几项
+   * 预产期、宝宝的名字这些一项一项比：后改的那边算。分不出先后的，这边空着就用那边的；
+   * 云同步时两边都填了、又不一样，两台选同一个。返回换成对方的有哪几项
    */
   function fields(a, b, names, fillable, ctx) {
     const taken = [];
+    const blank = (v) => v == null || v === '';
     for (const f of names) {
       if (same(a[f], b[f])) continue;
       const mine = ctx.edits.mine[`info:${f}`] || 0;
       const theirs = ctx.edits.other[`info:${f}`] || 0;
-      const blank = (v) => v == null || v === '';
-      if (theirs > mine || (!mine && !theirs && blank(a[f]) && !blank(b[f]) && fillable.includes(f))) {
+      const tie = mine === theirs;
+      const fill = tie && blank(a[f]) && !blank(b[f]) && (ctx.converge || fillable.includes(f));
+      const settle = tie && ctx.converge && !blank(a[f]) && !blank(b[f]) && firstOf(a[f], b[f]);
+      if (theirs > mine || fill || settle) {
         a[f] = b[f];
         taken.push(f);
       }
@@ -420,14 +442,20 @@
     a.edits = unionEdits(a.edits, b.edits);
   }
 
+  // 宝宝最近一次改动的时间（出生信息、每条记录改过的、撤销清除）：和另一台「清除宝宝」的时间比
+  const babyTime = (s) => Math.max(s.edits['baby:restored'] || 0, ...Object.values(s.baby.edits), 0);
+
   /**
-   * 把 other（另一台手机导出的，已经校验过）合进 mine，不改 mine：
+   * 把 other（另一台手机导出的，已经校验过）合进 mine，不改 mine。
+   * converge：云同步用，分不出先后的两台选同一个，免得来回提交；合并家人的文件时分不出先后以这台为准。
    * 返回 { state 合好的, stats [{ label, unit, added, updated, dropped, kept }], notes 要说一声的, added, updated, dropped, kept }
    */
-  function merge(mine, other) {
+  function merge(mine, other, { converge = false } = {}) {
     const out = JSON.parse(JSON.stringify(mine));
     const theirs = JSON.parse(JSON.stringify(other));
-    const ctx = { stats: [], notes: [], removed: { mine: out.removed, other: theirs.removed }, edits: { mine: out.edits, other: theirs.edits } };
+    const ctx = {
+      converge, stats: [], notes: [], removed: { mine: out.removed, other: theirs.removed }, edits: { mine: out.edits, other: theirs.edits },
+    };
 
     const due = out.profile.dueDate !== theirs.profile.dueDate;
     const taken = fields(out.profile, theirs.profile, fieldsOf('profile'), ['preWeight', 'height', 'nickname'], ctx);
@@ -448,10 +476,15 @@
     }
     for (const [day, k] of Object.entries(theirs.pelvic.days)) if ((out.pelvic.days[day] || 0) < k) out.pelvic.days[day] = k;
 
-    if (!out.baby && theirs.baby) {
+    // 一边清除了宝宝信息：另一边的宝宝是清除以前就有的，跟着清掉；清除以后又改过、撤销过的，留着
+    const cleared = out.edits['baby:cleared'] || 0;
+    if (!out.baby && theirs.baby && (!cleared || cleared < babyTime(theirs))) {
       out.baby = theirs.baby;
       tally(ctx.stats, '宝宝的出生信息', { ...counts(), added: 1 });
       tally(ctx.stats, '宝宝的日常记录', { ...counts(), added: theirs.baby.logs.length });
+    } else if (out.baby && !theirs.baby && (theirs.edits['baby:cleared'] || 0) > babyTime(out)) {
+      out.baby = null;
+      tally(ctx.stats, '宝宝的信息和记录', { ...counts(), dropped: 1 }, '份');
     } else if (out.baby && theirs.baby) {
       mergeBaby(out.baby, theirs.baby, ctx);
     }

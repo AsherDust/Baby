@@ -176,6 +176,19 @@ iframe.onload = async () => {
     await new Promise((r) => { iframe.onload = r; w.location.reload(); });
     bind();
     log($$('.wl-row').length === 2 && $('.seg-tab[aria-current="page"]').textContent === '体重', '刷新后停在原来的页面，数据都还在');
+    // 过了午夜：没动过的日期框跟着新的一天，自己改过的留着
+    const appUi = w.Baby.app.ui;
+    const realToday = appUi.today;
+    appUi.today = '2026-10-13';
+    w.Baby.app.render();
+    log($('#w-date').value === '2026-10-13' && $('#w-date').max === '2026-10-13', '过了午夜，没动过的日期框换成新的一天', $('#w-date').value);
+    $('#w-date').value = '2026-10-11';
+    appUi.today = '2026-10-14';
+    w.Baby.app.render();
+    log($('#w-date').value === '2026-10-11', '自己改过的日期留着', $('#w-date').value);
+    appUi.today = realToday;
+    appUi.clearInputs.push('w-date');
+    w.Baby.app.render();
     await nav('#/');
     log(/^\s*23/.test($('.week-big').textContent) && /明天产检/.test($('.banner').textContent), '首页数据也都在');
 

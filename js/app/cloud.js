@@ -271,7 +271,7 @@
         render();
         return { restored: true };
       }
-      const r = Mg.merge(app.state, remote);
+      const r = Mg.merge(app.state, remote, { converge: true });
       if (JSON.stringify(r.state) === JSON.stringify(M.normalize(JSON.parse(JSON.stringify(app.state))))) return null;
       app.state = r.state;
       ui.undo = null;

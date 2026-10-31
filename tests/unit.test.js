@@ -2479,6 +2479,69 @@ test('同步的总表：表里没写的字段照样上传，新手机恢复时�
   eq([restored.newThing, restored.prefs.newPref], [{ a: 1 }, '新设置']);
 });
 
+test('合并：删了已经同步出去、再撤销，不会被同步又删掉；删了又原样重记的也一样', () => {
+  const t0 = Date.now() - 60e3;
+  const base = viaFile(M.createState({ dueDate: DUE }));
+  const e = J.add(base, { mood: 'calm', text: '一', date: '2026-10-10' }, '2026-10-12', Date.UTC(2026, 9, 10, 1));
+  M.upsertWeight(base, '2026-10-10', 56.2);
+  const mine = viaFile(base);
+  const dad = viaFile(base);
+  Mg.track(mine, t0);
+  Mg.track(dad, t0);
+  const removed = J.remove(mine, e.id);
+  M.removeWeight(mine, '2026-10-10');
+  Mg.track(mine, Date.now());
+  const dad2 = Mg.merge(dad, viaFile(mine), { converge: true }).state;
+  eq([dad2.journal.length, dad2.weights.length], [0, 0], '爸爸那台跟着删了');
+  mine.journal.splice(removed.index, 0, removed.entry);
+  M.upsertWeight(mine, '2026-10-10', 56.2);
+  Mg.track(mine, Date.now() + 1000);
+  const r = Mg.merge(mine, viaFile(dad2), { converge: true });
+  eq([r.state.journal.map((x) => x.id), r.state.weights.length], [[e.id], 1], '这台撤销的、重记的都还在');
+  const back = Mg.merge(viaFile(dad2), viaFile(r.state), { converge: true });
+  eq([back.state.journal.map((x) => x.id), back.state.weights.length], [[e.id], 1], '爸爸那台也拿回来了');
+});
+
+test('云同步：分不出先后的冲突，两台选同一个，不再来回提交；合并家人的文件还是以这台为准', () => {
+  const a = viaFile(M.createState({ dueDate: '2027-01-29' }));
+  const b = viaFile(M.createState({ dueDate: '2027-02-02' }));
+  J.add(a, { mood: 'calm', text: '妈妈写的', date: '2026-10-10' }, '2026-10-12', Date.UTC(2026, 9, 10, 1));
+  b.journal = [{ ...a.journal[0], text: '同一条，爸爸那边的字不一样' }];
+  const ab = Mg.merge(a, viaFile(b), { converge: true }).state;
+  const ba = Mg.merge(b, viaFile(a), { converge: true }).state;
+  eq([ab.profile.dueDate, ab.journal[0].text], [ba.profile.dueDate, ba.journal[0].text], '两台选的一样');
+  eq(Sy.fingerprint('main.json', Sy.split(ab)['main.json']), Sy.fingerprint('main.json', Sy.split(ba)['main.json']), '两台的文件一样，不会再传');
+  eq([Mg.merge(a, viaFile(b)).state.profile.dueDate, Mg.merge(b, viaFile(a)).state.profile.dueDate], ['2027-01-29', '2027-02-02'], '合并家人的文件：以这台为准');
+});
+
+test('合并：清空宫缩、清除宝宝信息，同步后不会被带回来；撤销了的也不会被再清掉', () => {
+  const t0 = Date.now() - 60e3;
+  const base = viaFile(fullState());
+  const mine = viaFile(base);
+  const dad = viaFile(base);
+  Mg.track(mine, t0);
+  Mg.track(dad, t0);
+  ok(mine.contractions.length > 0 && mine.baby, '先有宫缩和宝宝');
+  M.clearContractions(mine);
+  const baby = M.clearBaby(mine, Date.now());
+  Mg.track(mine, Date.now());
+  const r = Mg.merge(mine, viaFile(dad), { converge: true });
+  eq([r.state.contractions.length, r.state.baby], [0, null], '爸爸那台的不会把它们带回来');
+  const d = Mg.merge(viaFile(dad), viaFile(r.state), { converge: true });
+  eq([d.state.contractions.length, d.state.baby, statOf(d, '宝宝的信息和记录').dropped], [0, null, 1], '爸爸那台跟着清掉');
+  M.restoreBaby(mine, baby, Date.now() + 1000);
+  const r2 = Mg.merge(mine, viaFile(d.state), { converge: true });
+  ok(r2.state.baby && r2.state.baby.logs.length === baby.logs.length, '撤销清除以后，不会被同步再清掉');
+  ok(Mg.merge(viaFile(d.state), viaFile(r2.state), { converge: true }).state.baby, '爸爸那台也拿回来');
+});
+
+test('存奶：超过 200 袋时留最新的', () => {
+  const b = newborn();
+  for (let i = 0; i < 230; i += 1) b.stash.push({ id: `st-${i.toString(36)}x`, ml: 100, at: Date.UTC(2026, 6, 1) + i * 3600e3, place: 'freezer', thawedAt: null });
+  const n = Bb.normalize(JSON.parse(JSON.stringify(b)));
+  eq([n.stash.length, n.stash[0].id, n.stash[199].id], [200, `st-${(30).toString(36)}x`, `st-${(229).toString(36)}x`]);
+});
+
 test('合并：盆底肌每次憋几秒按后改的', () => {
   const t0 = Date.now() - 60e3;
   const base = viaFile(M.createState({ dueDate: DUE }));

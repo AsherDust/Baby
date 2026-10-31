@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   // 宝宝的按钮和面板：出生、喂奶睡觉尿布、补记和修改、身长体重、里程碑、疫苗、体温用药、辅食
-  const { dates: D, baby: Bb, babyBook: BOOK, babyFood: FOOD, calendar: Cal, art: A, app } = globalThis.Baby;
+  const { dates: D, model: M, baby: Bb, babyBook: BOOK, babyFood: FOOD, calendar: Cal, art: A, app } = globalThis.Baby;
   const {
     sheetDialog, settingsDialog, esc, ui, hhmm, render, showDialog, dialogHead, closeDialog, formError, toast, oops, say,
     cheer, persist, download, babyMinText, babyLogInfo, babyFoodDot
@@ -502,13 +502,12 @@
 
     'baby-clear'() {
       if (!window.confirm('清除宝宝信息会删掉宝宝的全部记录，回到孕期的样子，确定吗？建议先导出备份。')) return;
-      const before = app.state.baby;
-      app.state.baby = null;
+      const before = M.clearBaby(app.state);
       persist();
       closeDialog(sheetDialog);
       location.hash = '#/';
       render();
-      toast('宝宝的信息清掉了', () => { app.state.baby = before; });
+      toast('宝宝的信息清掉了', () => M.restoreBaby(app.state, before));
     },
 
     'baby-breast'(el) {

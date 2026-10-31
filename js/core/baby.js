@@ -260,7 +260,11 @@
       }
       return out;
     };
-    const list = (items, fix) => (Array.isArray(items) ? items.map(fix).filter(Boolean).slice(0, LIST_MAX) : []);
+    // 太多时留最新的（先排好再截）
+    const list = (items, fix, order = null) => {
+      const out = Array.isArray(items) ? items.map(fix).filter(Boolean) : [];
+      return (order ? out.sort(order) : out).slice(-LIST_MAX);
+    };
     return {
       name: text(raw.name, NAME_MAX),
       sex: SEXES.some((s) => s.id === raw.sex) ? raw.sex : 'boy',
@@ -282,7 +286,7 @@
         const ml = m ? Math.round(toNumber(m.ml)) : 0;
         if (!m || !isId(m.id) || !isTime(m.at) || !STASH_PLACES.some((p) => p.id === m.place) || !(ml >= STASH_ML[0] && ml <= STASH_ML[1])) return null;
         return { id: m.id, ml, at: m.at, place: m.place, thawedAt: m.place === 'freezer' && isTime(m.thawedAt) ? m.thawedAt : null };
-      }).sort((x, y) => x.at - y.at),
+      }, (x, y) => x.at - y.at),
       removed: Baby.merge.clean(raw.removed),
       edits: Baby.merge.cleanEdits(raw.edits),
     };

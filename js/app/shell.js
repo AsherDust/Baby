@@ -14,10 +14,11 @@
   // ---------- 渲染 ----------
 
   function render() {
-    // 整块重绘会丢掉输入框里没提交的内容，这里先记下来再填回去
+    // 整块重绘会丢掉输入框里没提交的内容，这里先记下来再填回去。
+    // 只留改过的：没动过的日期、时间框跟着新的一天走，过了午夜不会还停在昨天
     const kept = {};
     root.querySelectorAll('[data-keep]').forEach((el) => {
-      if (el.id && !ui.clearInputs.includes(el.id)) kept[el.id] = el.value;
+      if (el.id && !ui.clearInputs.includes(el.id) && el.value !== el.defaultValue) kept[el.id] = el.value;
     });
     ui.clearInputs = [];
     const focusId = ui.focusNext || (root.contains(document.activeElement) ? document.activeElement.id : '');

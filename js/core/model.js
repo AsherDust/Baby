@@ -829,10 +829,33 @@
       running.end = Math.max(now, running.start);
       return { contraction: running, started: false };
     }
+    for (const old of state.contractions) if (old.start < now - CONTRACTION_KEEP) Mg.drop(state.removed, `contraction:${old.id}`, old);
     state.contractions = state.contractions.filter((c) => c.start >= now - CONTRACTION_KEEP);
     const c = { id: newId('q'), start: now, end: null };
     state.contractions.push(c);
     return { contraction: c, started: true };
+  }
+
+  /** 宫缩记录全部删掉，每条都留删过的标记（另一台同步时跟着删）；返回原来的，方便撤销 */
+  function clearContractions(state) {
+    const before = state.contractions;
+    for (const c of before) Mg.drop(state.removed, `contraction:${c.id}`, c);
+    state.contractions = [];
+    return before;
+  }
+
+  /** 清除宝宝信息：记下清除的时间，另一台同步时也清掉；返回原来的，方便撤销 */
+  function clearBaby(state, now = Date.now()) {
+    const before = state.baby;
+    state.baby = null;
+    state.edits['baby:cleared'] = now;
+    return before;
+  }
+
+  /** 撤销清除：记下这会儿，比清除晚，另一台同步时把宝宝的记录拿回去 */
+  function restoreBaby(state, baby, now = Date.now()) {
+    state.baby = baby;
+    state.edits['baby:restored'] = now;
   }
 
   function removeContraction(state, id) {
@@ -1286,6 +1309,9 @@
     activeContraction,
     keepScreenOn,
     toggleContraction,
+    clearContractions,
+    clearBaby,
+    restoreBaby,
     removeContraction,
     contractionRows,
     contractionStats,
