@@ -38,25 +38,31 @@ for name in "$@"; do
   slot=$(echo "$name" | tr ':' '-')
   out="$work/$slot.html"
   log="$work/$slot.log"
-  # 每次用全新的浏览器资料目录，本地存储和 Service Worker 都从空白开始
-  "$CHROME" --headless=new --use-mock-keychain --no-first-run --user-data-dir="$work/profile-$slot" $dark \
-    --enable-logging=stderr --v=0 --virtual-time-budget=30000 \
-    --dump-dom "http://127.0.0.1:$PORT/tests/browser/$page.html$query" >"$out" 2>"$log" &
-  chrome=$!
-  for _ in $(seq 1 40); do
-    sleep 1
-    grep -q '</html>' "$out" 2>/dev/null && break
+  # 偶尔一项都没跑就结束了（Chrome 没吐出结果，或者页面停在开头），换个资料目录再跑一次；跑了但没通过的不重跑
+  again=''
+  for try in 1 2; do
+    # 每次用全新的浏览器资料目录，本地存储和 Service Worker 都从空白开始
+    "$CHROME" --headless=new --use-mock-keychain --no-first-run --user-data-dir="$work/profile-$slot-$try" $dark \
+      --enable-logging=stderr --v=0 --virtual-time-budget=30000 \
+      --dump-dom "http://127.0.0.1:$PORT/tests/browser/$page.html$query" >"$out" 2>"$log" &
+    chrome=$!
+    for _ in $(seq 1 40); do
+      sleep 1
+      grep -q '</html>' "$out" 2>/dev/null && break
+    done
+    kill $chrome 2>/dev/null
+    pkill -f "$work/profile-$slot-$try" 2>/dev/null
+    grep -qE '>DONE|^(<[^>]*>)?(PASS|FAIL) ' "$out" && break
+    again='（第一次一项都没跑，又跑了一次）'
   done
-  kill $chrome 2>/dev/null
-  pkill -f "$work/profile-$slot" 2>/dev/null
   pass=$(grep -cE '^(<[^>]*>)?PASS ' "$out")
   fail=$(grep -cE '^(<[^>]*>)?FAIL ' "$out")
   crash=$(grep -E ':CONSOLE[^]]*\] "Uncaught' "$log" | sed -E 's/^[^"]*"(.*)", source: (.*)$/\1（\2）/' | awk '!seen[$0]++')
   if grep -q '>DONE' "$out" && [ "$fail" -eq 0 ] && [ -z "$crash" ]; then
-    echo "✓ ${name}：$pass 项通过"
+    echo "✓ ${name}：$pass 项通过$again"
   else
     status=1
-    echo "✗ ${name}：$pass 项通过，$fail 项失败$(grep -q '>DONE' "$out" || echo '，没跑完')$([ -z "$crash" ] || echo '，页面有没接住的报错')"
+    echo "✗ ${name}：$pass 项通过，$fail 项失败$(grep -q '>DONE' "$out" || echo '，没跑完')$([ -z "$crash" ] || echo '，页面有没接住的报错')$again"
     grep -E '^(<[^>]*>)?(FAIL |HLOG)' "$out" | sed 's/^<[^>]*>//; s/^/    /'
     [ -z "$crash" ] || echo "$crash" | sed 's/^/    报错：/'
   fi

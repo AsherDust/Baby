@@ -439,6 +439,8 @@
     showDialog(medDialog);
   }
 
+  const submitButton = (form) => form.querySelector('button:not([type="button"])');
+
   // 出错时读屏会念出来；只有一个输入框的表单（记体重、血糖、体温……）把它标成填错了，光标放回去
   function formError(form, message) {
     const el = form.querySelector('.form-error');
@@ -461,6 +463,6 @@
 
   Object.assign(app, {
     showDialog, dialogHead, onDialogClose, closeDialog, openGlucoseSheet, openUltrasoundSheet, openJournalSheet, fillFromReport, openSettings,
-    openCheckupDialog, openMedDialog, openMergeSheet, formError
+    openCheckupDialog, openMedDialog, openMergeSheet, formError, submitButton
   });
 })();
