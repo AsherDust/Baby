@@ -1,4 +1,4 @@
-/* global load, print, drainMicrotasks */
+/* global load, print, readFile, drainMicrotasks */
 // service worker 的测试：假的缓存、网络和定时器，看每个请求是从缓存还是网络拿的
 let passed = 0;
 const failures = [];
@@ -28,6 +28,11 @@ const cache = new Map();
 const net = new Map();
 const posted = [];
 let timers = [];
+const added = [];
+const deleted = [];
+let cacheNames = [];
+let claimed = false;
+let skipped = false;
 
 // JavaScriptCore 没有 URL，sw.js 只用它看是不是本站的请求
 globalThis.URL = class {
@@ -35,20 +40,26 @@ globalThis.URL = class {
     this.origin = (/^https?:\/\/[^/]+/.exec(url) || [''])[0];
   }
 };
+globalThis.Request = class {
+  constructor(url, init = {}) {
+    this.url = url;
+    this.cache = init.cache;
+  }
+};
 globalThis.self = {
   location: { origin: ORIGIN },
   addEventListener: (type, fn) => { handlers[type] = fn; },
-  skipWaiting: async () => {},
-  clients: { claim: async () => {}, matchAll: async () => [{ postMessage: (m) => posted.push(m) }] },
+  skipWaiting: async () => { skipped = true; },
+  clients: { claim: async () => { claimed = true; }, matchAll: async () => [{ postMessage: (m) => posted.push(m) }] },
 };
 globalThis.caches = {
   match: async (req) => {
     const key = keyOf(typeof req === 'string' ? req : req.url);
     return cache.has(key) ? res(cache.get(key)) : undefined;
   },
-  open: async () => ({ put: async (req, r) => { cache.set(keyOf(req.url), r.body); }, addAll: async () => {} }),
-  keys: async () => [],
-  delete: async () => true,
+  open: async () => ({ put: async (req, r) => { cache.set(keyOf(req.url), r.body); }, addAll: async (reqs) => { added.push(...reqs); } }),
+  keys: async () => cacheNames,
+  delete: async (name) => { deleted.push(name); return true; },
 };
 // 每个请求都挂着，测试里决定什么时候回、回什么（回的是最近发的那个）
 globalThis.fetch = (req) => {
@@ -139,6 +150,29 @@ test('没网：页面和脚本都从缓存打开；网络页面里的请求失�
   const online = request('js/app.js', { clientId: 'p2' });
   fail('js/app.js');
   eq(online.response && online.response.body, '旧脚本');
+});
+
+const CURRENT = /const CACHE = '([^']+)'/.exec(readFile('sw.js'))[1];
+const LISTED = /const FILES = \[([^\]]*)\]/.exec(readFile('sw.js'))[1].match(/'[^']+'/g).map((x) => x.slice(1, -1));
+
+test('安装：清单里的文件都绕过浏览器缓存重新下载一遍存好，马上接管', () => {
+  handlers.install({ waitUntil: () => {} });
+  drain();
+  eq([added.map((r) => r.url).join(), added.every((r) => r.cache === 'reload'), skipped], [LISTED.join(), true, true]);
+});
+
+test('换了版本：只删旧的缓存，接管已经打开的页面', () => {
+  cacheNames = ['honey-pot-v1', CURRENT, 'pregnancy-desk-v3'];
+  handlers.activate({ waitUntil: () => {} });
+  drain();
+  eq([deleted, claimed], [['honey-pot-v1', 'pregnancy-desk-v3'], true]);
+});
+
+test('第一次打开就没网，缓存里也没有：照实失败，不拿别的顶替', () => {
+  cache.clear();
+  const page = request('index.html', { navigate: true, resultingClientId: 'p4' });
+  fail('index.html');
+  eq([page.response, Boolean(page.error)], [null, true]);
 });
 
 test('别的网站的请求（比如 GitHub）不经过这里', () => {

@@ -110,6 +110,9 @@ iframe.onload = async () => {
     pick(sheet(), 'calm');
     log(w.Baby.app.ui.journalMood === 'excited', '面板里换心情不影响上面正在写的');
     sheet().querySelector('textarea').value = '腰酸，睡前泡了脚';
+    sheet().querySelector('input[name="date"]').value = '2026-10-20';
+    sheet().querySelector('form').requestSubmit();
+    log(sheet().open && /日期不能晚于今天/.test(sheet().querySelector('.form-error').textContent), '改到以后的日子：提示，不保存');
     sheet().querySelector('input[name="date"]').value = '2026-10-12';
     sheet().querySelector('form').requestSubmit();
     j = state().journal;

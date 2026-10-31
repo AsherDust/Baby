@@ -43,6 +43,8 @@ iframe.onload = async () => {
     f.requestSubmit();
     log(!$('.form-error').hidden && /预产期/.test($('.form-error').textContent), '没填预产期时提示错误');
     $('details.lmp').open = true;
+    $('[data-action="apply-lmp"]').click();
+    log(/先选末次月经的第一天/.test($('.form-error').textContent), '没选末次月经就点推算：提示先选');
     f.elements.lmp.value = '2026-04-24';
     $('[data-action="apply-lmp"]').click();
     log(f.elements.dueDate.value === '2027-01-29', '末次月经推算预产期', f.elements.dueDate.value);
@@ -156,6 +158,11 @@ iframe.onload = async () => {
     sf.requestSubmit();
     log(sd.open && !sf.querySelector('.form-error').hidden, '设置里校验预产期');
     sf.elements.dueDate.value = '2027-02-05';
+    const pre = sf.elements.preWeight.value;
+    sf.elements.preWeight.value = '五十二';
+    sf.requestSubmit();
+    log(sd.open && /孕前体重填个数字就好/.test(sf.querySelector('.form-error').textContent), '孕前体重填了字会提示');
+    sf.elements.preWeight.value = pre;
     sf.elements.height.value = '一米六';
     sf.requestSubmit();
     log(sd.open && /身高/.test(sf.querySelector('.form-error').textContent), '身高填错了会提示');

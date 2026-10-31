@@ -686,6 +686,45 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(baby().name === '小豆' && baby().birthTime === '07:10' && state().profile.nickname === '小豆'
       && baby().growth.find((g) => g.date === baby().birthDate).weight === 3.4 && !sheet().open, '改出生信息：小名、出生时间、出生体重', JSON.stringify([baby().name, baby().birthTime]));
 
+    // ---- 填错时的提示（面板和表单里的） ----
+    const wrong = async (name, show, formSel, values, expect) => {
+      try {
+        await show();
+        const f = inSheet(formSel) || $(formSel);
+        for (const [k, v] of Object.entries(values)) {
+          const el = f.elements[k];
+          if (el.type === 'checkbox') el.checked = Boolean(v);
+          else el.value = v;
+        }
+        f.requestSubmit();
+        await wait(30);
+        const msg = text(f.querySelector('.form-error'));
+        log(expect.test(msg), `填错了：${name}`, msg || '没有提示');
+      } catch (e) {
+        log(false, `填错了：${name}`, e.message);
+      }
+      if (sheet().open) await click('#sheet-dialog [data-action="close-dialog"]');
+    };
+    const page = (hash) => () => nav(hash);
+    const tap = (hash, sel) => async () => {
+      await nav(hash);
+      await click(sel);
+    };
+    await wrong('里程碑没选日子', tap('#/baby/growth', '#ms-crawl'), 'form[data-form="milestone"]', { date: '' }, /选一下哪天会的/);
+    await wrong('「第一次」没写是什么', page('#/baby/growth'), 'form[data-form="baby-moment"]', { name: '' }, /写一下是什么第一次/);
+    await wrong('「第一次」没选日子', page('#/baby/growth'), 'form[data-form="baby-moment"]', { name: '第一次游泳', date: '' }, /选一下哪天/);
+    await wrong('牙齿记在以后', tap('#/baby/growth', '#tooth-ua-l'), 'form[data-form="tooth"]', { date: '2026-10-20' }, /不能早于出生、晚于今天/);
+    await wrong('身长体重填了字', page('#/baby/growth'), 'form[data-form="baby-growth"]', { weight: '八斤' }, /体重/);
+    await wrong('疫苗打完的日子在以后', tap('#/baby/vaccines', '#vx-open-mpsva-1'), 'form[data-form="vaccine"]', { done: '2026-10-20' }, /打完的日子不能晚于今天/);
+    await wrong('自费疫苗没写名字', page('#/baby/vaccines'), 'form[data-form="extra-vaccine"]', { name: '' }, /写一下是什么疫苗/);
+    await wrong('自费疫苗没约日子', page('#/baby/vaccines'), 'form[data-form="extra-vaccine"]', { name: '流感疫苗', done: false, date: '' }, /选一下约的日子/);
+    await wrong('自费疫苗打完的日子在以后', page('#/baby/vaccines'), 'form[data-form="extra-vaccine"]', { name: '流感疫苗', done: true, date: '2026-10-20' }, /打完的日子不能晚于今天/);
+    await wrong('用药没写药名', page('#/baby/health'), 'form[data-form="baby-med"]', { name: '' }, /药/);
+    await wrong('瓶喂填了 1000 毫升', tap('#/baby', '#log-bottle'), 'form[data-form="baby-log"]', { ml: '1000' }, /填 5–500 之间的数/);
+    await wrong('出生日期在以后', tap('#/baby/growth', '[data-action="baby-birth-open"]'), 'form[data-form="baby-birth"]', { birthDate: '2026-10-20' }, /出生日期不能晚于今天/);
+    await pumpOnce();
+    await wrong('存一袋 0 毫升', page('#/baby'), 'form[data-form="stash-add"]', { ml: '0' }, /这袋多少毫升？填 5–500 之间的数/);
+
     // ---- 就诊小结：没有记录的那块不显示 ----
     const heads = () => $$('#report .rp-part h2').map((h) => h.textContent);
     await open('fresh', 'tools/report');

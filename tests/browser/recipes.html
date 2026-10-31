@@ -170,7 +170,16 @@ const menuIds = () => $$('.dish-open').map((b) => b.dataset.id);
     $('[data-action="share-shopping"]').click();
     await wait(60);
     log(shared && shared.text.startsWith('买菜清单'), '手机上弹系统分享');
+    Object.defineProperty(w.navigator, 'share', { value: async () => { throw new w.DOMException('cancel', 'AbortError'); }, configurable: true });
+    copied = '';
+    $('[data-action="share-shopping"]').click();
+    await wait(60);
+    log(copied === '', '手机上分享时点了取消：不再复制');
     w.matchMedia = realMatch;
+    Object.defineProperty(w.navigator, 'clipboard', { value: { writeText: async () => { throw new Error('denied'); } }, configurable: true });
+    $('[data-action="share-shopping"]').click();
+    await wait(60);
+    log(/没能复制，可以截个图发给家人/.test(toastText()), '电脑上复制不了：提示截图发给家人', toastText());
 
     const bursts = d.querySelectorAll('.burst').length;
     for (const box of $$('.recipe-shop input[type="checkbox"]:not(:checked)')) {

@@ -33,8 +33,9 @@ async function fakeGitHub({ empty = false } = {}) {
   let head = null;
   let n = 0;
   const id = () => (n += 1).toString(16).padStart(40, '0');
-  // authOk：Token 还有效；hang：请求一直不回；public：仓库是公开的；protect：分支受保护
-  const repo = { calls: [], offline: false, push: true, beforePatch: null, blobs, authOk: true, hang: false, public: false, protect: false };
+  // authOk：Token 还有效；hang：请求一直不回；public：仓库是公开的；protect：分支受保护；
+  // respond(method, path)：返回 [状态码, 内容] 就这样回，返回空就照常
+  const repo = { calls: [], offline: false, push: true, beforePatch: null, blobs, authOk: true, hang: false, public: false, protect: false, respond: null };
   const putBlob = async (text) => {
     const body = enc.encode(text);
     const sha = hex(await crypto.subtle.digest('SHA-1', enc.encode(`blob ${body.length}\0${text}`)));
@@ -60,6 +61,8 @@ async function fakeGitHub({ empty = false } = {}) {
     const path = decodeURIComponent(u.pathname.replace('/repos/AsherDust/BabySync', ''));
     repo.calls.push({ method, path, body });
     if (repo.offline) throw new TypeError('Failed to fetch');
+    const forced = repo.respond && repo.respond(method, path);
+    if (forced) return forced;
     if (auth !== `Bearer ${TOKEN}` || !repo.authOk) return [401, { message: 'Bad credentials' }];
     if (!u.pathname.startsWith('/repos/AsherDust/BabySync')) return [404, { message: 'Not Found' }];
     if (method === 'GET' && path === '') return [200, { default_branch: 'main', private: !repo.public, permissions: { pull: true, push: repo.push } }];
@@ -223,6 +226,12 @@ const sinceCalls = () => {
     const tokenLink = new URL($('form[data-form="cloud-setup"] .cloud-help a').href);
     log(tokenLink.pathname === '/settings/personal-access-tokens/new' && tokenLink.searchParams.get('contents') === 'write' && tokenLink.searchParams.get('expires_in') === '366',
       '「怎么创建 Token」的链接先填好了 Contents 读写和 1 年有效期', tokenLink.href);
+    fill({ repo: 'BabySync', token: TOKEN, password: PASSWORD, confirm: PASSWORD });
+    log(/仓库填「用户名\/仓库名」/.test(formError()), '仓库名少了用户名：提示怎么填', formError());
+    fill({ repo: 'AsherDust/BabySync', folder: 'a?b' });
+    log(/文件夹名只用字母/.test(formError()), '文件夹名里有怪字符：提示', formError());
+    fill({ folder: 'honey-pot', token: '' });
+    log(/填一下 GitHub Token/.test(formError()), '没填 Token：提示', formError());
     fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: '', confirm: '' });
     log(/设一个加密密码/.test(formError()), '没填加密密码时提示', formError());
     fill({ password: '蜜罐 honey', confirm: '蜜罐 honey' });
@@ -410,6 +419,107 @@ const sinceCalls = () => {
     await until(() => w.Baby.app.cloudOn());
     log(w.Baby.app.cloudOn(), '别的标签页又连上了，这个标签页跟着用');
 
+    // ---- GitHub 返回的几种错误：照实说；没权限先停下自动同步，请求太多歇一会儿 ----
+    const REF = '/git/ref/heads/main';
+    const failWith = (code, message) => { repo.respond = (m, p) => (p === REF ? [code, { message }] : null); };
+    const sync = (why = 'manual') => w.Baby.app.cloud.syncNow(why);
+    const said = (r) => (r && r.error ? r.error.message : '');
+    failWith(500, 'Server Error');
+    let res = await sync();
+    log(/GitHub 暂时出了问题/.test(said(res)), 'GitHub 出错（5xx）：说过一会儿再试', said(res));
+    failWith(404, 'Not Found');
+    res = await sync();
+    log(/找不到仓库 AsherDust\/BabySync 的「main」分支/.test(said(res)), '找不到分支（404）：说清楚检查哪几样', said(res));
+    failWith(403, 'Resource not accessible by personal access token');
+    res = await sync();
+    calls = sinceCalls();
+    await sync('poll');
+    log(/没有这个仓库的写入权限/.test(said(res)) && !calls().length, '没有写入权限（403）：说明原因，自动同步先停下', said(res));
+    failWith(429, 'API rate limit exceeded for user');
+    res = await sync();
+    calls = sinceCalls();
+    await sync('poll');
+    log(/请求太多了/.test(said(res)) && !calls().length, '请求太多（429）：自动同步歇一会儿', said(res));
+    failWith(403, 'API rate limit exceeded for user ID 1');
+    res = await sync();
+    log(/请求太多了/.test(said(res)), 'GitHub 用 403 说请求太多：也按请求太多算', said(res));
+    repo.respond = null;
+    res = await sync();
+    calls = sinceCalls();
+    await sync('poll');
+    log(res.ok && calls().length > 0, '手动同步好了以后，自动同步接着来');
+
+    // ---- 云端的文件被换了密码、或者坏了 ----
+    const goodMain = remote('main.json');
+    const sealedMain = JSON.parse(goodMain);
+    await repo.commitOther('honey-pot/main.json', JSON.stringify({ ...sealedMain, kdf: { ...sealedMain.kdf, salt: btoa('0123456789abcdef') } }));
+    res = await sync();
+    log(/云端的数据换过密码，到「设置 → 云同步」重新填一次密码/.test(said(res)), '云端换过密码：提示重新填一次密码', said(res));
+    await repo.commitOther('honey-pot/main.json', '这不是蜜罐的文件');
+    res = await sync();
+    log(/云端的文件不是蜜罐存的，或者坏了/.test(said(res)), '云端的文件坏了：照实说', said(res));
+    await repo.commitOther('honey-pot/main.json', goodMain);
+    res = await sync();
+    log(res.ok, '文件换回来以后同步照常');
+
+    // ---- 拉下来的记录存不下：照实说，下次再合 ----
+    // 先传一条体重上去，再让这台回到传之前（记录和同步进度都退回去）：云端就比这台多一条
+    const cfgBefore = localStorage.getItem(CLOUD);
+    const stateBefore = JSON.stringify(w.Baby.app.state);
+    w.Baby.model.upsertWeight(w.Baby.app.state, '2026-10-11', 57.1);
+    w.Baby.app.persist();
+    await sync();
+    w.Baby.app.state = w.Baby.model.normalize(JSON.parse(stateBefore));
+    localStorage.setItem(CLOUD, cfgBefore);
+    await until(() => w.Baby.app.cloud.config().head === JSON.parse(cfgBefore).head);
+    log(w.Baby.app.cloud.config().head === JSON.parse(cfgBefore).head, '别的标签页的同步进度变了：这个标签页跟上');
+    const realSet = w.Storage.prototype.setItem;
+    w.Storage.prototype.setItem = function (k, v) {
+      if (k === KEY) throw new w.DOMException('full', 'QuotaExceededError');
+      return realSet.call(this, k, v);
+    };
+    res = await sync();
+    w.Storage.prototype.setItem = realSet;
+    log(/手机存储满了，云端的新记录没存上/.test(said(res)) && !w.Baby.app.state.weights.some((x) => x.date === '2026-10-11'),
+      '存储满了存不下拉下来的：照实说，页面上也先不显示', said(res));
+    res = await sync();
+    log(res.ok && state().weights.some((x) => x.date === '2026-10-11') && /合进来了：加了 1 条/.test(toastText()), '有地方了再同步：合进来，说加了几条', toastText());
+
+    // ---- 一直被别的手机抢先：试 4 次就停下 ----
+    w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.95);
+    w.Baby.app.persist();
+    const race = async () => {
+      repo.beforePatch = race;
+      await repo.commitOther('notes.txt', String(Math.random()));
+    };
+    repo.beforePatch = race;
+    calls = sinceCalls();
+    res = await sync();
+    repo.beforePatch = null;
+    log(/两台手机同时在传/.test(said(res)) && calls().filter((c) => c.method === 'PATCH').length === 4, '一直被抢先：试 4 次就停下，说过一会儿再试', said(res));
+    res = await sync();
+    log(res.ok, '不抢了就传上去');
+
+    // ---- 别的标签页刚换了云同步的设置：这次不同步，也不报错 ----
+    const cfgNow = localStorage.getItem(CLOUD);
+    localStorage.setItem(CLOUD, JSON.stringify({ ...JSON.parse(cfgNow), gen: 'other-tab' }));
+    calls = sinceCalls();
+    res = await sync();
+    log(!res.ok && !res.error && !calls().length, '别的标签页刚换了设置：这次不同步，也不报错');
+    localStorage.setItem(CLOUD, cfgNow);
+    await until(() => w.Baby.app.cloud.config() && w.Baby.app.cloud.config().gen === JSON.parse(cfgNow).gen);
+
+    // ---- 正在同步时又要同步：等这次结束再来一次 ----
+    w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.96);
+    w.Baby.app.persist();
+    calls = sinceCalls();
+    const first = sync();
+    const second = sync();
+    log(first === second, '正在同步时再点：等这一次');
+    await first;
+    await until(() => calls().filter((c) => c.path === REF).length >= 2 && status() === 'idle');
+    log(calls().filter((c) => c.path === REF).length >= 2, '这次结束后自动再来一次');
+
     // ---- 切到后台：没传的改动马上传，不再等 ----
     const headBefore = repo.head();
     w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.9);
@@ -440,8 +550,13 @@ const sinceCalls = () => {
     d.querySelector('.settings-cloud [data-action="cloud-off"]').click();
     log(cloud() && w.Baby.app.cloudOn() && $('.cloud-badge'), '断开时点取消：还连着');
     w.confirm = () => true;
+    repo.hang = true;
+    const hanging = w.Baby.app.cloud.syncNow('manual');
     d.querySelector('.settings-cloud [data-action="cloud-off"]').click();
     log(!cloud() && !$('.cloud-badge') && names().includes('honey-pot/main.json') && /断开了/.test(toastText()), '断开：这台手机不再同步，云端的不动');
+    const cut = await hanging;
+    repo.hang = false;
+    log(!cut.ok && !cut.error && status() === 'off', '同步到一半断开：请求取消，不报错', JSON.stringify(cut));
 
     // ---- 空仓库、宝宝的记录按月分文件 ----
     repo = await fakeGitHub({ empty: true });
@@ -467,6 +582,16 @@ const sinceCalls = () => {
     await until(() => calls().some((c) => c.method === 'PATCH'));
     const t = calls().find((c) => c.path === '/git/trees');
     log(t && t.body.tree.map((e) => e.path).join() === `honey-pot/logs-${TODAY.slice(0, 7)}.json`, '记了一次尿布，只传当月的文件', t && JSON.stringify(t.body.tree.map((e) => e.path)));
+
+    // ---- 一个月的记录删光了：云端那个月的文件也删掉 ----
+    const sep = w.Baby.baby.addLog(w.Baby.app.state.baby, w.Baby.baby.readLog('diaper', { date: '2026-09-20', time: '10:00', pee: true }, w.Baby.baby.msAt(TODAY, '12:00')));
+    w.Baby.app.persist();
+    await until(() => names().includes('honey-pot/logs-2026-09.json'));
+    log(names().includes('honey-pot/logs-2026-09.json'), '补记一条九月的：云端多了九月的文件');
+    w.Baby.baby.removeLog(w.Baby.app.state.baby, sep.id);
+    w.Baby.app.persist();
+    await until(() => !names().includes('honey-pot/logs-2026-09.json'));
+    log(!names().includes('honey-pot/logs-2026-09.json') && names().includes(`honey-pot/logs-${TODAY.slice(0, 7)}.json`), '九月删光了：云端九月的文件也删掉', names().join());
 
     // ---- 清空全部数据时断开 ----
     await openSettings();

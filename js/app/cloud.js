@@ -328,17 +328,25 @@
     if (config !== c) throw new CloudError('同步取消了', 'cancelled');
     applying = true;
     try {
+      // 存不下就退回去：页面上显示的和存着的一样，下次同步再合一次
       if (!app.state) {
         app.state = Sy.forThisDevice(remote, ui.today);
-        if (!persist()) throw new CloudError('手机存储满了，云端的记录没存上', 'storage');
+        if (!persist()) {
+          app.state = null;
+          throw new CloudError('手机存储满了，云端的记录没存上', 'storage');
+        }
         render();
         return { restored: true };
       }
       const r = Mg.merge(app.state, remote, { converge: true });
       if (JSON.stringify(r.state) === JSON.stringify(M.normalize(JSON.parse(JSON.stringify(app.state))))) return null;
+      const before = app.state;
       app.state = r.state;
       app.resetTransient();
-      if (!persist()) throw new CloudError('手机存储满了，云端的新记录没存上', 'storage');
+      if (!persist()) {
+        app.state = before;
+        throw new CloudError('手机存储满了，云端的新记录没存上', 'storage');
+      }
       renderSoon();
       return r;
     } finally {

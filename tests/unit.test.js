@@ -2743,6 +2743,34 @@ test('合并：老格式的删除标记只记了哪天，按那天零点算', ()
   eq([Mg.merge(before, other).state.weights.length, Mg.merge(after, other).state.weights.length], [0, 1], '零点以前改的跟着删，零点以后改的留着');
 });
 
+test('校验：填错时的提示（核心逻辑里的）', () => {
+  const T = '2026-10-12';
+  const now = tAt(T, '20:00');
+  const cases = [
+    [M.medError({ name: '', start: '2026-10-01' }, T), '写一下药或补剂的名字'],
+    [M.medError({ name: '叶酸', start: '2026-10-01', end: '2026-1-5' }, T), '结束日期格式不对，重新选一下'],
+    [M.medError({ name: '叶酸', start: '2026-10-05', end: '2026-10-01' }, T), '结束日期不能早于开始日期'],
+    [M.bpError({ date: '', sys: '120', dia: '80' }, T), '选一下日期'],
+    [M.bpError({ date: '2026-10-13', sys: '120', dia: '80' }, T), '日期不能晚于今天'],
+    [M.glucoseError({ date: '', slot: 'fasting', value: '5' }, T), '选一下日期'],
+    [M.glucoseError({ date: '2026-10-13', slot: 'fasting', value: '5' }, T), '日期不能晚于今天'],
+    [M.glucoseError({ date: T, slot: 'brunch', value: '5' }, T), '选一下是什么时候测的'],
+    [M.usError({ date: '', values: {} }, T), '选一下检查日期'],
+    [M.usError({ date: '2026-10-13', values: {} }, T), '日期不能晚于今天'],
+    [Bb.birthError({ sex: '', birthDate: T, birthTime: '' }, T, DUE), '选一下是男宝还是女宝'],
+    [Bb.birthError({ sex: 'girl', birthDate: '', birthTime: '' }, T, DUE), '选一下出生日期'],
+    [Bb.birthError({ sex: 'girl', birthDate: '2026-10-13', birthTime: '' }, T, DUE), '出生日期不能晚于今天'],
+    [Bb.birthError({ sex: 'girl', birthDate: '2026-10-10', birthTime: '8点' }, T, DUE), '出生时间填成 08:30 这样'],
+    [Bb.readLog('nap', { date: T, time: '08:00' }, now).error, '记的是什么？'],
+    [Bb.readLog('bottle', { date: '', time: '08:00', ml: '90' }, now).error, '选一下日期和时间'],
+    [Bb.readLog('bottle', { date: T, time: '21:00', ml: '90' }, now).error, '时间不能晚于现在'],
+    [Bb.readLog('food', { date: T, time: '08:00', text: ' ' }, now).error, '吃了什么？写一下'],
+    [Bb.readLog('breast', { date: T, time: '08:00', left: '0', right: '' }, now).error, '两边一共喂了几分钟？填 1–120 之间的数'],
+    [Bb.readLog('sleep', { date: T, time: '19:00', endTime: '20:30' }, now).error, '醒来的时间不能晚于现在'],
+  ];
+  cases.forEach(([got, want], i) => eq(got, want, `第 ${i + 1} 条`));
+});
+
 // ---------- 本机存储：日常记录按月存进 IndexedDB ----------
 
 function fakeLocalStorage() {

@@ -113,7 +113,14 @@ iframe.onload = async () => {
     log(text('.tool[data-tool="story"]').includes(`今晚：${cardTitle}`), '工具目录里写着今晚读什么', text('.tool[data-tool="story"]'));
 
     // ---- 故事页 ----
+    // 第一次下载正文时没联网：说一声，点「再试一次」重新下载
+    const netFetch = w.fetch;
+    w.fetch = (url, opts) => (String(url).includes('data/stories/') ? Promise.resolve(new w.Response('', { status: 404 })) : netFetch(url, opts));
     await nav('#/tools/story');
+    await until(() => $('[data-action="story-retry"]'));
+    log(/正文没下载下来/.test(text('.story-wait')) && $('[data-action="story-retry"]'), '正文下载失败：说一声，可以再试一次', text('.story-wait'));
+    w.fetch = netFetch;
+    click('[data-action="story-retry"]');
     log(await loaded(), '正文下载好了');
     log(title() === cardTitle && /约 \d+ 分钟/.test(text('.story-meta')), '和首页是同一篇', `${title()} / ${cardTitle}`);
     log(text('.page-title') === '睡前故事' && $('.story-source a[href^="https://"]'), '有标题和出处链接');
@@ -191,6 +198,11 @@ iframe.onload = async () => {
     w.Baby.app.started = true;
     w.Baby.app.ui.reading = playing;
     log(errors.length === errorsBefore && $('#app').innerHTML === shown, '脚本还没加载完时声音列表先到了：先不画，也不报错', errors.slice(errorsBefore).join(' | '));
+    // 朗读出错（比如系统的声音出了问题）：先停下，提示点「继续」
+    current.onerror({ error: 'synthesis-failed' });
+    await wait(0);
+    log(/朗读停住了，点「继续」接着读/.test(toastText()) && !w.Baby.app.ui.reading.playing, '朗读出错：先停下，提示点「继续」', toastText());
+    click('.story-player [data-action="story-play"]');
 
     // 读到最后
     for (let i = 0; i < 40 && $('.story-player'); i += 1) {
@@ -311,6 +323,25 @@ iframe.onload = async () => {
     await reload();
     await nav('#/tools/story');
     log(await loaded() && title(), '没有故事记录的老数据也能打开');
+
+    // ---- 只剩一篇能挑、不能朗读、能挑的都被隐藏了（只改页面里的数据） ----
+    const st = w.Baby.app.state.stories;
+    const ids = w.Baby.storyIndex.stories.map((x) => x.id);
+    st.blocked = ids.filter((id) => id !== w.Baby.app.storyNight(Date.now()).story.id);
+    w.Baby.app.render();
+    click('[data-action="story-swap"]');
+    log(/没有别的故事可换了/.test(toastText()), '只剩这一篇能挑：「换一篇」说没有别的了', toastText());
+    const realUtterance = w.SpeechSynthesisUtterance;
+    w.SpeechSynthesisUtterance = undefined;
+    w.Baby.app.render();
+    log(/这个浏览器不能朗读/.test(text('.story-hint')) && !$('[data-action="story-play"]'), '浏览器不能朗读：说一声，可以自己读给宝宝听', text('.story-hint'));
+    w.SpeechSynthesisUtterance = realUtterance;
+    st.blocked = ids.slice();
+    st.tonight = null;
+    w.Baby.app.render();
+    log(/能挑的故事都被隐藏了/.test(text('#app')), '能挑的都被隐藏了：说怎么恢复', text('#app').slice(0, 80));
+    st.blocked = [];
+    w.Baby.app.render();
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }
