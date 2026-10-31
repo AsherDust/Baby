@@ -70,6 +70,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     const rpPart = (title) => text($$('#report .rp-part').find((p) => p.querySelector('h2').textContent === title));
     log(/黄体酮.*5月28日～7月3日孕 19⁺³～24⁺⁴ 周.*保胎/.test(rpPart('用药')) && /阿莫西林.*孕 31⁺³～31⁺⁵ 周.*牙龈发炎/.test(rpPart('用药')) && !/钙片/.test(rpPart('用药')),
       '用药：怀孕以来吃过的药都列上，停了很久的也在，写着孕几周', rpPart('用药'));
+    log(rpPart('用药').indexOf('黄体酮') < rpPart('用药').indexOf('阿莫西林') && rpPart('补剂').indexOf('复合维生素') < rpPart('补剂').indexOf('钙片'), '就诊小结里还是按先后排', rpPart('用药'));
     log(/复合维生素/.test(rpPart('补剂')) && /钙片/.test(rpPart('补剂')) && !/叶酸/.test(rpPart('补剂')) && !/黄体酮/.test(rpPart('补剂')),
       '补剂：只有正在吃的和最近一个月停掉的', rpPart('补剂'));
     let printed = 0;

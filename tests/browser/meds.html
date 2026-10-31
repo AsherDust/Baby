@@ -83,7 +83,7 @@ iframe.onload = async () => {
     log(row('黄体酮').classList.contains('med-medicine') && /药物/.test(row('黄体酮').querySelector('.tag-med').textContent), '药物有自己的标签和颜色');
 
     addMed({ name: '钙片', start: '2026-09-11' });
-    log(names().join() === '叶酸,黄体酮,钙片', '按开始日期排', names().join());
+    log(names().join() === '钙片,黄体酮,叶酸', '按开始日期倒着排，最近开始吃的在最上面', names().join());
     log(/正在吃 1 样 · 一共记了 3 样/.test($('.card-meds .card-meta').textContent), '卡片显示正在吃几样');
     log(/在吃/.test(row('钙片').textContent) && /至今/.test(row('钙片').querySelector('.med-when').textContent), '没填结束日期就是在吃');
     log(/20 周起 · 已经 32 天/.test(row('钙片').querySelector('.med-ga').textContent), '在吃的显示从几周开始、吃了几天', row('钙片').querySelector('.med-ga').textContent);
@@ -106,7 +106,7 @@ iframe.onload = async () => {
     log($$('.med-axis span').map((s) => s.textContent).join() === '孕前,孕早期,孕中期,孕晚期', '时间轴标出四个阶段');
 
     chip('t1').click();
-    log(names().join() === '叶酸,黄体酮' && chip('t1').getAttribute('aria-pressed') === 'true', '只看孕早期');
+    log(names().join() === '黄体酮,叶酸' && chip('t1').getAttribute('aria-pressed') === 'true', '只看孕早期');
     log(/孕早期（1–13 周）吃过 2 样：叶酸、黄体酮/.test($('.med-summary').textContent), '孕早期汇总', $('.med-summary') && $('.med-summary').textContent);
     log($('.med-axis .is-focus').textContent === '孕早期', '时间轴高亮孕早期');
     chip('t1').click();
@@ -133,7 +133,7 @@ iframe.onload = async () => {
     dialog().querySelector('[data-action="delete-med"]').click();
     log(!dialog().open && !row('黄体酮') && state().meds.length === 2, '在编辑里删除');
     $('[data-action="undo"]').click();
-    log(state().meds[1].name === '黄体酮' && names().join() === '叶酸,黄体酮,钙片', '撤销删除');
+    log(state().meds[1].name === '黄体酮' && names().join() === '钙片,黄体酮,叶酸', '撤销删除');
 
     addMed({ name: '<b>维生素</b>', start: '2026-10-01' });
     log(!row('<b>维生素</b>').querySelector('b'), '名字里的尖括号按文字显示');
@@ -153,7 +153,7 @@ iframe.onload = async () => {
     d.getElementById('settings-dialog').querySelector('[data-action="close-dialog"]').click();
 
     await reload();
-    log(names().join() === '叶酸,黄体酮', '刷新后记录还在');
+    log(names().join() === '黄体酮,叶酸', '刷新后记录还在');
 
     const old = state();
     delete old.meds;

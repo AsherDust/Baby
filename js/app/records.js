@@ -108,6 +108,7 @@
       .map((s) => ({ ...s, from: Math.max(s.from, tl.from), to: Math.min(s.to, tl.to), count: rows.filter((r) => r.stages.includes(s.id)).length }))
       .filter((s) => s.to > s.from);
     const focus = stages.find((s) => s.id === ui.medStage && s.count) || null;
+    // 汇总按先后说；下面的列表倒过来，最近开始吃的在最上面
     const shown = focus ? rows.filter((r) => r.stages.includes(focus.id)) : rows;
     const isFocus = (s) => (focus && focus.id === s.id ? ' class="is-focus"' : '');
 
@@ -164,7 +165,7 @@
         </div>
         ${summary}
         <div class="med-axis" aria-hidden="true">${stages.map((s) => `<span${isFocus(s)} style="flex:${s.to - s.from}">${s.name}</span>`).join('')}</div>
-        <ul class="med-list">${shown.map(row).join('')}</ul>
+        <ul class="med-list">${shown.slice().reverse().map(row).join('')}</ul>
         <p class="fineprint">这里只做记录，吃什么、吃多少请遵医嘱。</p>
       </article>`;
   }
