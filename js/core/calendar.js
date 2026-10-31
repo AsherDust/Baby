@@ -2,8 +2,7 @@
   'use strict';
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
-
-  const pad = (n) => String(n).padStart(2, '0');
+  const { pad } = Baby.util;
 
   function escapeText(s) {
     return String(s)

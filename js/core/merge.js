@@ -194,7 +194,7 @@
 
   /** 记下删掉了哪条 */
   function drop(store, key, item, now = Date.now()) {
-    store[key] = { on: D.today(), at: now, sig: sign(item) };
+    store[key] = { on: D.localISO(new Date(now)), at: now, sig: sign(item) };
     cap(store, KEEP_REMOVED, (v) => v.on);
   }
 

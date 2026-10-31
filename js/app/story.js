@@ -270,5 +270,5 @@
       </section>`;
   }
 
-  Object.assign(app, { canSpeak, voicesFor, voiceFor, storyNight, storyStatus, viewStoryCard, viewStoryTool });
+  Object.assign(app, { canSpeak, voiceFor, storyNight, storyStatus, viewStoryCard, viewStoryTool });
 })();

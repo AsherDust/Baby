@@ -211,5 +211,5 @@
     },
   };
 
-  Object.assign(app, { recipeActions, openRecipe });
+  Object.assign(app, { recipeActions });
 })();

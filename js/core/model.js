@@ -2,6 +2,7 @@
   'use strict';
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
+  const { text, isBlank, isClock, isTime, toNumber, newId, byStart } = Baby.util;
   const C = Baby.content;
   const St = Baby.stories;
   const J = Baby.journal;
@@ -52,16 +53,9 @@
   const PELVIC_KEEP = 60;
 
   const round2 = (n) => Math.round(n * 100) / 100;
-  const isClock = (t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
-  const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
-  const isTime = (v) => Number.isFinite(v) && v > 0;
-  const newId = (prefix) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const byStart = (a, b) => a.start - b.start;
   const byDateTime = (a, b) => byDate(a, b) || (a.time < b.time ? -1 : a.time > b.time ? 1 : 0);
   const slotIndex = (slot) => C.GLUCOSE_SLOTS.findIndex((s) => s.id === slot);
   const byDateSlot = (a, b) => byDate(a, b) || slotIndex(a.slot) - slotIndex(b.slot);
-  const toNumber = (v) => (typeof v === 'number' ? v : Number(String(v ?? '').trim().replace(/[,，]/, '.')));
-  const isBlank = (v) => v == null || String(v).trim() === '';
 
   function intIn(v, [lo, hi]) {
     if (isBlank(v)) return null;
@@ -1300,8 +1294,6 @@
     medRows,
     medTimeline,
     KICK_WINDOW,
-    KICK_MERGE,
-    KICK_NORMAL,
     CONTRACTION_LONG,
     countedKicks,
     activeKicks,
@@ -1325,7 +1317,6 @@
     removeBp,
     bpLevel,
     bpSummary,
-    GLUCOSE_LOW,
     parseGlucose,
     glucoseTarget,
     glucoseLevel,

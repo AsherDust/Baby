@@ -4,6 +4,7 @@
   // 存的时候新的在前，时间线按天分组，跨月时插月份标题
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
+  const U = Baby.util;
 
   const MOODS = [
     { id: 'happy', name: '开心' },
@@ -15,11 +16,10 @@
   ];
   const TEXT_MAX = 2000;
 
-  const pad2 = (n) => String(n).padStart(2, '0');
+  const { pad: pad2, isClock } = U;
   const isMood = (m) => MOODS.some((x) => x.id === m);
-  const isClock = (t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
   const clockOf = (now) => `${pad2(new Date(now).getHours())}:${pad2(new Date(now).getMinutes())}`;
-  const newId = () => `j-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const newId = () => U.newId('j');
   const newest = (a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.time < b.time ? 1 : a.time > b.time ? -1 : 0);
 
   /** 统一换行，连着的空行只留一个 */

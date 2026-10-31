@@ -17,6 +17,7 @@ const FILES = [
   'css/mood.css',
   'css/story.css',
   'css/report.css',
+  'js/core/util.js',
   'js/core/dates.js',
   'js/core/merge.js',
   'js/core/content.js',

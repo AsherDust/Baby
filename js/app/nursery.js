@@ -818,5 +818,5 @@
     },
   };
 
-  Object.assign(app, { babyForms, babyActions, openBirthSheet });
+  Object.assign(app, { babyForms, babyActions });
 })();

@@ -5,6 +5,7 @@
   // 食谱本身在 data/recipes.js，这里只管挑和记，不碰页面
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
+  const { hash } = Baby.util;
 
   const KINDS = [
     { id: 'breakfast', name: '早餐' },
@@ -144,16 +145,6 @@
       if (calm.length >= perDay(kind, ctx)) list = calm;
     }
     return list;
-  }
-
-  /** 同一个字符串总得到同一个数，用来按日期「随机」排 */
-  function hash(s) {
-    let h = 2166136261;
-    for (let i = 0; i < s.length; i += 1) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
   }
 
   function shuffled(list, kind, cycle) {
@@ -410,7 +401,6 @@
     KINDS,
     MEALS,
     SLOTS,
-    STAGES,
     TAGS,
     AVOIDS,
     SHOP_GROUPS,

@@ -8,7 +8,7 @@
   const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
   const SUPERSCRIPT = ['⁰', '¹', '²', '³', '⁴', '⁵', '⁶'];
 
-  const pad = (n) => String(n).padStart(2, '0');
+  const { pad } = Baby.util;
 
   function isISODate(s) {
     if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;

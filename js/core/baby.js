@@ -4,6 +4,7 @@
   // 疫苗日程，里程碑，辅食推荐。内容在 data/baby.js、data/baby-food.js，生长标准在 data/growth.js，这里不碰页面
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
+  const { pad: pad2, text, isBlank, isClock, isTime, toNumber, newId, byStart, hash } = Baby.util;
 
   const SEXES = [{ id: 'boy', name: '男宝' }, { id: 'girl', name: '女宝' }];
   const TYPES = ['breast', 'bottle', 'food', 'sleep', 'diaper', 'temp', 'med', 'pump'];
@@ -36,15 +37,7 @@
   const LIST_MAX = 200;
   const ID = /^[a-z0-9-]{2,40}$/;
 
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
-  const isTime = (v) => Number.isFinite(v) && v > 0;
-  const isClock = (t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
   const isId = (v) => typeof v === 'string' && ID.test(v);
-  const toNumber = (v) => (typeof v === 'number' ? v : Number(String(v ?? '').trim().replace(/[,，]/, '.')));
-  const isBlank = (v) => v == null || String(v).trim() === '';
-  const newId = (prefix) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-  const byStart = (a, b) => a.start - b.start;
   const dayOf = (ms) => D.localISO(new Date(ms));
   const secs = (v) => (Number.isFinite(v) && v >= 0 ? Math.min(Math.round(v), 4 * 3600) : 0);
 
@@ -902,15 +895,6 @@
     else b.foodNotes[name] = { feel, note: text(note, 40), date };
   }
 
-  function hash(s) {
-    let h = 2166136261;
-    for (let i = 0; i < s.length; i += 1) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  }
-
   /**
    * 今天做什么：从现在这个阶段和更早的里挑，按日期轮着来。
    * 一天最多一道带新食材的（新食材也只能有一样），刚加过新食材的 3 天里不再加；刚开始优先补铁的
@@ -951,12 +935,10 @@
 
   Baby.baby = {
     SEXES,
-    TYPES,
     MILKS,
     FEELS,
     STASH_PLACES,
     METRICS,
-    CURVES,
     dayOf,
     dayStart,
     msAt,
@@ -964,7 +946,6 @@
     ageOf,
     ageText,
     monthsText,
-    parseMetric,
     birthError,
     born,
     updateBirth,

@@ -105,5 +105,5 @@
     return bytes;
   }
 
-  Baby.noise = { KINDS, RATE, SECONDS, SHUSH_PERIOD, SHUSH_ON, samples, wav };
+  Baby.noise = { KINDS, RATE, samples, wav };
 })();

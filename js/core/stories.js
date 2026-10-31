@@ -4,6 +4,7 @@
   // 都由 scripts/build_stories.py 生成。这里只管挑哪篇和记住读过什么，不碰页面
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
+  const { hash } = Baby.util;
 
   // 19 点起首页出现今晚的故事；凌晨 4 点前还算前一天晚上
   const EVENING_FROM = 19;
@@ -45,16 +46,6 @@
   const isEvening = (hour) => hour >= EVENING_FROM || hour < NIGHT_ENDS;
   /** 这一晚记在哪天名下 */
   const nightOf = (today, hour) => (hour < NIGHT_ENDS ? D.addDays(today, -1) : today);
-
-  /** 同一个字符串总得到同一个数，用来按日期「随机」挑 */
-  function hash(s) {
-    let h = 2166136261;
-    for (let i = 0; i < s.length; i += 1) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  }
 
   const find = (index, id) => index.stories.find((s) => s.id === id) || null;
   const collectionOf = (index, story) => index.collections.find((c) => c.id === story.c) || null;
@@ -208,8 +199,6 @@
   }
 
   Baby.stories = {
-    EVENING_FROM,
-    NIGHT_ENDS,
     RATES,
     empty,
     normalize,
