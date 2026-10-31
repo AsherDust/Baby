@@ -86,11 +86,24 @@
       }).join('')}</tr>`))
       : empty('最近 7 天没有血糖记录。');
 
+    // 药：怀孕以来吃过的都列上，停了很久的医生也要知道；补剂：正在吃的和最近一个月停掉的
     const monthAgo = D.addDays(today, -30);
-    const meds = M.medRows(s, today).filter((r) => r.ongoing || (r.med.end && r.med.end >= monthAgo));
-    const medTable = meds.length
-      ? table(['名称', '用法', '从', '到'], meds.map((r) => `<tr><td>${esc(r.med.name)}</td><td>${esc(r.med.dose)}</td><td>${D.formatDate(r.med.start)}</td><td>${r.ongoing ? '还在吃' : D.formatDate(r.med.end)}</td></tr>`))
-      : empty('没有正在吃的药和补剂。');
+    const rows = M.medRows(s, today);
+    const gaOf = (d) => (d < 0 ? '孕前' : D.formatGA(d));
+    const drugs = rows.filter((r) => r.med.kind === 'medicine' && (r.ongoing || r.endGA >= 0));
+    const drugTable = drugs.length
+      ? table(['药和用法', '什么时候', '备注'], drugs.map((r) => {
+        const day = (date) => `<span class="rp-day">${D.formatDate(date)}</span>`;
+        const when = r.ongoing
+          ? `${day(r.med.start)}起，还在吃<br><small>孕 ${gaOf(r.startGA)} 周起</small>`
+          : `${day(r.med.start)}～${day(r.med.end)}<br><small>孕 ${gaOf(r.startGA)}～${gaOf(r.endGA)} 周</small>`;
+        return `<tr><td>${esc(r.med.name)}${r.med.dose ? `<br><small>${esc(r.med.dose)}</small>` : ''}</td><td>${when}</td><td>${esc(r.med.note)}</td></tr>`;
+      }))
+      : empty('怀孕以来没记过吃药。');
+    const supplements = rows.filter((r) => r.med.kind !== 'medicine' && (r.ongoing || (r.med.end && r.med.end >= monthAgo)));
+    const supplementTable = supplements.length
+      ? table(['补剂', '用法', '从', '到'], supplements.map((r) => `<tr><td>${esc(r.med.name)}</td><td>${esc(r.med.dose)}</td><td>${D.formatDate(r.med.start)}</td><td>${r.ongoing ? '还在吃' : D.formatDate(r.med.end)}</td></tr>`))
+      : empty('没有正在吃的补剂。');
 
     const us = s.ultrasounds.filter((u) => u.date <= today).slice(-1)[0];
     let usBody = empty('还没有 B 超记录。');
@@ -113,7 +126,8 @@
       ${part('体重', weight)}
       ${part('血压', bpTable, bp.length ? `最近 7 天量了 ${bpSum.count} 次${bpSum.high ? `，${bpSum.high} 次偏高（≥140/90）` : ''}；标红的是偏高的。` : '')}
       ${part('血糖（mmol/L）', glTable, days.length ? `餐后按 ${after} 小时测；目标空腹 ≤5.3，餐后 ≤${M.glucoseTarget('breakfast', after)}，睡前 ≤6.7。最近 7 天 ${glSum.high} 次偏高${glSum.low ? `、${glSum.low} 次偏低` : ''}，标红的是超出目标的。` : '')}
-      ${part('用药和补剂', medTable, '正在吃的，和最近一个月停掉的。')}
+      ${part('用药', drugTable, drugs.length ? '怀孕以来吃过的药都在这里，包括已经停了的。' : '')}
+      ${part('补剂', supplementTable, supplements.length ? '正在吃的，和最近一个月停掉的。' : '')}
       ${part('最近一次 B 超', usBody)}
       ${others.length ? part('其它', `<ul class="rp-list">${others.map((t) => `<li>${t}</li>`).join('')}</ul>`) : ''}`;
   }

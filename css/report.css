@@ -17,6 +17,8 @@
 .rp-kv td { padding: 4px 0; }
 .rp-table th { padding: 6px 6px 6px 0; border-bottom: 1px solid var(--line-strong); text-align: left; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .rp-table td { padding: 6px 6px 6px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; vertical-align: top; }
+.rp-table small { font-size: 12px; color: var(--ink-3); }
+.rp-day { white-space: nowrap; }
 .rp-high td, td.rp-high, .rp-high-text { color: var(--red); font-weight: 600; }
 td.rp-low { color: var(--sky-deep); font-weight: 600; }
 .rp-list { display: grid; gap: 4px; margin: 0; padding-left: 20px; font-size: 14px; }
@@ -45,6 +47,7 @@ td.rp-low { color: var(--sky-deep); font-weight: 600; }
   .rp-chart { max-width: 150mm; }
   .rp-charts { grid-template-columns: 1fr 1fr; }
   .rp-head h1, .rp-part h2, .rp-table td, .rp-kv td, .rp-list { color: #000000; }
-  .rp-note, .rp-head p, .rp-kv th, .rp-foot, .rp-empty { color: #444444 !important; }
+  .rp-table small { font-size: 8.5pt; }
+  .rp-note, .rp-head p, .rp-kv th, .rp-foot, .rp-empty, .rp-table small { color: #444444 !important; }
   .rp-high td, td.rp-high, .rp-high-text { color: #B00020; }
 }
