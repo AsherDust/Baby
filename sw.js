@@ -18,6 +18,8 @@ const FILES = [
   'css/story.css',
   'css/report.css',
   'js/core/util.js',
+  'js/core/i18n.js',
+  'lang/zh.js',
   'js/core/dates.js',
   'js/core/merge.js',
   'js/core/content.js',

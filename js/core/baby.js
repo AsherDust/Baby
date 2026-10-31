@@ -5,6 +5,7 @@
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
   const { pad: pad2, text, isBlank, isClock, isTime, toNumber, newId, byStart, hash } = Baby.util;
+  const { msg } = Baby.i18n;
 
   const SEXES = [{ id: 'boy', name: '男宝' }, { id: 'girl', name: '女宝' }];
   const TYPES = ['breast', 'bottle', 'food', 'sleep', 'diaper', 'temp', 'med', 'pump'];
@@ -97,16 +98,16 @@
 
   /** 出生表单：{ name, sex, birthDate, birthTime, weight, length, head } */
   function birthError(f, today, dueDate) {
-    if (!SEXES.some((s) => s.id === f.sex)) return '选一下是男宝还是女宝';
-    if (!D.isISODate(f.birthDate)) return '选一下出生日期';
-    if (f.birthDate > today) return '出生日期不能晚于今天';
-    if (dueDate && D.diffDays(f.birthDate, dueDate) > 20 * 7) return '出生日期离预产期太远了，再确认一下？';
-    if (f.birthTime && !isClock(f.birthTime)) return '出生时间填成 08:30 这样';
+    if (!SEXES.some((s) => s.id === f.sex)) return msg('birth.sexMissing');
+    if (!D.isISODate(f.birthDate)) return msg('birth.dateMissing');
+    if (f.birthDate > today) return msg('birth.dateFuture');
+    if (dueDate && D.diffDays(f.birthDate, dueDate) > 20 * 7) return msg('birth.farFromDue');
+    if (f.birthTime && !isClock(f.birthTime)) return msg('birth.timeFormat');
     for (const m of METRICS) {
       if (isBlank(f[m.id])) continue;
       const [lo, hi] = BIRTH_RANGE[m.id];
       const n = parseMetric(m.id, f[m.id]);
-      if (n == null || n < lo || n > hi) return `出生${m.name}填 ${lo}–${hi} ${m.unit} 之间的数`;
+      if (n == null || n < lo || n > hi) return msg('birth.range', { name: m.name, min: lo, max: hi, unit: m.unit });
     }
     return null;
   }
@@ -392,53 +393,53 @@
    * f: { date, time, note, 以及每种自己的：left/right（分钟）、ml、milk、text、amount、recipe、endTime、pee、poo、color、value、site、name、dose }
    */
   function readLog(type, f, now) {
-    if (!TYPES.includes(type)) return { error: '记的是什么？' };
-    if (!D.isISODate(f.date) || !isClock(f.time)) return { error: '选一下日期和时间' };
+    if (!TYPES.includes(type)) return { error: msg('log.typeMissing') };
+    if (!D.isISODate(f.date) || !isClock(f.time)) return { error: msg('log.whenMissing') };
     const start = msAt(f.date, f.time);
-    if (start > now + 60000) return { error: '时间不能晚于现在' };
+    if (start > now + 60000) return { error: msg('log.future') };
     const out = { type, start, note: text(f.note, NOTE_MAX) };
     switch (type) {
       case 'breast': {
         const left = isBlank(f.left) ? 0 : toNumber(f.left);
         const right = isBlank(f.right) ? 0 : toNumber(f.right);
-        if (!(left >= 0 && right >= 0 && left + right > 0 && left + right <= 120)) return { error: '两边一共喂了几分钟？填 1–120 之间的数' };
+        if (!(left >= 0 && right >= 0 && left + right > 0 && left + right <= 120)) return { error: msg('log.breastMinutes') };
         return { ...out, left: Math.round(left * 60), right: Math.round(right * 60), end: start + Math.round((left + right) * 60) * 1000, side: null, since: null };
       }
       case 'bottle': {
         const ml = Math.round(toNumber(f.ml));
-        if (!(ml >= BOTTLE_ML[0] && ml <= BOTTLE_ML[1])) return { error: `喝了多少毫升？填 ${BOTTLE_ML[0]}–${BOTTLE_ML[1]} 之间的数` };
+        if (!(ml >= BOTTLE_ML[0] && ml <= BOTTLE_ML[1])) return { error: msg('log.bottleMl', { min: BOTTLE_ML[0], max: BOTTLE_ML[1] }) };
         return { ...out, ml, milk: MILKS.some((m) => m.id === f.milk) ? f.milk : 'formula' };
       }
       case 'food': {
         const what = text(f.text, TEXT_MAX);
-        if (!what) return { error: '吃了什么？写一下' };
+        if (!what) return { error: msg('log.foodMissing') };
         return { ...out, text: what, amount: text(f.amount, 20), recipe: isId(f.recipe) ? f.recipe : '' };
       }
       case 'sleep': {
         if (!isClock(f.endTime)) return { ...out, end: null };
         let end = msAt(f.date, f.endTime);
         if (end <= start) end = msAt(D.addDays(f.date, 1), f.endTime);
-        if (end - start > 24 * 3600000) return { error: '一觉最长记 24 小时' };
-        if (end > now + 60000) return { error: '醒来的时间不能晚于现在' };
+        if (end - start > 24 * 3600000) return { error: msg('log.sleepTooLong') };
+        if (end > now + 60000) return { error: msg('log.wakeFuture') };
         return { ...out, end };
       }
       case 'diaper':
-        if (!f.pee && !f.poo) return { error: '选一下是尿了还是便了' };
+        if (!f.pee && !f.poo) return { error: msg('log.diaperMissing') };
         return { ...out, pee: Boolean(f.pee), poo: Boolean(f.poo), color: f.poo && typeof f.color === 'string' ? f.color : '' };
       case 'temp': {
         const value = Math.round(toNumber(f.value) * 10) / 10;
-        if (!(value >= TEMP_RANGE[0] && value <= TEMP_RANGE[1])) return { error: '体温填 34–43 之间的数，例如 36.8' };
+        if (!(value >= TEMP_RANGE[0] && value <= TEMP_RANGE[1])) return { error: msg('log.temp', { min: TEMP_RANGE[0], max: TEMP_RANGE[1] }) };
         return { ...out, value, site: ['armpit', 'ear', 'forehead'].includes(f.site) ? f.site : 'armpit' };
       }
       case 'pump': {
         const left = isBlank(f.left) ? 0 : Math.round(toNumber(f.left));
         const right = isBlank(f.right) ? 0 : Math.round(toNumber(f.right));
-        if (!(left >= 0 && right >= 0 && left <= PUMP_ML && right <= PUMP_ML && left + right > 0)) return { error: `吸了多少毫升？每边填 0–${PUMP_ML} 之间的数` };
+        if (!(left >= 0 && right >= 0 && left <= PUMP_ML && right <= PUMP_ML && left + right > 0)) return { error: msg('log.pumpMl', { max: PUMP_ML }) };
         return { ...out, left, right };
       }
       default: {
         const name = text(f.name, 20);
-        if (!name) return { error: '吃的什么药？写一下名字' };
+        if (!name) return { error: msg('log.medMissing') };
         return { ...out, name, dose: text(f.dose, 20) };
       }
     }
@@ -594,12 +595,12 @@
   // ---------- 身长体重头围、WHO 百分位 ----------
 
   function growthError(b, f, today) {
-    if (!D.isISODate(f.date)) return '选一下哪天量的';
-    if (f.date > today) return '日期不能晚于今天';
-    if (f.date < b.birthDate) return '日期不能早于出生那天';
-    if (METRICS.every((m) => isBlank(f[m.id]))) return '体重、身长、头围至少填一样';
+    if (!D.isISODate(f.date)) return msg('growth.dateMissing');
+    if (f.date > today) return msg('form.notFuture');
+    if (f.date < b.birthDate) return msg('growth.beforeBirth');
+    if (METRICS.every((m) => isBlank(f[m.id]))) return msg('growth.empty');
     for (const m of METRICS) {
-      if (!isBlank(f[m.id]) && parseMetric(m.id, f[m.id]) == null) return `${m.name}填 ${m.range[0]}–${m.range[1]} ${m.unit} 之间的数`;
+      if (!isBlank(f[m.id]) && parseMetric(m.id, f[m.id]) == null) return msg('growth.range', { name: m.name, min: m.range[0], max: m.range[1], unit: m.unit });
     }
     return null;
   }

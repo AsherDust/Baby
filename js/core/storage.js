@@ -350,15 +350,16 @@
     return JSON.stringify({ app: APP, exportedAt: now.toISOString(), ...state }, null, 2);
   }
 
+  /** 打不开时抛出的 Error，message 是词典里的键（界面用 Baby.i18n.t 变成文字） */
   function parseBackup(text) {
     let raw;
     try {
       raw = JSON.parse(text);
     } catch (e) {
-      throw new Error('这个文件打不开，不是有效的备份');
+      throw new Error('backup.invalid');
     }
     const state = Baby.model.normalize(raw);
-    if (!state) throw new Error('备份里没找到预产期，可能不是蜜罐导出的');
+    if (!state) throw new Error('backup.noDue');
     return state;
   }
 

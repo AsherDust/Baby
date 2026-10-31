@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   // 提示条、保存、导出文件、读表单
-  const { dates: D, content: C, model: M, storage: S, calendar: Cal, art: A, app } = globalThis.Baby;
+  const { dates: D, content: C, model: M, storage: S, calendar: Cal, art: A, i18n: { t }, app } = globalThis.Baby;
   const { toastBox, esc, kg, notifyPermission, isTouch, ui, GL_TAGS, glText, render } = app;
 
   // ---------- 提示条 ----------
@@ -54,7 +54,8 @@
   toastBox.addEventListener('focusin', holdToast);
   toastBox.addEventListener('focusout', (e) => { if (!toastBox.contains(e.relatedTarget)) releaseToast(); });
 
-  const oops = (message) => toast(message, null, null, 'oops');
+  /** 出错的提示条；message 是一句话，或者核心逻辑返回的 msg() */
+  const oops = (message) => toast(t(message), null, null, 'oops');
 
   const said = {};
   /** 同一件事几种说法轮着用，免得每次都一样；{baby} 换成宝宝小名，其它 {名字} 从 vars 里取 */

@@ -4,6 +4,8 @@ const PAGE = readFile('index.html');
 [...PAGE.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]).filter((src) => !src.startsWith('js/app/')).forEach((src) => load(src));
 
 const { dates: D, content: C, stories: St, model: M, storage: S, calendar: Cal, chart: Chart } = globalThis.Baby;
+// 核心逻辑返回的 msg() 在中文词典里是哪句话；null 还是 null
+const zh = (m) => (m == null ? m : globalThis.Baby.i18n.t(m));
 
 let passed = 0;
 const failures = [];
@@ -358,8 +360,8 @@ test('待产包：空分类也保留，方便往里加', () => {
 
 test('待产包：新物品名不能为空、不能重复', () => {
   const s = M.createState({ dueDate: DUE });
-  ok(M.bagItemError(s, ''));
-  ok(/已经在清单里/.test(M.bagItemError(s, '保温杯')));
+  eq(zh(M.bagItemError(s, '')), '先写上要带什么');
+  eq(zh(M.bagItemError(s, '保温杯')), '「保温杯」已经在清单里了');
   eq(M.bagItemError(s, '吸奶器'), null);
 });
 
@@ -383,10 +385,10 @@ const med = (over = {}) => ({ name: '叶酸', kind: 'supplement', dose: '每天 
 test('用药表单校验', () => {
   const today = '2026-10-12';
   eq(M.medError(med(), today), null);
-  ok(/名字/.test(M.medError(med({ name: '  ' }), today)));
-  ok(/开始日期/.test(M.medError(med({ start: '' }), today)));
-  ok(/晚于今天/.test(M.medError(med({ start: '2026-10-13' }), today)));
-  ok(/早于开始/.test(M.medError(med({ end: '2026-01-01' }), today)));
+  ok(/名字/.test(zh(M.medError(med({ name: '  ' }), today))));
+  ok(/开始日期/.test(zh(M.medError(med({ start: '' }), today))));
+  ok(/晚于今天/.test(zh(M.medError(med({ start: '2026-10-13' }), today))));
+  ok(/早于开始/.test(zh(M.medError(med({ end: '2026-01-01' }), today))));
   eq(M.medError(med({ end: '2026-12-01' }), today), null, '计划以后停是可以的');
 });
 
@@ -552,12 +554,12 @@ const bp = (over = {}) => ({ date: '2026-10-12', time: '08:30', sys: '118', dia:
 test('血压：表单校验', () => {
   const today = '2026-10-12';
   eq(M.bpError(bp(), today), null);
-  ok(/高压/.test(M.bpError(bp({ sys: '' }), today)));
-  ok(/高压/.test(M.bpError(bp({ sys: '118.5' }), today)), '要整数');
-  ok(/低压/.test(M.bpError(bp({ dia: '20' }), today)));
-  ok(/填反/.test(M.bpError(bp({ sys: '70', dia: '110' }), today)));
-  ok(/心率/.test(M.bpError(bp({ pulse: '300' }), today)));
-  ok(/晚于今天/.test(M.bpError(bp({ date: '2026-10-13' }), today)));
+  eq(zh(M.bpError(bp({ sys: '' }), today)), '高压（收缩压）填 60–250 之间的整数');
+  ok(/高压/.test(zh(M.bpError(bp({ sys: '118.5' }), today))), '要整数');
+  eq(zh(M.bpError(bp({ dia: '20' }), today)), '低压（舒张压）填 30–150 之间的整数');
+  ok(/填反/.test(zh(M.bpError(bp({ sys: '70', dia: '110' }), today))));
+  eq(zh(M.bpError(bp({ pulse: '300' }), today)), '心率填 30–220 之间的整数，不知道可以空着');
+  ok(/晚于今天/.test(zh(M.bpError(bp({ date: '2026-10-13' }), today))));
 });
 
 test('血压：按日期时间排，分级，最近 7 天汇总', () => {
@@ -592,8 +594,8 @@ test('血糖：同一天同一时间点只留一条，按天汇总', () => {
   const s = M.createState({ dueDate: DUE });
   const g = (date, slot, value) => ({ date, slot, value });
   eq(M.glucoseError(g('2026-10-12', 'lunch', '6.1'), '2026-10-12'), null);
-  ok(/mmol/.test(M.glucoseError(g('2026-10-12', 'lunch', '110'), '2026-10-12')));
-  ok(/什么时候/.test(M.glucoseError(g('2026-10-12', 'brunch', '6'), '2026-10-12')));
+  eq(zh(M.glucoseError(g('2026-10-12', 'lunch', '110'), '2026-10-12')), '血糖填 1–33.3 之间的数，单位是 mmol/L，例如 5.2');
+  ok(/什么时候/.test(zh(M.glucoseError(g('2026-10-12', 'brunch', '6'), '2026-10-12'))));
   eq(M.setGlucose(s, g('2026-10-12', 'lunch', '6.1')), null);
   M.setGlucose(s, g('2026-10-12', 'fasting', '5.6'));
   M.setGlucose(s, g('2026-10-11', 'night', '3.1'));
@@ -614,9 +616,9 @@ test('B 超：校验、取整、标出超出一般范围的', () => {
   const today = '2026-10-12';
   const f = (values, over = {}) => ({ date: '2026-09-25', values, placenta: '', note: '', ...over });
   eq(M.usError(f({ bpd: '48.26', fl: '35' }), today), null);
-  ok(/至少/.test(M.usError(f({ bpd: '' }), today)));
-  ok(/双顶径/.test(M.usError(f({ bpd: '4.8' }), today)), '可能把厘米当成了毫米');
-  ok(/晚于今天/.test(M.usError(f({ bpd: '48' }, { date: '2026-10-13' }), today)));
+  ok(/至少/.test(zh(M.usError(f({ bpd: '' }), today))));
+  ok(/^双顶径填 \d+–\d+ mm 之间的数，看看单位对不对$/.test(zh(M.usError(f({ bpd: '4.8' }), today))), '可能把厘米当成了毫米');
+  ok(/晚于今天/.test(zh(M.usError(f({ bpd: '48' }, { date: '2026-10-13' }), today))));
   eq(M.usError(f({}, { note: '只看了胎位' }), today), null, '只写备注也行');
   const s = M.createState({ dueDate: DUE });
   const a = M.addUltrasound(s, f({ bpd: '48.26', fl: '35', efw: '412.6', afi: ' 4,5 ' }));
@@ -825,9 +827,9 @@ test('备份：导出再导入一致，坏文件给出中文错误', () => {
   eq(S.parseBackup(S.backupText(s, new Date('2026-10-12T10:00:00Z'))), s);
   let message = '';
   try { S.parseBackup('{not json'); } catch (e) { message = e.message; }
-  ok(/不是有效的备份/.test(message), message);
+  eq(zh(message), '这个文件打不开，不是有效的备份');
   try { S.parseBackup('{"profile":{}}'); } catch (e) { message = e.message; }
-  ok(/没找到预产期/.test(message), message);
+  eq(zh(message), '备份里没找到预产期，可能不是蜜罐导出的');
 });
 
 // ---------- calendar ----------
@@ -1169,11 +1171,11 @@ const NOON = new Date(2026, 9, 12, 12, 5).getTime();
 test('心情：表单校验', () => {
   eq(J.entryError(mood(), '2026-10-12'), null);
   eq(J.entryError(mood({ text: '' }), '2026-10-12'), null, '只选心情不写字也行');
-  eq(J.entryError(mood({ mood: '' }), '2026-10-12'), '先选一个心情吧');
-  eq(J.entryError(mood({ mood: 'angry' }), '2026-10-12'), '先选一个心情吧');
-  eq(J.entryError(mood({ date: '' }), '2026-10-12'), '选一下日期');
-  eq(J.entryError(mood({ date: '2026-10-13' }), '2026-10-12'), '日期不能晚于今天');
-  ok(J.entryError(mood({ text: '好'.repeat(J.TEXT_MAX + 1) }), '2026-10-12').includes('太长'));
+  eq(zh(J.entryError(mood({ mood: '' }), '2026-10-12')), '先选一个心情吧');
+  eq(zh(J.entryError(mood({ mood: 'angry' }), '2026-10-12')), '先选一个心情吧');
+  eq(zh(J.entryError(mood({ date: '' }), '2026-10-12')), '选一下日期');
+  eq(zh(J.entryError(mood({ date: '2026-10-13' }), '2026-10-12')), '日期不能晚于今天');
+  eq(zh(J.entryError(mood({ text: '好'.repeat(J.TEXT_MAX + 1) }), '2026-10-12')), `写得太长啦，最多 ${J.TEXT_MAX} 字`);
   eq(J.entryError(mood({ text: `${'好'.repeat(J.TEXT_MAX - 2)}\n\n\n\n\n` }), '2026-10-12'), null, '多余的空行不算字数');
 });
 
@@ -1562,11 +1564,11 @@ test('宝宝年龄：满月按日子算，月底出生的按月底算', () => {
 
 test('宝宝出生：表单校验，出生那天量的数记进成长档案，体重可以写斤', () => {
   const f = { name: '豆豆', sex: 'boy', birthDate: '2026-10-10', birthTime: '', weight: '6.6斤', length: '50', head: '34' };
-  eq(Bb.birthError({ ...f, sex: '' }, '2026-10-12', DUE), '选一下是男宝还是女宝');
-  eq(Bb.birthError({ ...f, birthDate: '2026-10-13' }, '2026-10-12', DUE), '出生日期不能晚于今天');
-  eq(Bb.birthError({ ...f, birthDate: '2026-01-01' }, '2026-10-12', DUE), '出生日期离预产期太远了，再确认一下？');
-  eq(Bb.birthError({ ...f, weight: '30' }, '2026-10-12', DUE), '出生体重填 0.5–6.5 kg 之间的数');
-  eq(Bb.birthError({ ...f, head: '60' }, '2026-10-12', DUE), '出生头围填 20–45 cm 之间的数');
+  eq(zh(Bb.birthError({ ...f, sex: '' }, '2026-10-12', DUE)), '选一下是男宝还是女宝');
+  eq(zh(Bb.birthError({ ...f, birthDate: '2026-10-13' }, '2026-10-12', DUE)), '出生日期不能晚于今天');
+  eq(zh(Bb.birthError({ ...f, birthDate: '2026-01-01' }, '2026-10-12', DUE)), '出生日期离预产期太远了，再确认一下？');
+  eq(zh(Bb.birthError({ ...f, weight: '30' }, '2026-10-12', DUE)), '出生体重填 0.5–6.5 kg 之间的数');
+  eq(zh(Bb.birthError({ ...f, head: '60' }, '2026-10-12', DUE)), '出生头围填 20–45 cm 之间的数');
   eq(Bb.birthError(f, '2026-10-12', DUE), null);
   const b = Bb.born(f);
   eq([b.name, b.sex, b.growth], ['豆豆', 'boy', [{ date: '2026-10-10', weight: 3.3, length: 50, head: 34 }]]);
@@ -1609,16 +1611,16 @@ test('睡觉：开始和醒来，跨过半夜的分到两天；当天的小结',
 test('补记和修改：每种记录的校验，睡到第二天早上的按第二天算，改了重新排序', () => {
   const now = tAt('2026-10-12', '12:00');
   const r = (type, f) => Bb.readLog(type, { date: '2026-10-12', time: '08:00', ...f }, now);
-  eq(r('breast', { left: '', right: '' }).error, '两边一共喂了几分钟？填 1–120 之间的数');
+  eq(zh(r('breast', { left: '', right: '' }).error), '两边一共喂了几分钟？填 1–120 之间的数');
   eq([r('breast', { left: '8', right: '6' }).left, r('breast', { left: '8', right: '6' }).end], [480, tAt('2026-10-12', '08:14')]);
-  eq(r('bottle', { ml: '1000' }).error, '喝了多少毫升？填 5–500 之间的数');
-  eq(r('food', { text: ' ' }).error, '吃了什么？写一下');
-  eq(r('diaper', {}).error, '选一下是尿了还是便了');
-  eq(r('temp', { value: '45' }).error, '体温填 34–43 之间的数，例如 36.8');
-  eq(r('med', { name: '' }).error, '吃的什么药？写一下名字');
+  eq(zh(r('bottle', { ml: '1000' }).error), '喝了多少毫升？填 5–500 之间的数');
+  eq(zh(r('food', { text: ' ' }).error), '吃了什么？写一下');
+  eq(zh(r('diaper', {}).error), '选一下是尿了还是便了');
+  eq(zh(r('temp', { value: '45' }).error), '体温填 34–43 之间的数，例如 36.8');
+  eq(zh(r('med', { name: '' }).error), '吃的什么药？写一下名字');
   eq(Bb.readLog('sleep', { date: '2026-10-11', time: '22:00', endTime: '06:30' }, now).end, tAt('2026-10-12', '06:30'));
-  eq(Bb.readLog('sleep', { date: '2026-10-12', time: '11:00', endTime: '12:30' }, now).error, '醒来的时间不能晚于现在');
-  eq(r('bottle', { time: '13:00', ml: '60' }).error, '时间不能晚于现在');
+  eq(zh(Bb.readLog('sleep', { date: '2026-10-12', time: '11:00', endTime: '12:30' }, now).error), '醒来的时间不能晚于现在');
+  eq(zh(r('bottle', { time: '13:00', ml: '60' }).error), '时间不能晚于现在');
   eq(r('diaper', { poo: true, color: 'white' }).color, 'white');
   const b = newborn();
   const a = Bb.addLog(b, r('diaper', { pee: true }));
@@ -1692,9 +1694,9 @@ test('生长曲线：WHO 的中位数对得上，在中位数上是第 50 百分
 
 test('成长档案：同一天只留一条，带上几天大和百分位；日期和数值的校验', () => {
   const b = newborn('2026-08-15', 'boy');
-  eq(Bb.growthError(b, { date: '2026-08-01', weight: '4' }, '2026-10-12'), '日期不能早于出生那天');
-  eq(Bb.growthError(b, { date: '2026-10-12' }, '2026-10-12'), '体重、身长、头围至少填一样');
-  eq(Bb.growthError(b, { date: '2026-10-12', length: '300' }, '2026-10-12'), '身长填 30–130 cm 之间的数');
+  eq(zh(Bb.growthError(b, { date: '2026-08-01', weight: '4' }, '2026-10-12')), '日期不能早于出生那天');
+  eq(zh(Bb.growthError(b, { date: '2026-10-12' }, '2026-10-12')), '体重、身长、头围至少填一样');
+  eq(zh(Bb.growthError(b, { date: '2026-10-12', length: '300' }, '2026-10-12')), '身长填 30–130 cm 之间的数');
   eq(Bb.setGrowth(b, { date: '2026-09-15', weight: '4.4', length: '55' }), null);
   eq(Bb.setGrowth(b, { date: '2026-09-15', weight: '4.5', length: '55.5' }).weight, 4.4);
   const rows = Bb.growthRows(b, STD);
@@ -2072,8 +2074,8 @@ const Mg = globalThis.Baby.merge;
 const clone = (x) => JSON.parse(JSON.stringify(x));
 // 另一台手机：同一份记录导出再导入，跟真的用文件传过去一样
 const viaFile = (s) => S.parseBackup(S.backupText(s, new Date('2026-10-12T10:00:00Z')));
-const statOf = (r, label) => r.stats.find((s) => s.label === label) || { added: 0, updated: 0, dropped: 0, kept: 0 };
-const stat = (label, added, updated, dropped, kept, unit = '条') => ({ label, unit, added, updated, dropped, kept });
+const statOf = (r, tag) => r.stats.find((s) => s.tag === tag) || { added: 0, updated: 0, dropped: 0, kept: 0 };
+const stat = (tag, added, updated, dropped, kept, unit = 'entry') => ({ tag, unit, added, updated, dropped, kept });
 
 /** 每样记录都有的一台：孕期的、宝宝的，都是刚记下、还没存过的样子 */
 function fullState() {
@@ -2135,7 +2137,7 @@ test('合并：两边各记各的合在一起，分不出先后的同一条以�
   eq(mine, before, '不改这台原来的');
   const s = r.state;
   eq(s.weights.map((w) => [w.date, w.kg]), [['2026-10-01', 55], ['2026-10-10', 56], ['2026-10-11', 56.3]]);
-  eq(statOf(r, '体重'), stat('体重', 1, 0, 0, 1));
+  eq(statOf(r, 'weight'), stat('weight', 1, 0, 0, 1));
   eq(s.journal.map((e) => e.text).sort(), ['我记的', '爸爸记的'].sort());
   ok(s.checkups.some((c) => c.title === '牙科检查'), '对方加的产检');
   ok(s.checkups.find((c) => c.id === 'nt').done && s.checkups.find((c) => c.id === 'anomaly').date === '2026-10-20', '对方填的日期、勾的做完补上');
@@ -2145,7 +2147,7 @@ test('合并：两边各记各的合在一起，分不出先后的同一条以�
   const again = Mg.merge(s, other);
   eq([again.added, again.dropped], [0, 0], '再合一次没有新的');
   other.profile.dueDate = '2027-02-01';
-  ok(/预产期不一样/.test(Mg.merge(mine, other).notes.join()), '预产期不一样要说');
+  ok(/预产期不一样/.test(Mg.merge(mine, other).notes.map(zh).join()), '预产期不一样要说');
 });
 
 test('合并：对方删掉的这台也删；这台删过的不会加回来；撤销删除、删之前改过的都不删', () => {
@@ -2165,7 +2167,7 @@ test('合并：对方删掉的这台也删；这台删过的不会加回来；�
   mine.weights.push(w);
   const r = Mg.merge(mine, viaFile(other));
   eq(r.state.journal.map((e) => e.id), [e2.id], '一模一样的那条跟着删，改过的留着');
-  eq(statOf(r, '心情').dropped, 1);
+  eq(statOf(r, 'journal').dropped, 1);
   eq(r.state.bp, [], '这台删过的血压不会被加回来');
   eq(r.state.weights.length, 1, '这台删了又撤销的还在');
   ok(r.state.removed[`journal:${e1.id}`] && r.state.removed[`bp:${bp.id}`], '两边的标记都留着');
@@ -2203,12 +2205,12 @@ test('合并：宝宝 — 这台还没有就整个拿来，同一个宝宝逐项
   const other = fullState();
   const r = Mg.merge(preg, viaFile(other));
   eq(r.state.baby, viaFile(other).baby, '整个拿过来');
-  eq([statOf(r, '宝宝的出生信息').added, statOf(r, '宝宝的日常记录').added], [1, 1]);
+  eq([statOf(r, 'birth').added, statOf(r, 'log').added], [1, 1]);
 
   const twin = fullState();
   twin.baby.birthDate = '2026-08-16';
   const diff = Mg.merge(fullState(), viaFile(twin));
-  ok(/出生日期不一样，用的是这台手机上的/.test(diff.notes.join()), diff.notes.join());
+  ok(/出生日期不一样，用的是这台手机上的/.test(diff.notes.map(zh).join()), diff.notes.map(zh).join());
   eq(diff.state.baby.birthDate, '2026-08-15');
 
   const base = viaFile(fullState());
@@ -2229,12 +2231,12 @@ test('合并：宝宝 — 这台还没有就整个拿来，同一个宝宝逐项
   const m = Mg.merge(mine, viaFile(dad));
   const b = m.state.baby;
   eq(b.logs.map((l) => l.type).sort(), ['bottle', 'diaper'], '各记的都在，爸爸删掉的那条也删了');
-  eq(statOf(m, '宝宝的日常记录'), stat('宝宝的日常记录', 1, 0, 1, 0));
+  eq(statOf(m, 'log'), stat('log', 1, 0, 1, 0));
   eq([b.vaccines['hepb-2'].done, b.teeth['la-r'], b.papers.cert, b.foodNotes['鸡蛋'].feel, b.tried['南瓜']],
     ['2026-09-15', '2026-10-01', '2026-08-20', 'reaction', '2026-10-10']);
   eq(b.growth.map((g) => g.date), ['2026-08-15', '2026-09-15', '2026-10-10'], '出生那天的、各记的都在');
   eq([b.milestones.roll, b.milestones.tooth], ['2026-09-01', '2026-10-01'], '里程碑这台记过的不动，没记的加上');
-  eq(statOf(m, '里程碑').kept, 1);
+  eq(statOf(m, 'milestone').kept, 1);
 });
 
 test('合并：两边都在计时的不合，对方停了的那条用停了的', () => {
@@ -2246,7 +2248,7 @@ test('合并：两边都在计时的不合，对方停了的那条用停了的',
   Bb.startSleep(dad.baby, t + 5 * MINUTE);
   const r = Mg.merge(mine, viaFile(dad));
   eq(r.state.baby.logs.filter((l) => l.type === 'sleep').length, 1, '只留这台在计时的');
-  ok(/正在计时/.test(r.notes.join()), r.notes.join());
+  ok(/正在计时/.test(r.notes.map(zh).join()), r.notes.map(zh).join());
   const shared = Mg.merge(mine, viaFile(mine)).state;
   const dad2 = viaFile(shared);
   Bb.stopSleep(dad2.baby, t + 40 * MINUTE);
@@ -2321,7 +2323,7 @@ test('合并：两边都改过的同一条取后改的那边，合回去两台�
   Mg.track(mine, t0 + 2000);
   const r = Mg.merge(mine, viaFile(dad));
   eq([r.state.journal[0].text, r.state.weights[0].kg], ['爸爸改的', 56.4], '心情是爸爸后改的，体重是这台后改的');
-  eq([statOf(r, '心情'), statOf(r, '体重')], [stat('心情', 0, 1, 0, 0), stat('体重', 0, 0, 0, 1)]);
+  eq([statOf(r, 'journal'), statOf(r, 'weight')], [stat('journal', 0, 1, 0, 0), stat('weight', 0, 0, 0, 1)]);
   const back = Mg.merge(viaFile(dad), viaFile(r.state));
   eq([back.state.journal[0].text, back.state.weights[0].kg], ['爸爸改的', 56.4], '对方合回去也一样');
   const again = Mg.merge(r.state, viaFile(back.state));
@@ -2344,7 +2346,7 @@ test('合并：疫苗、办证这些，对方后来去掉的跟着去掉，这�
   Mg.track(mine, t0 + 2000);
   const r = Mg.merge(mine, viaFile(dad));
   eq(Object.keys(r.state.baby.papers), ['insure']);
-  eq(statOf(r, '办证清单'), stat('办证清单', 1, 0, 1, 0));
+  eq(statOf(r, 'paper'), stat('paper', 1, 0, 1, 0));
   eq(Object.keys(Mg.merge(viaFile(dad), viaFile(r.state)).state.baby.papers), ['insure'], '对方那台合回去也一样');
 });
 
@@ -2364,8 +2366,9 @@ test('合并：预产期、宝宝的出生信息一项一项比，后改的那�
   Mg.track(mine, t0 + 2000);
   const r = Mg.merge(mine, viaFile(dad));
   eq([r.state.profile.dueDate, r.state.profile.nickname, r.state.baby.birthDate, r.state.baby.name], ['2027-02-01', '豆豆', '2026-08-16', '小豆']);
-  ok(/预产期不一样，用的是对方后来改的/.test(r.notes.join()) && /出生日期不一样，用的是对方后来改的/.test(r.notes.join()), r.notes.join());
-  eq([statOf(r, '预产期和资料'), statOf(r, '宝宝的出生信息')], [stat('预产期和资料', 0, 1, 0, 0, '项'), stat('宝宝的出生信息', 0, 1, 0, 0, '项')]);
+  const notes = r.notes.map(zh).join();
+  ok(/预产期不一样，用的是对方后来改的/.test(notes) && /出生日期不一样，用的是对方后来改的/.test(notes), notes);
+  eq([statOf(r, 'profile'), statOf(r, 'birth')], [stat('profile', 0, 1, 0, 0, 'item'), stat('birth', 0, 1, 0, 0, 'item')]);
 });
 
 test('合并：上万条记录，保存时比一遍、合并都不慢', () => {
@@ -2412,7 +2415,7 @@ test('合并：食谱换过的菜、收藏、买菜清单、忌口、收藏和�
   eq([s.meals.favorites, s.meals.bought['2026-10-12'], s.meals.days['2026-10-12']['lunch-main'], s.meals.avoid],
     [['fish-soup'], ['鸡蛋'], 'egg-custard', ['spicy']], '爸爸取消的收藏、取消的勾、换的菜、加的忌口');
   eq([s.stories.favorites, s.stories.blocked, s.prefs.glucoseAfter], [['prose-01', 'prose-02'], ['prose-03'], 1], '故事的收藏两边的都在，不想听的加上了，餐后改成 1 小时');
-  eq([statOf(r, '收藏的菜').dropped, statOf(r, '买菜清单').dropped, statOf(r, '食谱里换过的菜').updated, statOf(r, '餐后测血糖的时间').updated], [1, 1, 1, 1]);
+  eq([statOf(r, 'fav').dropped, statOf(r, 'bought').dropped, statOf(r, 'menu').updated, statOf(r, 'glucoseAfter').updated], [1, 1, 1, 1]);
   const back = Mg.merge(viaFile(dad), viaFile(s)).state;
   eq([back.meals.favorites, back.stories.favorites], [['fish-soup'], ['prose-01', 'prose-02']], '爸爸那台合回去：取消的收藏不会被加回来');
   eq(Object.keys(mine.edits).filter((k) => /^(story-fav|fav|avoid|bought|menu|info:glucoseAfter)/.test(k)), ['story-fav:prose-02'], '保存时记下故事收藏改的时间');
@@ -2622,7 +2625,7 @@ test('合并：清空宫缩、清除宝宝信息，同步后不会被带回来�
   const r = Mg.merge(mine, viaFile(dad), { converge: true });
   eq([r.state.contractions.length, r.state.baby], [0, null], '爸爸那台的不会把它们带回来');
   const d = Mg.merge(viaFile(dad), viaFile(r.state), { converge: true });
-  eq([d.state.contractions.length, d.state.baby, statOf(d, '宝宝的信息和记录').dropped], [0, null, 1], '爸爸那台跟着清掉');
+  eq([d.state.contractions.length, d.state.baby, statOf(d, 'babyAll').dropped], [0, null, 1], '爸爸那台跟着清掉');
   M.restoreBaby(mine, baby, Date.now() + 1000);
   const r2 = Mg.merge(mine, viaFile(d.state), { converge: true });
   ok(r2.state.baby && r2.state.baby.logs.length === baby.logs.length, '撤销清除以后，不会被同步再清掉');
@@ -2702,7 +2705,7 @@ test('合并：盆底肌每次憋几秒按后改的', () => {
   dad.pelvic.hold = 8;
   Mg.track(dad, t0 + 1000);
   const r = Mg.merge(mine, viaFile(dad));
-  eq([r.state.pelvic.hold, statOf(r, '盆底肌每次憋几秒').updated], [8, 1]);
+  eq([r.state.pelvic.hold, statOf(r, 'pelvicHold').updated], [8, 1]);
   eq(Sy.changes(Sy.split(dad), { 'main.json': { hash: Sy.fingerprint('main.json', Sy.split(mine)['main.json']) } }).upload, ['main.json'], '改了要传');
 });
 
@@ -2826,6 +2829,37 @@ test('合并：老格式的删除标记只记了哪天，按那天零点算', ()
   eq([Mg.merge(before, other).state.weights.length, Mg.merge(after, other).state.weights.length], [0, 1], '零点以前改的跟着删，零点以后改的留着');
 });
 
+// ---------- 多语言 ----------
+
+const I18N = globalThis.Baby.i18n;
+const ZH = globalThis.Baby.lang.zh;
+
+test('多语言：t() 按键取话、换参数，也认 msg()；词典里没有的原样返回', () => {
+  eq(I18N.t('bag.duplicate', { name: '保温杯' }), '「保温杯」已经在清单里了');
+  eq(I18N.t(I18N.msg('bag.duplicate', { name: '保温杯' })), '「保温杯」已经在清单里了');
+  eq(I18N.msg('due.missing'), { key: 'due.missing' }, '核心逻辑返回的只有键和参数');
+  eq(I18N.t('bp.sys', { min: 60 }), '高压（收缩压）填 60–{max} 之间的整数', '少给的参数留着，一眼看得出');
+  eq([I18N.t('给这次产检起个名字吧'), I18N.t('toString'), I18N.t(''), I18N.t(null)], ['给这次产检起个名字吧', 'toString', '', ''], '本来就是一句话的照原样');
+});
+
+test('多语言：代码里用到的键词典里都有，词典里的都用得上', () => {
+  const sources = [...PAGE.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]).filter((src) => src.startsWith('js/')).map((src) => readFile(src)).join('\n');
+  const used = [...sources.matchAll(/\b(?:msg|t)\(\s*'([^']+)'/g)].map((m) => m[1]);
+  ok(used.length > 50, `找到的键太少：${used.length}`);
+  const missing = used.filter((k) => !Object.prototype.hasOwnProperty.call(ZH, k));
+  ok(!missing.length, `词典里没有：${missing.join('、')}`);
+  // 合并预览：每样东西的编号（core/merge.js 的几张表和 tally 的）都有名字，加了、改了、删了每种单位都有
+  const merge = readFile('js/core/merge.js');
+  const tags = [...merge.matchAll(/^\s+\['([\w-]+)', '\w+'[,\]]/gm), ...merge.matchAll(/tag: '([\w-]+)'/g), ...merge.matchAll(/tally\(ctx\.stats, '([\w-]+)'/g)].map((m) => m[1]);
+  ok(tags.length > 30, `找到的编号太少：${tags.length}`);
+  const what = tags.map((tag) => `merge.what.${tag}`);
+  const counts = ['added', 'updated', 'dropped'].flatMap((k) => ['entry', 'item', 'copy'].map((u) => `merge.${k}.${u}`));
+  const unnamed = [...what, ...counts].filter((k) => !ZH[k]);
+  ok(!unnamed.length, `合并预览缺名字：${unnamed.join('、')}`);
+  const unused = Object.keys(ZH).filter((k) => !used.includes(k) && !what.includes(k) && !counts.includes(k) && !sources.includes(`'${k}'`));
+  ok(!unused.length, `词典里没用上的：${unused.join('、')}`);
+});
+
 test('校验：填错时的提示（核心逻辑里的）', () => {
   const T = '2026-10-12';
   const now = tAt(T, '20:00');
@@ -2851,7 +2885,7 @@ test('校验：填错时的提示（核心逻辑里的）', () => {
     [Bb.readLog('breast', { date: T, time: '08:00', left: '0', right: '' }, now).error, '两边一共喂了几分钟？填 1–120 之间的数'],
     [Bb.readLog('sleep', { date: T, time: '19:00', endTime: '20:30' }, now).error, '醒来的时间不能晚于现在'],
   ];
-  cases.forEach(([got, want], i) => eq(got, want, `第 ${i + 1} 条`));
+  cases.forEach(([got, want], i) => eq(zh(got), want, `第 ${i + 1} 条`));
 });
 
 // ---------- 本机存储：日常记录按月存进 IndexedDB ----------

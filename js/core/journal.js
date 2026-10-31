@@ -5,6 +5,7 @@
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
   const U = Baby.util;
+  const { msg } = Baby.i18n;
 
   const MOODS = [
     { id: 'happy', name: '开心' },
@@ -53,10 +54,10 @@
   }
 
   function entryError(f, today) {
-    if (!isMood(f.mood)) return '先选一个心情吧';
-    if (!D.isISODate(f.date)) return '选一下日期';
-    if (f.date > today) return '日期不能晚于今天';
-    if (tidy(f.text).length > TEXT_MAX) return `写得太长啦，最多 ${TEXT_MAX} 字`;
+    if (!isMood(f.mood)) return msg('mood.missing');
+    if (!D.isISODate(f.date)) return msg('form.pickDate');
+    if (f.date > today) return msg('form.notFuture');
+    if (tidy(f.text).length > TEXT_MAX) return msg('mood.tooLong', { max: TEXT_MAX });
     return null;
   }
 

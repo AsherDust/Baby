@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   // 弹窗和底部面板
-  const { dates: D, content: C, model: M, journal: J, art: A, app } = globalThis.Baby;
+  const { dates: D, content: C, model: M, journal: J, art: A, i18n: { t }, app } = globalThis.Baby;
   const {
     settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, esc, atRisk, ui, glText, usText, profileFields,
     moodPicker
@@ -172,12 +172,8 @@
   /** 合并之前先看一眼：每样加几条、改几条、跟着对方删几条，还有要说一声的 */
   function openMergeSheet(result, when) {
     const rows = result.stats.filter((s) => s.added || s.updated || s.dropped).map((s) => {
-      const what = [
-        s.added ? `加 ${s.added} ${s.unit}` : '',
-        s.updated ? `改 ${s.updated} ${s.unit}` : '',
-        s.dropped ? `跟着对方删 ${s.dropped} ${s.unit}` : '',
-      ].filter(Boolean).join('，');
-      return `<li><span>${s.label}</span><b>${what}</b></li>`;
+      const what = ['added', 'updated', 'dropped'].filter((k) => s[k]).map((k) => t(`merge.${k}.${s.unit}`, { n: s[k] })).join('，');
+      return `<li><span>${t(`merge.what.${s.tag}`)}</span><b>${what}</b></li>`;
     }).join('');
     const nothing = !result.added && !result.updated && !result.dropped;
     sheetDialog.innerHTML = `
@@ -185,7 +181,7 @@
         ${dialogHead('合并家人的记录', when ? `对方 ${when} 导出的` : '')}
         ${nothing ? '<p class="merge-same">没有要加的，两边的记录已经一样了。</p>' : `<ul class="merge-list">${rows}</ul>`}
         ${result.kept ? `<p class="hint">另有 ${result.kept} 条两边不一样，这台改得更晚或者分不出先后，留的是这台手机上的。</p>` : ''}
-        ${result.notes.map((n) => `<p class="merge-note">${A.icon.alert}<span>${n}</span></p>`).join('')}
+        ${result.notes.map((n) => `<p class="merge-note">${A.icon.alert}<span>${t(n)}</span></p>`).join('')}
         ${nothing ? '' : '<p class="hint">两边都改过的同一条，用后改的那次；对方删掉的，这台也删掉。合完马上可以撤销。</p>'}
         <div class="dialog-actions">
           <span class="spacer"></span>
@@ -441,13 +437,14 @@
 
   const submitButton = (form) => form.querySelector('button:not([type="button"])');
 
-  // 出错时读屏会念出来；只有一个输入框的表单（记体重、血糖、体温……）把它标成填错了，光标放回去
+  // 出错时读屏会念出来；只有一个输入框的表单（记体重、血糖、体温……）把它标成填错了，光标放回去。
+  // message 是一句话，或者核心逻辑返回的 msg()
   function formError(form, message) {
     const el = form.querySelector('.form-error');
     if (!el) return;
     el.setAttribute('role', 'alert');
     el.id = el.id || `${form.dataset.form || 'form'}-error`;
-    el.textContent = message;
+    el.textContent = t(message);
     el.hidden = !message;
     const fields = [...form.querySelectorAll('input:not([type=hidden]):not([type=radio]):not([type=checkbox]), textarea')]
       .filter((f) => f.getClientRects().length);

@@ -3,6 +3,7 @@
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
   const { text, isBlank, isClock, isTime, toNumber, newId, byStart } = Baby.util;
+  const { msg } = Baby.i18n;
   const C = Baby.content;
   const St = Baby.stories;
   const J = Baby.journal;
@@ -62,6 +63,8 @@
     const n = toNumber(v);
     return Number.isInteger(n) && n >= lo && n <= hi ? n : null;
   }
+  /** 提示里「填 min–max 之间」的参数 */
+  const span = ([min, max]) => ({ min, max });
   const mean = (list) => list.reduce((s, n) => s + n, 0) / list.length;
   const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
   const bagGroupId = (g) => (C.BAG_GROUPS.some((x) => x.id === g) ? g : 'misc');
@@ -108,10 +111,10 @@
   }
 
   function dueDateError(due, today) {
-    if (!D.isISODate(due)) return '先选一下预产期';
+    if (!D.isISODate(due)) return msg('due.missing');
     const days = D.gestation(due, today).days;
-    if (days < 0) return '这个预产期离现在超过 40 周了，再确认一下？';
-    if (days > 44 * 7) return '这个预产期已经过去很久了，再确认一下？';
+    if (days < 0) return msg('due.tooFar');
+    if (days > 44 * 7) return msg('due.tooOld');
     return null;
   }
 
@@ -609,8 +612,8 @@
 
   /** 新物品名有问题时返回提示，没问题返回 null */
   function bagItemError(state, name) {
-    if (!name) return '先写上要带什么';
-    if (state.bag.some((b) => b.name === name)) return `「${name}」已经在清单里了`;
+    if (!name) return msg('bag.nameMissing');
+    if (state.bag.some((b) => b.name === name)) return msg('bag.duplicate', { name });
     return null;
   }
 
@@ -650,11 +653,11 @@
 
   /** 表单内容有问题时返回提示，没问题返回 null */
   function medError(f, today) {
-    if (!text(f.name, MED_NAME_MAX)) return '写一下药或补剂的名字';
-    if (!D.isISODate(f.start)) return '选一下开始日期';
-    if (f.start > today) return '开始日期不能晚于今天';
-    if (f.end && !D.isISODate(f.end)) return '结束日期格式不对，重新选一下';
-    if (f.end && f.end < f.start) return '结束日期不能早于开始日期';
+    if (!text(f.name, MED_NAME_MAX)) return msg('med.nameMissing');
+    if (!D.isISODate(f.start)) return msg('med.startMissing');
+    if (f.start > today) return msg('med.startFuture');
+    if (f.end && !D.isISODate(f.end)) return msg('med.endInvalid');
+    if (f.end && f.end < f.start) return msg('med.endBeforeStart');
     return null;
   }
 
@@ -902,12 +905,12 @@
   // ---- 血压 ----
 
   function bpError(f, today) {
-    if (!D.isISODate(f.date)) return '选一下日期';
-    if (f.date > today) return '日期不能晚于今天';
-    if (intIn(f.sys, BP_RANGE.sys) == null) return '高压（收缩压）填 60–250 之间的整数';
-    if (intIn(f.dia, BP_RANGE.dia) == null) return '低压（舒张压）填 30–150 之间的整数';
-    if (toNumber(f.sys) <= toNumber(f.dia)) return '高压要比低压大，是不是填反了？';
-    if (!isBlank(f.pulse) && intIn(f.pulse, BP_RANGE.pulse) == null) return '心率填 30–220 之间的整数，不知道可以空着';
+    if (!D.isISODate(f.date)) return msg('form.pickDate');
+    if (f.date > today) return msg('form.notFuture');
+    if (intIn(f.sys, BP_RANGE.sys) == null) return msg('bp.sys', span(BP_RANGE.sys));
+    if (intIn(f.dia, BP_RANGE.dia) == null) return msg('bp.dia', span(BP_RANGE.dia));
+    if (toNumber(f.sys) <= toNumber(f.dia)) return msg('bp.reversed');
+    if (!isBlank(f.pulse) && intIn(f.pulse, BP_RANGE.pulse) == null) return msg('bp.pulse', span(BP_RANGE.pulse));
     return null;
   }
 
@@ -962,10 +965,10 @@
   }
 
   function glucoseError(f, today) {
-    if (!D.isISODate(f.date)) return '选一下日期';
-    if (f.date > today) return '日期不能晚于今天';
-    if (slotIndex(f.slot) < 0) return '选一下是什么时候测的';
-    if (parseGlucose(f.value) == null) return '血糖填 1–33.3 之间的数，单位是 mmol/L，例如 5.2';
+    if (!D.isISODate(f.date)) return msg('form.pickDate');
+    if (f.date > today) return msg('form.notFuture');
+    if (slotIndex(f.slot) < 0) return msg('glucose.slotMissing');
+    if (parseGlucose(f.value) == null) return msg('glucose.range', span(GLUCOSE_RANGE));
     return null;
   }
 
@@ -1012,18 +1015,18 @@
   // ---- B 超 ----
 
   function usError(f, today) {
-    if (!D.isISODate(f.date)) return '选一下检查日期';
-    if (f.date > today) return '日期不能晚于今天';
+    if (!D.isISODate(f.date)) return msg('us.dateMissing');
+    if (f.date > today) return msg('form.notFuture');
     for (const field of C.US_FIELDS) {
       const v = f.values ? f.values[field.id] : null;
       if (isBlank(v)) continue;
       const n = toNumber(v);
       if (!Number.isFinite(n) || n < field.min || n > field.max) {
-        return `${field.name}填 ${field.min}–${field.max} ${field.unit} 之间的数，看看单位对不对`;
+        return msg('us.range', { name: field.name, min: field.min, max: field.max, unit: field.unit });
       }
     }
     const fields = usFields(f);
-    if (!Object.keys(fields.values).length && !fields.placenta && !fields.note) return '至少填一项数值';
+    if (!Object.keys(fields.values).length && !fields.placenta && !fields.note) return msg('us.empty');
     return null;
   }
 

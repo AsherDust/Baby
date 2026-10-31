@@ -619,6 +619,16 @@ const sinceCalls = () => {
     await until(() => !names().includes('honey-pot/logs-2026-09.json'));
     log(!names().includes('honey-pot/logs-2026-09.json') && names().includes(`honey-pot/logs-${TODAY.slice(0, 7)}.json`), '九月删光了：云端九月的文件也删掉', names().join());
 
+    // ---- 云端的预产期和这台不一样：合进来时说一声 ----
+    // 分不出先后时两台按内容选同一个，2026-08-10 比这台的 2026-08-20 排在前面，用云端的
+    await settled();
+    const otherDue = JSON.parse(w.Baby.sync.split(w.Baby.app.state)['main.json']);
+    otherDue.profile.dueDate = '2026-08-10';
+    await repo.commitOther('honey-pot/main.json', await sealAs('main.json', JSON.stringify(otherDue)));
+    await w.Baby.app.cloud.syncNow('manual');
+    await until(() => /预产期不一样/.test(toastText()));
+    log(/两边的预产期不一样，用的是对方后来改的/.test(toastText()) && w.Baby.app.state.profile.dueDate === '2026-08-10', '云端的预产期和这台不一样：提示条里说一声', toastText());
+
     // ---- 清空全部数据时断开 ----
     await openSettings();
     d.querySelector('[data-action="clear-all"]').click();

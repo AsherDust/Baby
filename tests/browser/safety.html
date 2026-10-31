@@ -346,6 +346,13 @@ save(seed);
     log(/体重\s*改 1 条/.test(text('.merge-sheet')), '对方后来改过的列出来', text('.merge-sheet'));
     await closeSheet();
     log(state().weights[0].kg === 54.9 && /改了 1 条/.test(toastText()), '对方后来改过的用对方的', toastText());
+
+    const dadDue = dadFile((s) => { s.profile.dueDate = '2027-02-01'; });
+    $('[data-action="open-settings"]').click();
+    await pickMerge(dadDue);
+    log(text('.merge-sheet .merge-note') === '两边的预产期不一样，用的是这台手机上的', '两边预产期不一样：合并前说一声用的是哪边的', text('.merge-sheet'));
+    await closeSheet('close-dialog');
+
     w.Baby.model.upsertWeight(w.Baby.app.state, '2026-10-12', 55.5);
     w.Baby.app.persist();
     log(state().edits['weight:2026-10-12'] > Date.now() - 60000, '这台改过的保存时记下时间', JSON.stringify(state().edits));

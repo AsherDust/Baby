@@ -6,6 +6,7 @@
   // 标记只在这一边确实没有这条时才算数，撤销删除后自然就不作数了
   const Baby = globalThis.Baby || (globalThis.Baby = {});
   const D = Baby.dates;
+  const { msg } = Baby.i18n;
 
   const KEEP_DAYS = 180;
   const KEEP_REMOVED = 500;
@@ -84,34 +85,35 @@
     return walk(state, fresh, SCHEMA);
   }
 
-  // 每样记录放在哪、编号怎么取、合并时叫什么；记「改过」、记「删过」、合并都按这张表
+  // 每样记录的编号、放在哪、每条的编号怎么取；记「改过」、记「删过」、合并都按这张表。
+  // 合并预览里叫什么在词典里（merge.what.编号）
   const LISTS = [
-    ['weight', 'weights', '体重', (w) => w.date],
-    ['bp', 'bp', '血压'],
-    ['glucose', 'glucose', '血糖', (g) => `${g.date}/${g.slot}`],
-    ['med', 'meds', '用药和补剂'],
-    ['us', 'ultrasounds', 'B 超'],
-    ['journal', 'journal', '心情'],
-    ['kick', 'kicks', '数胎动'],
-    ['contraction', 'contractions', '宫缩'],
-    ['checkup', 'checkups', '产检'],
-    ['bag', 'bag', '待产包'],
+    ['weight', 'weights', (w) => w.date],
+    ['bp', 'bp'],
+    ['glucose', 'glucose', (g) => `${g.date}/${g.slot}`],
+    ['med', 'meds'],
+    ['us', 'ultrasounds'],
+    ['journal', 'journal'],
+    ['kick', 'kicks'],
+    ['contraction', 'contractions'],
+    ['checkup', 'checkups'],
+    ['bag', 'bag'],
   ];
   const BABY_LISTS = [
-    ['log', 'logs', '宝宝的日常记录'],
-    ['growth', 'growth', '身长体重', (g) => g.date],
-    ['moment', 'moments', '其它的第一次'],
-    ['xv', 'extraVaccines', '自费疫苗'],
-    ['stash', 'stash', '存奶'],
+    ['log', 'logs'],
+    ['growth', 'growth', (g) => g.date],
+    ['moment', 'moments'],
+    ['xv', 'extraVaccines'],
+    ['stash', 'stash'],
   ];
   const BABY_MAPS = [
-    ['vaccine', 'vaccines', '疫苗'],
-    ['exam', 'exams', '体检'],
-    ['paper', 'papers', '办证清单'],
-    ['milestone', 'milestones', '里程碑'],
-    ['tooth', 'teeth', '长牙'],
-    ['tried', 'tried', '吃过的食材'],
-    ['food', 'foodNotes', '辅食的标记'],
+    ['vaccine', 'vaccines'],
+    ['exam', 'exams'],
+    ['paper', 'papers'],
+    ['milestone', 'milestones'],
+    ['tooth', 'teeth'],
+    ['tried', 'tried'],
+    ['food', 'foodNotes'],
   ];
   // 按改的时间一项一项合的单个值：顶层这几组共用一套「改过的时间」，宝宝的在宝宝那份里
   const FIELD_GROUPS = ['profile', 'prefs', 'pelvic'];
@@ -127,7 +129,6 @@
     {
       path: 'meals.days',
       tag: 'menu',
-      label: '食谱里换过的菜',
       get: (s) => Object.fromEntries(Object.entries(s.meals.days).flatMap(([day, picks]) => Object.entries(picks).map(([slot, id]) => [`${day}/${slot}`, id]))),
       put: (s, m) => {
         s.meals.days = {};
@@ -140,7 +141,6 @@
     {
       path: 'meals.bought',
       tag: 'bought',
-      label: '买菜清单',
       get: (s) => setOf(Object.entries(s.meals.bought).flatMap(([day, names]) => names.map((n) => `${day}/${n}`))),
       put: (s, m) => {
         const old = s.meals.bought;
@@ -152,10 +152,10 @@
         for (const day of Object.keys(s.meals.bought)) s.meals.bought[day] = keepOrder(old[day] || [], setOf(s.meals.bought[day]));
       },
     },
-    { path: 'meals.favorites', tag: 'fav', label: '收藏的菜', get: (s) => setOf(s.meals.favorites), put: (s, m) => { s.meals.favorites = keepOrder(s.meals.favorites, m); } },
-    { path: 'meals.avoid', tag: 'avoid', label: '忌口', get: (s) => setOf(s.meals.avoid), put: (s, m) => { s.meals.avoid = keepOrder(s.meals.avoid, m); } },
-    { path: 'stories.favorites', tag: 'story-fav', label: '收藏的故事', get: (s) => setOf(s.stories.favorites), put: (s, m) => { s.stories.favorites = keepOrder(s.stories.favorites, m); } },
-    { path: 'stories.blocked', tag: 'story-block', label: '不想听的故事', get: (s) => setOf(s.stories.blocked), put: (s, m) => { s.stories.blocked = keepOrder(s.stories.blocked, m); } },
+    { path: 'meals.favorites', tag: 'fav', get: (s) => setOf(s.meals.favorites), put: (s, m) => { s.meals.favorites = keepOrder(s.meals.favorites, m); } },
+    { path: 'meals.avoid', tag: 'avoid', get: (s) => setOf(s.meals.avoid), put: (s, m) => { s.meals.avoid = keepOrder(s.meals.avoid, m); } },
+    { path: 'stories.favorites', tag: 'story-fav', get: (s) => setOf(s.stories.favorites), put: (s, m) => { s.stories.favorites = keepOrder(s.stories.favorites, m); } },
+    { path: 'stories.blocked', tag: 'story-block', get: (s) => setOf(s.stories.blocked), put: (s, m) => { s.stories.blocked = keepOrder(s.stories.blocked, m); } },
   ];
 
   // 同一条记录刚记下时和存过一遍再读出来，字段的顺序、空着的字段可能不一样，指纹不能跟着变
@@ -240,7 +240,7 @@
   function shapeOf(src, lists, maps, info) {
     const out = {};
     const text = (entries) => new Map(entries.map(([k, v]) => [k, JSON.stringify(v)]));
-    for (const [tag, field, , key = byId] of lists) out[tag] = { full: key !== byId, each: text(src[field].map((x) => [String(key(x)), x])) };
+    for (const [tag, field, key = byId] of lists) out[tag] = { full: key !== byId, each: text(src[field].map((x) => [String(key(x)), x])) };
     for (const [tag, field] of maps) out[tag] = { full: true, each: text(Object.entries(src[field])) };
     out.info = { full: true, each: text(Object.entries(info)) };
     return out;
@@ -306,9 +306,10 @@
     return out;
   }
 
-  // added 加了几条，updated 换成了对方后改的，dropped 跟着对方删的，kept 两边不一样、留了这台的；unit 是「条」还是「项」
-  const tally = (stats, label, n, unit = '条') => {
-    if (n.added || n.updated || n.dropped || n.kept) stats.push({ label, unit, ...n });
+  // tag 是哪样东西（词典里 merge.what.编号）；added 加了几条，updated 换成了对方后改的，dropped 跟着对方删的，
+  // kept 两边不一样、留了这台的；unit：entry 一条条的记录，item 一个个的设置，copy 整个宝宝的记录
+  const tally = (stats, tag, n, unit = 'entry') => {
+    if (n.added || n.updated || n.dropped || n.kept) stats.push({ tag, unit, ...n });
   };
   const counts = () => ({ added: 0, updated: 0, dropped: 0, kept: 0 });
 
@@ -340,7 +341,7 @@
    * 一种列表：对方删掉了、这边一模一样的那条删掉；对方有、这边没有的加进来，这边删过一模一样的就不加；
    * 两边都有的交给 pick
    */
-  function list(mine, other, tag, label, key, ctx, fill) {
+  function list(mine, other, tag, key, ctx, fill) {
     const n = counts();
     const otherKeys = new Set(other.map(key));
     const out = mine.filter((x) => {
@@ -366,12 +367,12 @@
       out.push(x);
       n.added += 1;
     }
-    tally(ctx.stats, label, n);
+    tally(ctx.stats, tag, n);
     return out;
   }
 
   /** { 编号: 值 } 这种：没有标记删过，靠改过的时间——只有一边有、另一边后来删了的，跟着删 */
-  function map(mine, other, tag, label, ctx, fill) {
+  function map(mine, other, tag, ctx, fill) {
     const n = counts();
     for (const k of new Set([...Object.keys(mine), ...Object.keys(other)])) {
       const id = `${tag}:${k}`;
@@ -388,7 +389,7 @@
         n.dropped += 1;
       }
     }
-    tally(ctx.stats, label, n);
+    tally(ctx.stats, tag, n);
   }
 
   /**
@@ -433,15 +434,15 @@
     const mineIds = new Set(a.logs.map((l) => l.id));
     const busy = new Set(a.logs.filter(timing).map((l) => l.type));
     const logs = b.logs.filter((l) => mineIds.has(l.id) || !timing(l) || !busy.has(l.type));
-    if (logs.length < b.logs.length) ctx.notes.push('两边都有正在计时的喂奶或睡觉，对方那条先没合；都停了以后再合一次');
+    if (logs.length < b.logs.length) ctx.notes.push(msg('merge.note.timing'));
 
     const born = a.birthDate !== b.birthDate;
     const taken = fields(a, b, Object.keys(birthOf(a)), ['name', 'birthTime'], sub);
-    tally(ctx.stats, '宝宝的出生信息', { ...counts(), updated: taken.length }, '项');
-    if (born) ctx.notes.push(`两边宝宝的出生日期不一样，用的是${taken.includes('birthDate') ? '对方后来改的' : '这台手机上的'}`);
+    tally(ctx.stats, 'birth', { ...counts(), updated: taken.length }, 'item');
+    if (born) ctx.notes.push(msg(taken.includes('birthDate') ? 'merge.note.birthTheirs' : 'merge.note.birthMine'));
 
-    for (const [tag, field, label, key = byId] of BABY_LISTS) a[field] = list(a[field], tag === 'log' ? logs : b[field], tag, label, key, sub, FILLS[tag]);
-    for (const [tag, field, label] of BABY_MAPS) map(a[field], b[field], tag, label, sub, FILLS[tag]);
+    for (const [tag, field, key = byId] of BABY_LISTS) a[field] = list(a[field], tag === 'log' ? logs : b[field], tag, key, sub, FILLS[tag]);
+    for (const [tag, field] of BABY_MAPS) map(a[field], b[field], tag, sub, FILLS[tag]);
     a.removed = union(a.removed, b.removed);
     a.edits = unionEdits(a.edits, b.edits);
   }
@@ -452,7 +453,7 @@
   /**
    * 把 other（另一台手机导出的，已经校验过）合进 mine，不改 mine。
    * converge：云同步用，分不出先后的两台选同一个，免得来回提交；合并家人的文件时分不出先后以这台为准。
-   * 返回 { state 合好的, stats [{ label, unit, added, updated, dropped, kept }], notes 要说一声的, added, updated, dropped, kept }
+   * 返回 { state 合好的, stats [{ tag, unit, added, updated, dropped, kept }], notes 要说一声的（msg）, added, updated, dropped, kept }
    */
   function merge(mine, other, { converge = false } = {}) {
     const out = JSON.parse(JSON.stringify(mine));
@@ -463,19 +464,19 @@
 
     const due = out.profile.dueDate !== theirs.profile.dueDate;
     const taken = fields(out.profile, theirs.profile, fieldsOf('profile'), ['preWeight', 'height', 'nickname'], ctx);
-    tally(ctx.stats, '预产期和资料', { ...counts(), updated: taken.length }, '项');
-    if (due) ctx.notes.push(`两边的预产期不一样，用的是${taken.includes('dueDate') ? '对方后来改的' : '这台手机上的'}`);
+    tally(ctx.stats, 'profile', { ...counts(), updated: taken.length }, 'item');
+    if (due) ctx.notes.push(msg(taken.includes('dueDate') ? 'merge.note.dueTheirs' : 'merge.note.dueMine'));
 
     const prefs = fields(out.prefs, theirs.prefs, fieldsOf('prefs'), [], ctx);
-    tally(ctx.stats, '餐后测血糖的时间', { ...counts(), updated: prefs.length }, '项');
+    tally(ctx.stats, 'glucoseAfter', { ...counts(), updated: prefs.length }, 'item');
     const hold = fields(out.pelvic, theirs.pelvic, fieldsOf('pelvic'), [], ctx);
-    tally(ctx.stats, '盆底肌每次憋几秒', { ...counts(), updated: hold.length }, '项');
+    tally(ctx.stats, 'pelvicHold', { ...counts(), updated: hold.length }, 'item');
 
-    for (const [tag, field, label, key = byId] of LISTS) out[field] = list(out[field], theirs[field], tag, label, key, ctx, FILLS[tag]);
+    for (const [tag, field, key = byId] of LISTS) out[field] = list(out[field], theirs[field], tag, key, ctx, FILLS[tag]);
 
     for (const f of FLAT) {
       const m = f.get(out);
-      map(m, f.get(theirs), f.tag, f.label, ctx);
+      map(m, f.get(theirs), f.tag, ctx);
       f.put(out, m);
     }
     for (const [day, k] of Object.entries(theirs.pelvic.days)) if ((out.pelvic.days[day] || 0) < k) out.pelvic.days[day] = k;
@@ -484,11 +485,11 @@
     const cleared = out.edits['baby:cleared'] || 0;
     if (!out.baby && theirs.baby && (!cleared || cleared < babyTime(theirs))) {
       out.baby = theirs.baby;
-      tally(ctx.stats, '宝宝的出生信息', { ...counts(), added: 1 });
-      tally(ctx.stats, '宝宝的日常记录', { ...counts(), added: theirs.baby.logs.length });
+      tally(ctx.stats, 'birth', { ...counts(), added: 1 });
+      tally(ctx.stats, 'log', { ...counts(), added: theirs.baby.logs.length });
     } else if (out.baby && !theirs.baby && (theirs.edits['baby:cleared'] || 0) > babyTime(out)) {
       out.baby = null;
-      tally(ctx.stats, '宝宝的信息和记录', { ...counts(), dropped: 1 }, '份');
+      tally(ctx.stats, 'babyAll', { ...counts(), dropped: 1 }, 'copy');
     } else if (out.baby && theirs.baby) {
       mergeBaby(out.baby, theirs.baby, ctx);
     }

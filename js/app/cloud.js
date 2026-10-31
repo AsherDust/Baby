@@ -3,7 +3,7 @@
   // 云同步：记录加密后存进自己的 GitHub 私有仓库。打开时拉最新的，改了以后防抖传上去。
   // 每次都是「拉 → 合并 → 推」：两台手机都在记也不会互相覆盖（合并规则见 core/merge.js，分文件见 core/sync.js）。
   // 本机只记仓库设置、Token 和由密码算出来的钥匙，不存密码；这些不进备份文件
-  const { dates: D, model: M, storage: S, merge: Mg, sync: Sy, art: A, app } = globalThis.Baby;
+  const { dates: D, model: M, storage: S, merge: Mg, sync: Sy, art: A, i18n: { t }, app } = globalThis.Baby;
   const {
     sheetDialog, settingsDialog, esc, ui, hhmm, render, showDialog, dialogHead, closeDialog, formError, toast, oops, persist,
   } = app;
@@ -516,7 +516,7 @@
       paused = false;
       pausedUntil = 0;
       setStatus('idle');
-      const notes = result && result.notes && result.notes.length ? result.notes.join('；') : '';
+      const notes = result && result.notes && result.notes.length ? result.notes.map((n) => t(n)).join('；') : '';
       if (result && result.restored) toast('云端的记录拿下来了');
       else if (result && (result.added || result.updated || result.dropped)) {
         const what = [result.added ? `加了 ${result.added} 条` : '', result.updated ? `改了 ${result.updated} 条` : '', result.dropped ? `删了 ${result.dropped} 条` : ''];
