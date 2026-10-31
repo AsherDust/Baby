@@ -2546,6 +2546,51 @@ test('备份提醒：只记宝宝的、只记心情日记的也会提醒', () =>
   eq(M.backupReminder(M.createState({ dueDate: DUE }, '2026-08-01'), '2026-10-12'), null, '什么都没记就不提醒');
 });
 
+test('宝宝日常：按时间范围找的结果和一条条看的一样（每天小结、一周、下次喂奶、正在计时）', () => {
+  const b = newborn('2026-08-15');
+  let seed = 7;
+  const rand = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const t0 = tAt('2026-09-10', '00:00');
+  for (let i = 0; i < 900; i += 1) {
+    const start = t0 + Math.floor(rand() * 32 * 86400) * 1000;
+    const kind = ['breast', 'bottle', 'diaper', 'sleep', 'food'][Math.floor(rand() * 5)];
+    const id = `x-${i.toString(36)}`;
+    if (kind === 'sleep') b.logs.push({ id, type: 'sleep', start, end: start + Math.floor(rand() * 10 * 3600) * 1000, note: '' });
+    else if (kind === 'breast') b.logs.push({ id, type: 'breast', start, end: start + 900000, left: 400, right: 300, side: null, since: null, note: '' });
+    else if (kind === 'bottle') b.logs.push({ id, type: 'bottle', start, ml: 90, milk: 'formula', note: '' });
+    else if (kind === 'diaper') b.logs.push({ id, type: 'diaper', start, pee: true, poo: rand() < 0.3, color: '', note: '' });
+    else b.logs.push({ id, type: 'food', start, items: '米粉', amount: '', note: '' });
+  }
+  b.logs.push({ id: 'x-open', type: 'sleep', start: tAt('2026-10-09', '21:00'), end: null, note: '' });
+  const s = Bb.normalize(JSON.parse(JSON.stringify(b)));
+  const now = tAt('2026-10-12', '15:30');
+  // 以前的写法：每条都看一遍
+  const dayOfMs = (ms) => D.localISO(new Date(ms));
+  const refDay = (date) => {
+    const logs = s.logs.filter((l) => dayOfMs(l.start) === date).reverse();
+    const from = Bb.dayStart(date);
+    const to = Bb.dayStart(D.addDays(date, 1));
+    const sleepMs = s.logs.filter((l) => l.type === 'sleep')
+      .reduce((n, l) => n + Math.max(0, Math.min(l.end ?? now, Math.min(to, now)) - Math.max(l.start, from)), 0);
+    const feeds = s.logs.filter((l) => (l.type === 'breast' || l.type === 'bottle') && l.start <= now);
+    return { ids: logs.map((l) => l.id), sleepMin: Math.round(sleepMs / 60000), lastFeed: feeds.length ? feeds[feeds.length - 1].start : null };
+  };
+  for (let i = 0; i < 34; i += 1) {
+    const date = D.addDays('2026-09-09', i);
+    const got = Bb.daySummary(s, date, now);
+    eq({ ids: got.logs.map((l) => l.id), sleepMin: got.sleepMin, lastFeed: got.lastFeed }, refDay(date), date);
+  }
+  eq(Bb.weekSummary(s, '2026-10-12', now).map((d) => d.sleepMin), Array.from({ length: 7 }, (_, i) => refDay(D.addDays('2026-10-06', i)).sleepMin), '一周');
+  eq(Bb.running(s, 'sleep').id, 'x-open', '正在睡的');
+  const starts = s.logs.filter((l) => (l.type === 'breast' || l.type === 'bottle') && l.start <= now && l.start > now - 24 * 3600000).map((l) => l.start);
+  const got = Bb.nextFeed({ ...s, logs: s.logs.filter((l) => l.id !== 'x-open') }, now);
+  ok(starts.length < 3 || got === null || got.at > starts[starts.length - 1], '下次喂奶在最后一次之后');
+  const removed = Bb.removeLog(s, s.logs[10].id);
+  Bb.addLog(s, Bb.readLog('diaper', { date: '2026-09-10', time: '00:05', pee: true }, now));
+  Bb.restoreLog(s, removed);
+  ok(s.logs.every((l, i) => i === 0 || s.logs[i - 1].start <= l.start), '撤销删除以后还是按时间排着');
+});
+
 test('存奶：超过 200 袋时留最新的', () => {
   const b = newborn();
   for (let i = 0; i < 230; i += 1) b.stash.push({ id: `st-${i.toString(36)}x`, ml: 100, at: Date.UTC(2026, 6, 1) + i * 3600e3, place: 'freezer', thawedAt: null });

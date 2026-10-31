@@ -168,7 +168,7 @@
       : '';
 
     const since = D.addDays(today, -13);
-    const recent = b.logs.filter((l) => Bb.dayOf(l.start) >= since && Bb.dayOf(l.start) <= today);
+    const recent = Bb.logsIn(b, Bb.dayStart(since), Bb.dayStart(D.addDays(today, 1)));
     const when = (l) => `${D.formatDate(Bb.dayOf(l.start))} ${app.hhmm(l.start)}`;
     const temps = recent.filter((l) => l.type === 'temp').reverse();
     const siteName = Object.fromEntries(BB.feverSites);

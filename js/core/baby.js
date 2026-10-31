@@ -300,7 +300,26 @@
     return entry;
   }
 
-  const running = (b, type) => b.logs.find((l) => l.type === type && l.end == null) || null;
+  // 日常记录一直按开始的时间排着（新记、改、撤销都会排），按时间找可以二分
+  function lowerBound(logs, t) {
+    let lo = 0;
+    let hi = logs.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (logs[mid].start < t) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  /** 开始时间在 [from, to) 里的记录，先记的在前 */
+  const logsIn = (b, from, to) => b.logs.slice(lowerBound(b.logs, from), lowerBound(b.logs, to));
+
+  // 正在计时的一般是最近的，从后往前找
+  function running(b, type) {
+    for (let i = b.logs.length - 1; i >= 0; i -= 1) if (b.logs[i].type === type && b.logs[i].end == null) return b.logs[i];
+    return null;
+  }
 
   function accrue(e, now) {
     if (e.side && e.since) e[e.side] += Math.max(0, Math.round((now - e.since) / 1000));
@@ -349,7 +368,7 @@
    */
   function nextFeed(b, now) {
     if (running(b, 'breast')) return null;
-    const starts = b.logs.filter((l) => (l.type === 'breast' || l.type === 'bottle') && l.start <= now && l.start > now - FEED_WINDOW).map((l) => l.start);
+    const starts = logsIn(b, now - FEED_WINDOW + 1, now + 1).filter((l) => l.type === 'breast' || l.type === 'bottle').map((l) => l.start);
     const gaps = starts.slice(1).map((t, i) => t - starts[i]).filter((g) => g > 0 && g <= FEED_GAP_MAX).sort((x, y) => x - y);
     const last = starts[starts.length - 1];
     if (gaps.length < 2 || now - last > FEED_STALE) return null;
@@ -465,12 +484,16 @@
   const removeMoment = (b, id) => removeFrom(b, 'moments', 'moment', id);
   const removeExtraVaccine = (b, id) => removeFrom(b, 'extraVaccines', 'xv', id);
 
+  /** 撤销删除：按时间放回去（中间可能又记了别的，原来的位置不一定对） */
   function restoreLog(b, removed) {
-    b.logs.splice(Math.min(removed.index, b.logs.length), 0, removed.entry);
+    insert(b, removed.entry);
   }
 
   /** 某天的记录（按开始的时间算在哪天），新的在前 */
-  const dayLogs = (b, date) => b.logs.filter((l) => dayOf(l.start) === date).reverse();
+  const dayLogs = (b, date) => logsIn(b, dayStart(date), dayStart(D.addDays(date, 1))).reverse();
+
+  // 睡觉跨过半夜的分到两天：往前找两天以内开始的就够了，再长的只可能是忘了停、还在计时的
+  const SLEEP_SPAN = 2 * 24 * 3600000;
 
   const overlap = (a0, a1, b0, b1) => Math.max(0, Math.min(a1, b1) - Math.max(a0, b0));
 
@@ -481,9 +504,16 @@
     const to = dayStart(D.addDays(date, 1));
     const of = (type) => logs.filter((l) => l.type === type);
     const breastSec = of('breast').reduce((s, l) => { const t = breastSeconds(l, now); return s + t.left + t.right; }, 0);
-    const sleepMs = b.logs.filter((l) => l.type === 'sleep').reduce((s, l) => s + overlap(l.start, l.end ?? now, from, Math.min(to, now)), 0);
+    const sleeps = logsIn(b, from - SLEEP_SPAN, to).filter((l) => l.type === 'sleep');
+    const open = running(b, 'sleep');
+    if (open && open.start < from - SLEEP_SPAN) sleeps.push(open);
+    const sleepMs = sleeps.reduce((s, l) => s + overlap(l.start, l.end ?? now, from, Math.min(to, now)), 0);
     const diapers = of('diaper');
-    const feeds = b.logs.filter((l) => (l.type === 'breast' || l.type === 'bottle') && l.start <= now);
+    // 到现在为止最后一次喂奶（不限这一天），从后往前找
+    let lastFeed = null;
+    for (let i = lowerBound(b.logs, now + 1) - 1; i >= 0 && lastFeed == null; i -= 1) {
+      if (b.logs[i].type === 'breast' || b.logs[i].type === 'bottle') lastFeed = b.logs[i].start;
+    }
     return {
       logs,
       feeds: of('breast').length + of('bottle').length,
@@ -496,7 +526,7 @@
       foods: of('food').length,
       pumps: of('pump').length,
       pumpMl: of('pump').reduce((s, l) => s + l.left + l.right, 0),
-      lastFeed: feeds.length ? feeds[feeds.length - 1].start : null,
+      lastFeed,
     };
   }
 
@@ -937,6 +967,7 @@
     updateBirth,
     normalize,
     running,
+    logsIn,
     startBreast,
     stopBreast,
     breastSeconds,

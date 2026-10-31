@@ -268,9 +268,13 @@
   const TRENDS = [['sleep', '睡眠', '小时'], ['feeds', '喂奶', '次'], ['diapers', '尿布', '片']];
   const trendMetric = () => (TRENDS.some(([id]) => id === ui.trendMetric) ? ui.trendMetric : 'sleep');
 
+  // 这次重画算好的最近 7 天，画图（重画后、窗口变了大小）时直接用
+  let trendWeek = null;
+
   /** 「最近 7 天」：每天睡了多久、喂了几次、换了几片尿布，图在 drawTrend 里画 */
   function viewTrend(now) {
-    const all = Bb.weekSummary(kid(), ui.today, now).filter((d) => d.has);
+    trendWeek = Bb.weekSummary(kid(), ui.today, now);
+    const all = trendWeek.filter((d) => d.has);
     // 今天还没过完，有前几天的就只算前几天
     const past = all.filter((d) => d.date !== ui.today);
     const days = past.length ? past : all;
@@ -309,7 +313,7 @@
     const box = document.getElementById('trend-chart');
     if (!box || !app.state || !kid()) return;
     const metric = trendMetric();
-    const bars = Bb.weekSummary(kid(), ui.today, Date.now()).map((d) => {
+    const bars = (trendWeek || Bb.weekSummary(kid(), ui.today, Date.now())).map((d) => {
       const today = d.date === ui.today;
       const label = today ? '今天' : `周${D.weekday(d.date)}`;
       const value = metric === 'sleep' ? Math.round(d.sleepMin / 6) / 10 : metric === 'feeds' ? d.feeds : d.diapers;
@@ -852,7 +856,7 @@
     const b = kid();
     const age = ageNow();
     const items = [];
-    const vitD = b.logs.some((l) => l.type === 'med' && /维生素\s*A?D|维\s*A?D|AD\s*滴/i.test(l.name) && Bb.dayOf(l.start) === ui.today);
+    const vitD = Bb.dayLogs(b, ui.today).some((l) => l.type === 'med' && /维生素\s*A?D|维\s*A?D|AD\s*滴/i.test(l.name));
     items.push(vitD
       ? todoItem({ title: '今天的维生素 D 喂过了', text: '每天 400 国际单位', done: true })
       : todoItem({ icon: A.icon.pill, title: '维生素 D', text: '每天 400 国际单位；配方奶喂养的，补多少听医生的', action: '<button type="button" class="btn btn-ghost btn-sm" id="vitd-done" data-action="vitd-done">喂过了</button>' }));
