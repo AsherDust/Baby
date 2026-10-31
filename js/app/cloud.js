@@ -410,6 +410,8 @@
     if (!token) return { error: '填一下 GitHub Token' };
     const password = String(f.password || '');
     if (!password && !same) return { error: '设一个加密密码' };
+    // 手机键盘常会自己补个空格，结尾的空格又看不见，两台手机很容易输得不一样
+    if (/\s/.test(password)) return { error: '密码里不能有空格' };
     if (password !== String(f.confirm || '')) return { error: '两次输的密码不一样' };
     return { repo, folder, branch: String(f.branch || '').trim(), token, password, same };
   }
@@ -557,7 +559,7 @@
             <input name="confirm" type="password" autocomplete="new-password">
           </label>
         </div>
-        <p class="hint">云端的数据用这个密码加密，什么字都可以，越长越难猜。每台手机填同一个；忘了就打不开云端的数据，手机上的记录不受影响。这台手机只记下由密码算出来的钥匙，不存密码本身。Token 要保管好，别发给别人。</p>
+        <p class="hint">云端的数据用这个密码加密，什么字都可以（不能有空格），越长越难猜。每台手机填同一个；忘了就打不开云端的数据，手机上的记录不受影响。这台手机只记下由密码算出来的钥匙，不存密码本身。Token 要保管好，别发给别人。</p>
         <p class="form-error" hidden></p>
         <div class="dialog-actions">
           <span class="spacer"></span>
