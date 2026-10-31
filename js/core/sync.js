@@ -26,7 +26,7 @@
   /**
    * 判断要不要重新传用的指纹，只看内容：
    * - 字段的顺序、空着的字段不算（刚记下的和读出来整理过的，字不一样内容一样）
-   * - main.json 里每台设备自己的东西不算（哪些是共用的见 core/merge.js），合并时这些都留本机的
+   * - main.json 里每台设备自己的东西不算（哪些是共用的见 core/merge.js）：现在不上传了，以前传上去的文件里可能还有
    * 不然拉完云端以后总觉得「变了」，又传一次
    */
   function fingerprint(name, text) {
@@ -40,7 +40,7 @@
     return hash(JSON.stringify(Mg.canon(raw)));
   }
 
-  /** 新手机从云端恢复：每台设备自己的东西用这台的初始值（和新建记录时一样），只带共用的那几项 */
+  /** 新手机从云端恢复：每台设备自己的东西用这台的初始值（和新建记录时一样），只带共用的那几项（以前传上去的文件里可能还有别的） */
   function forThisDevice(remote, today) {
     const Mg = Baby.merge;
     const fresh = Baby.model.createState(remote.profile, today);
@@ -52,10 +52,20 @@
     });
   }
 
-  /** 拆成 { 文件名: 明文 } */
+  /**
+   * 拆成 { 文件名: 明文 }。每台设备自己的东西不上传：设置、睡前故事只留共用的几项，弹过的提醒不要。
+   * 拉下来时缺的这些由校验补成默认值，合并时本来就留本机的
+   */
   function split(state) {
+    const Mg = Baby.merge;
     const logs = state.baby ? state.baby.logs : [];
-    const main = state.baby ? { ...state, baby: { ...state.baby, logs: [] } } : state;
+    const main = {
+      ...state,
+      prefs: Mg.pickKeys(state.prefs, Mg.SHARED_PREFS),
+      stories: Mg.pickKeys(state.stories, Mg.SHARED_STORIES),
+      ...(state.baby ? { baby: { ...state.baby, logs: [] } } : {}),
+    };
+    delete main.notified;
     const parts = { [MAIN]: JSON.stringify({ app: Baby.storage.APP, ...main }) };
     const months = {};
     for (const l of logs) (months[monthOf(l.start)] = months[monthOf(l.start)] || []).push(l);

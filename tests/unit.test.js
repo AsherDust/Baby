@@ -2419,11 +2419,25 @@ test('云同步：只传变了的文件，某个月的记录全删了就删掉�
   ok(Sy.hash('a') !== Sy.hash('b') && Sy.hash('蜜罐') === Sy.hash('蜜罐'), '指纹');
 });
 
+test('云同步：每台设备自己的东西不上传，云端只有要同步的', () => {
+  const s = viaFile(fullState());
+  Object.assign(s.prefs, { glucoseAfter: 1, installHintHidden: true, lastBackup: '2026-10-01', storyCardHidden: '2026-10-11' });
+  s.notified = { 'ck-nt': '2026-10-10' };
+  Object.assign(s.stories, { favorites: ['prose-01'], blocked: ['prose-03'], rate: 0.75, done: { 'prose-02': '2026-10-11' }, voices: { zh: '婷婷', en: '' } });
+  const main = JSON.parse(Sy.split(s)['main.json']);
+  eq([main.prefs, main.stories, 'notified' in main], [{ glucoseAfter: 1 }, { favorites: ['prose-01'], blocked: ['prose-03'] }, false]);
+  ok(!/installHintHidden|lastBackup|婷婷|ck-nt|prose-02/.test(Sy.split(s)['main.json']), '设备自己的设置、提醒、读到哪、声音都不在里面');
+  const back = Sy.join(Sy.split(s));
+  eq([back.prefs.glucoseAfter, back.prefs.installHintHidden, back.stories.favorites, back.stories.rate, back.notified], [1, false, ['prose-01'], 0.9, {}], '拉下来缺的补成默认值');
+  const r = Mg.merge(s, back);
+  eq([r.state.prefs, r.state.stories, r.state.notified], [s.prefs, s.stories, s.notified], '合并时这台的留着');
+});
+
 test('云同步：新手机恢复时，每台设备自己的东西用这台的初始值，只带共用的', () => {
   const s = viaFile(fullState());
   Object.assign(s.prefs, { glucoseAfter: 1, installHintHidden: true, lastBackup: '2026-10-01', storyCardHidden: '2026-10-11', moodCareHidden: '2026-10-05', since: '2026-05-01' });
   s.notified = { 'ck-nt': '2026-10-10' };
-  Object.assign(s.stories, { favorites: ['prose-01'], blocked: ['prose-03'], rate: 1.2, big: true, done: { 'prose-02': '2026-10-11' }, voices: { zh: '婷婷', en: '' } });
+  Object.assign(s.stories, { favorites: ['prose-01'], blocked: ['prose-03'], rate: 0.75, big: true, done: { 'prose-02': '2026-10-11' }, voices: { zh: '婷婷', en: '' } });
   const r = Sy.forThisDevice(Sy.join(Sy.split(s)), '2026-10-12');
   eq(r.prefs, { glucoseAfter: 1, since: '2026-10-12', lastBackup: null, backupNudged: null, installHintHidden: false, storyCardHidden: null, moodCareHidden: null });
   eq([r.notified, r.stories.favorites, r.stories.blocked, r.stories.rate, r.stories.big, r.stories.done, r.stories.voices],
