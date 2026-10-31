@@ -441,6 +441,20 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await click('#toast [data-action="undo"]');
     log(JSON.stringify(baby().exams) === examsBefore, '一键记成做过了也能撤销');
 
+    // ---- 7 个月：发热的提示和 3 个月以下的不一样 ----
+    await nav('#/baby/health');
+    d.getElementById('bt-value').value = '38.6';
+    $('form[data-form="baby-temp"]').requestSubmit();
+    await wait(40);
+    log(/烧了 3 天以上/.test(text($('.rec-alert'))) && $('.rec-alert-high') && !$('.rec-alert-severe') && !/3 个月以下的宝宝发热/.test(text($('.rec-alert'))),
+      '7 个月宝宝 38.6℃：说清楚哪些情况要去医院', text($('.rec-alert')));
+    await click('#toast [data-action="undo"]');
+    d.getElementById('bt-value').value = '39.6';
+    $('form[data-form="baby-temp"]').requestSubmit();
+    await wait(40);
+    log($('.rec-alert-severe') && /高热/.test(text($('.temp-now'))), '39.6℃ 算高热：提示换成醒目的颜色', text($('.temp-now')));
+    await click('#toast [data-action="undo"]');
+
     // ---- 最近 7 天 ----
     await nav('#/baby');
     log($('.baby-trend') && $$('#trend-chart rect.c-bar').length >= 1 && $('#trend-chart .c-need') && /平均每天睡/.test(text($('.trend-note'))) && /7 个月的宝宝一般每天睡 12～16 小时/.test(text($('.trend-note'))), '最近 7 天：睡眠的柱子和该睡多久的范围', text($('.trend-note')));

@@ -204,6 +204,51 @@ iframe.onload = async () => {
     await nav('#/');
     log(/^\s*23/.test($('.week-big').textContent) && /明天产检/.test($('.banner').textContent), '首页数据也都在');
 
+    // ---- 网页通知：开启、晚上弹明天的产检、弹过的不再弹 ----
+    const shown = [];
+    let perm = 'default';
+    let answer = 'denied';
+    function FakeNotification(title, opts) { shown.push({ title, ...opts }); }
+    FakeNotification.requestPermission = () => { perm = answer; return Promise.resolve(answer); };
+    Object.defineProperty(FakeNotification, 'permission', { get: () => perm });
+    w.Notification = FakeNotification;
+    const realHours = w.Date.prototype.getHours;
+    w.Date.prototype.getHours = () => 20;
+    await nav('#/checkups');
+    w.Baby.app.render();
+    log(/开启网页通知/.test(($('[data-action="enable-notify"]') || {}).textContent || ''), '产检页有「开启网页通知」');
+    $('[data-action="enable-notify"]').click();
+    await wait(0);
+    log(/通知没打开/.test(toastText()) && !shown.length && !$('[data-action="enable-notify"]'), '浏览器没答应：说明在哪里打开，不弹通知', toastText());
+    perm = 'default';
+    answer = 'granted';
+    w.Baby.app.render();
+    $('[data-action="enable-notify"]').click();
+    await wait(0);
+    log(/会弹通知/.test(toastText()) && /网页通知已开启/.test($('.remind-strip').textContent) && shown.length === 1
+      && shown[0].title === '明天产检：糖耐量 OGTT' && shown[0].tag === 'ogtt@2026-10-13#eve', '答应了：晚上弹出明天的产检', JSON.stringify(shown));
+    log(Object.keys(state().notified).includes('ogtt@2026-10-13#eve'), '记下这条弹过了');
+    w.Baby.app.checkNotifications();
+    log(shown.length === 1, '弹过的不再弹');
+    w.Date.prototype.getHours = () => 17;
+    appUi.today = '2026-10-13';
+    w.Baby.app.checkNotifications();
+    log(shown.length === 2 && shown[1].title === '今天产检：糖耐量 OGTT', '到了当天早上 7 点以后再弹一次', JSON.stringify(shown[1]));
+    appUi.today = realToday;
+    w.Date.prototype.getHours = realHours;
+
+    // ---- 预产期当天、过了预产期 ----
+    await nav('#/');
+    const due = state().profile.dueDate;
+    appUi.today = due;
+    w.Baby.app.render();
+    log(/就是今天/.test($('.panel-week').textContent), '预产期当天：首页写「就是今天」');
+    appUi.today = w.Baby.dates.addDays(due, 3);
+    w.Baby.app.render();
+    log(/已过预产期\s*3\s*天/.test($('.panel-week').textContent), '过了预产期 3 天：首页照实写', $('.panel-week').textContent.replace(/\s+/g, ' ').slice(0, 80));
+    appUi.today = realToday;
+    w.Baby.app.render();
+
     $('[data-action="open-settings"]').click();
     d.getElementById('settings-dialog').querySelector('[data-action="clear-all"]').click();
     log(!!$('form[data-form="onboard"]') && !w.localStorage.getItem('honey-pot:v1'), '清空数据回到引导页');

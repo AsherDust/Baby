@@ -269,6 +269,27 @@ iframe.onload = async () => {
     log($('.card-us .empty'), '没有这几项的老数据也能打开');
     await nav('#/records/glucose');
     log($('[data-action="glucose-after"][data-after="2"]').getAttribute('aria-pressed') === 'true', '老数据默认按餐后 2 小时');
+
+    // ---- 体重的两种特殊提示（只改页面里的数据，不保存） ----
+    const ap = w.Baby.app;
+    const profile = { ...ap.state.profile };
+    const weights = ap.state.weights;
+    const realToday = ap.ui.today;
+    await nav('#/records/weight');
+    Object.assign(ap.state.profile, { height: 135, preWeight: 60 });
+    ap.render();
+    log(/国家的推荐值不适用/.test(text('.gain-missing')), '身高不到 140 厘米：说明推荐值不适用，听医生的', text('.gain-missing'));
+    ap.state.profile.height = 160;
+    const week10 = w.Baby.dates.dateAtGestation(ap.state.profile.dueDate, 70);
+    ap.ui.today = week10;
+    ap.state.weights = [{ date: week10, kg: 57 }];
+    ap.render();
+    log(/孕早期吐得厉害时，体重掉一点很常见/.test(text('.gain-plan')) && /现在比孕前轻了 3(\.0)? kg/.test(text('.gain-plan')),
+      '孕早期比孕前轻了：说这很常见，一直吃不下要告诉医生', text('.gain-plan'));
+    Object.assign(ap.state.profile, profile);
+    ap.state.weights = weights;
+    ap.ui.today = realToday;
+    ap.render();
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }
