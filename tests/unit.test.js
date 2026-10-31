@@ -2419,6 +2419,18 @@ test('云同步：只传变了的文件，某个月的记录全删了就删掉�
   ok(Sy.hash('a') !== Sy.hash('b') && Sy.hash('蜜罐') === Sy.hash('蜜罐'), '指纹');
 });
 
+test('云同步：新手机恢复时，每台设备自己的东西用这台的初始值，只带共用的', () => {
+  const s = viaFile(fullState());
+  Object.assign(s.prefs, { glucoseAfter: 1, installHintHidden: true, lastBackup: '2026-10-01', storyCardHidden: '2026-10-11', moodCareHidden: '2026-10-05', since: '2026-05-01' });
+  s.notified = { 'ck-nt': '2026-10-10' };
+  Object.assign(s.stories, { favorites: ['prose-01'], blocked: ['prose-03'], rate: 1.2, big: true, done: { 'prose-02': '2026-10-11' }, voices: { zh: '婷婷', en: '' } });
+  const r = Sy.forThisDevice(Sy.join(Sy.split(s)), '2026-10-12');
+  eq(r.prefs, { glucoseAfter: 1, since: '2026-10-12', lastBackup: null, backupNudged: null, installHintHidden: false, storyCardHidden: null, moodCareHidden: null });
+  eq([r.notified, r.stories.favorites, r.stories.blocked, r.stories.rate, r.stories.big, r.stories.done, r.stories.voices],
+    [{}, ['prose-01'], ['prose-03'], 0.9, false, {}, { zh: '', en: '' }]);
+  eq([r.weights, r.baby.logs.length, r.journal.length], [s.weights, s.baby.logs.length, s.journal.length], '记录都在');
+});
+
 test('合并：撤销删除再保存，删过的标记就去掉了', () => {
   const s = viaFile(fullState());
   Mg.track(s);

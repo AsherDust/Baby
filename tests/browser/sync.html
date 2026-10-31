@@ -253,6 +253,9 @@ const sinceCalls = () => {
     await closeSettings();
 
     // ---- 改了以后防抖上传 ----
+    // 顺带改几样：这台设备自己的（关掉的提示）和两台共用的（餐后几小时测、收藏的故事），跟着这次一起传上去
+    Object.assign(w.Baby.app.state.prefs, { installHintHidden: true, storyCardHidden: TODAY, glucoseAfter: 1 });
+    w.Baby.app.state.stories.favorites = ['prose-01'];
     calls = sinceCalls();
     const before = repo.head();
     w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.3);
@@ -281,6 +284,9 @@ const sinceCalls = () => {
     await until(() => $('.hero'));
     await settled();
     log($('.hero') && state() && state().weights.some((x) => x.date === TODAY && x.kg === 56.4) && /拿下来了/.test(toastText()), '新手机从云端恢复，直接进首页', toastText());
+    const dadPrefs = state().prefs;
+    log(dadPrefs.glucoseAfter === 1 && state().stories.favorites.join() === 'prose-01' && dadPrefs.installHintHidden === false && dadPrefs.storyCardHidden === null,
+      '恢复时只带共用的设置，妈妈手机自己关掉的提示不跟过来', JSON.stringify(dadPrefs));
 
     // ---- 爸爸记一条，推的时候妈妈刚好也推了 ----
     calls = sinceCalls();

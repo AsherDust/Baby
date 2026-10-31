@@ -26,20 +26,30 @@
   /**
    * 判断要不要重新传用的指纹，只看内容：
    * - 字段的顺序、空着的字段不算（刚记下的和读出来整理过的，字不一样内容一样）
-   * - main.json 里每台设备自己的东西不算：设置（餐后几小时测血糖除外）、弹过的提醒、
-   *   睡前故事读到哪、语速声音（收藏和不想听的除外）。合并时这些都留本机的
+   * - main.json 里每台设备自己的东西不算（哪些是共用的见 core/merge.js），合并时这些都留本机的
    * 不然拉完云端以后总觉得「变了」，又传一次
    */
   function fingerprint(name, text) {
+    const Mg = Baby.merge;
     const raw = JSON.parse(text);
     if (name === MAIN) {
-      const prefs = raw.prefs || {};
-      const stories = raw.stories || {};
-      raw.prefs = { glucoseAfter: prefs.glucoseAfter };
-      raw.stories = { favorites: stories.favorites, blocked: stories.blocked };
+      raw.prefs = Mg.pickKeys(raw.prefs, Mg.SHARED_PREFS);
+      raw.stories = Mg.pickKeys(raw.stories, Mg.SHARED_STORIES);
       delete raw.notified;
     }
-    return hash(JSON.stringify(Baby.merge.canon(raw)));
+    return hash(JSON.stringify(Mg.canon(raw)));
+  }
+
+  /** 新手机从云端恢复：每台设备自己的东西用这台的初始值（和新建记录时一样），只带共用的那几项 */
+  function forThisDevice(remote, today) {
+    const Mg = Baby.merge;
+    const fresh = Baby.model.createState(remote.profile, today);
+    return Baby.model.normalize({
+      ...remote,
+      prefs: { ...fresh.prefs, ...Mg.pickKeys(remote.prefs, Mg.SHARED_PREFS) },
+      stories: { ...fresh.stories, ...Mg.pickKeys(remote.stories, Mg.SHARED_STORIES) },
+      notified: {},
+    });
   }
 
   /** 拆成 { 文件名: 明文 } */
@@ -77,5 +87,5 @@
     return { upload, remove };
   }
 
-  Baby.sync = { MAIN, isPart, hash, fingerprint, split, join, changes };
+  Baby.sync = { MAIN, isPart, hash, fingerprint, forThisDevice, split, join, changes };
 })();

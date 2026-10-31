@@ -45,8 +45,12 @@
   ];
   const profileOf = (p) => ({ dueDate: p.dueDate, preWeight: p.preWeight, height: p.height, nickname: p.nickname });
   const birthOf = (b) => ({ name: b.name, sex: b.sex, birthDate: b.birthDate, birthTime: b.birthTime });
-  // 设置里两台手机共用的：餐后几小时测血糖
-  const sharedPrefs = (p) => ({ glucoseAfter: p.glucoseAfter });
+  // 设置、睡前故事里两台手机共用的几项；其余的设置、弹过的提醒、故事读到哪是每台设备自己的：
+  // 合并时留本机的，判断要不要上传时不算（core/sync.js），新手机从云端恢复时也不跟着拿
+  const SHARED_PREFS = ['glucoseAfter'];
+  const SHARED_STORIES = ['favorites', 'blocked'];
+  const pickKeys = (o, keys) => Object.fromEntries(keys.map((k) => [k, (o || {})[k]]));
+  const sharedPrefs = (p) => pickKeys(p, SHARED_PREFS);
 
   // 藏在别的结构里、两台手机要同步的几样：拍平成 { 编号: 值 }，记改过的时间、合并都和疫苗那些一样，
   // 去掉的也会跟着去掉（只取并集的话，一台取消了收藏，另一台合并回来又加上了）
@@ -396,5 +400,5 @@
     };
   }
 
-  Baby.merge = { canon, sign, drop, clean, cleanEdits, track, merge };
+  Baby.merge = { SHARED_PREFS, SHARED_STORIES, pickKeys, canon, sign, drop, clean, cleanEdits, track, merge };
 })();

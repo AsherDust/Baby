@@ -266,7 +266,7 @@
     applying = true;
     try {
       if (!app.state) {
-        app.state = remote;
+        app.state = Sy.forThisDevice(remote, ui.today);
         persist();
         render();
         return { restored: true };
