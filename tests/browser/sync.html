@@ -174,7 +174,7 @@ const cloud = () => JSON.parse(localStorage.getItem(CLOUD));
 const status = () => w.Baby.app.cloud.status.state;
 const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
 const settled = () => until(() => !['syncing', 'pending'].includes(status()));
-const remote = (name) => repo.blobs.get(repo.files()[`pregnancy-desk/${name}`]);
+const remote = (name) => repo.blobs.get(repo.files()[`honey-pot/${name}`]);
 const names = () => Object.keys(repo.files()).sort();
 const snapshot = () => ({ [KEY]: localStorage.getItem(KEY), [CLOUD]: localStorage.getItem(CLOUD) });
 const fill = (values) => {
@@ -211,7 +211,10 @@ const sinceCalls = () => {
     log(/云同步/.test(text('.settings-cloud')) && $('.settings-cloud [data-action="cloud-setup"]'), '设置里有「云同步」');
     $('.settings-cloud [data-action="cloud-setup"]').click();
     await until(setupOpen);
-    log(setupOpen() && $('form[data-form="cloud-setup"] [name="folder"]').value === 'pregnancy-desk', '打开云同步的设置面板，文件夹默认 pregnancy-desk');
+    log(setupOpen() && $('form[data-form="cloud-setup"] [name="folder"]').value === 'honey-pot', '打开云同步的设置面板，文件夹默认 honey-pot');
+    const tokenLink = new URL($('form[data-form="cloud-setup"] .cloud-help a').href);
+    log(tokenLink.pathname === '/settings/personal-access-tokens/new' && tokenLink.searchParams.get('contents') === 'write' && tokenLink.searchParams.get('expires_in') === '366',
+      '「怎么创建 Token」的链接先填好了 Contents 读写和 1 年有效期', tokenLink.href);
     fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: PASSWORD, confirm: 'honeypot2' });
     log(/两次输的密码不一样/.test(formError()), '两次密码不一样时提示', formError());
     fill({ repo: 'https://github.com/AsherDust/BabySync', token: 'github_pat_bad', password: PASSWORD, confirm: PASSWORD });
@@ -226,7 +229,7 @@ const sinceCalls = () => {
     fill({ token: TOKEN });
     await until(() => !setupOpen());
     await settled();
-    log(status() === 'idle' && names().join() === 'README.md,pregnancy-desk/main.json', '连上以后传上去：仓库里多了 pregnancy-desk/main.json', `${status()} ${names()}`);
+    log(status() === 'idle' && names().join() === 'README.md,honey-pot/main.json', '连上以后传上去：仓库里多了 honey-pot/main.json', `${status()} ${names()}`);
     log(calls().some((c) => c.method === 'PATCH') && !calls().some((c) => c.method === 'PUT'), '仓库不是空的：用一次提交传上去');
     const env = JSON.parse(remote('main.json'));
     log(env.cipher === 'AES-GCM' && env.kdf.name === 'PBKDF2' && env.zip === 'gzip' && !/叶酸|dueDate|豆豆/.test(remote('main.json')), '云端是加密过的乱码，看不到记录', remote('main.json').slice(0, 80));
@@ -248,7 +251,7 @@ const sinceCalls = () => {
     await settled();
     await until(() => repo.head() !== before);
     const trees = calls().filter((c) => c.path === '/git/trees');
-    log(repo.head() !== before && trees.length === 1 && trees[0].body.tree.map((e) => e.path).join() === 'pregnancy-desk/main.json', '连着改两次只传一次', JSON.stringify(trees.map((t) => t.body.tree.map((e) => e.path))));
+    log(repo.head() !== before && trees.length === 1 && trees[0].body.tree.map((e) => e.path).join() === 'honey-pot/main.json', '连着改两次只传一次', JSON.stringify(trees.map((t) => t.body.tree.map((e) => e.path))));
     calls = sinceCalls();
     const r = await w.Baby.app.cloud.syncNow('manual');
     log(r.ok && calls().length === 1 && calls()[0].path === '/git/ref/heads/main', '没有改动时同步只问一下分支到哪了', JSON.stringify(calls().map((c) => c.path)));
@@ -307,7 +310,7 @@ const sinceCalls = () => {
 
     // ---- 断开 ----
     d.querySelector('.settings-cloud [data-action="cloud-off"]').click();
-    log(!cloud() && !$('.cloud-badge') && names().includes('pregnancy-desk/main.json') && /断开了/.test(toastText()), '断开：这台手机不再同步，云端的不动');
+    log(!cloud() && !$('.cloud-badge') && names().includes('honey-pot/main.json') && /断开了/.test(toastText()), '断开：这台手机不再同步，云端的不动');
 
     // ---- 空仓库、宝宝的记录按月分文件 ----
     repo = await fakeGitHub({ empty: true });
@@ -320,19 +323,19 @@ const sinceCalls = () => {
     await until(() => !setupOpen());
     await settled();
     const months = names().filter((x) => /logs-/.test(x));
-    log(calls().some((c) => c.method === 'PUT') && names().includes('pregnancy-desk/main.json') && months.join() === `pregnancy-desk/logs-${TODAY.slice(0, 7)}.json`, '空仓库也能用，宝宝的日常记录按月单独放', names().join());
+    log(calls().some((c) => c.method === 'PUT') && names().includes('honey-pot/main.json') && months.join() === `honey-pot/logs-${TODAY.slice(0, 7)}.json`, '空仓库也能用，宝宝的日常记录按月单独放', names().join());
     calls = sinceCalls();
     w.Baby.baby.addLog(w.Baby.app.state.baby, w.Baby.baby.readLog('diaper', { date: TODAY, time: '10:00', pee: true }, w.Baby.baby.msAt(TODAY, '12:00')));
     w.Baby.app.persist();
     await settled();
     await until(() => calls().some((c) => c.method === 'PATCH'));
     const t = calls().find((c) => c.path === '/git/trees');
-    log(t && t.body.tree.map((e) => e.path).join() === `pregnancy-desk/logs-${TODAY.slice(0, 7)}.json`, '记了一次尿布，只传当月的文件', t && JSON.stringify(t.body.tree.map((e) => e.path)));
+    log(t && t.body.tree.map((e) => e.path).join() === `honey-pot/logs-${TODAY.slice(0, 7)}.json`, '记了一次尿布，只传当月的文件', t && JSON.stringify(t.body.tree.map((e) => e.path)));
 
     // ---- 清空全部数据时断开 ----
     await openSettings();
     d.querySelector('[data-action="clear-all"]').click();
-    log(!cloud() && !state() && names().includes('pregnancy-desk/main.json'), '清空全部数据：这台手机的云同步也断开，云端的不删');
+    log(!cloud() && !state() && names().includes('honey-pot/main.json'), '清空全部数据：这台手机的云同步也断开，云端的不删');
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }

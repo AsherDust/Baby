@@ -167,7 +167,7 @@ const SHEETS = [
     await wait(600);
     d.querySelector('dialog[open] .cloud-help').open = true;
     bad = bad.concat(audit(d.querySelector('dialog[open]'), 'main 云同步设置'));
-    const cloud = { repo: 'AsherDust/BabySync', branch: 'main', folder: 'pregnancy-desk', token: 'x', key: 'AAAA', salt: 'AAAA', iter: 1000, files: {}, head: null, last: Date.now() };
+    const cloud = { repo: 'AsherDust/BabySync', branch: 'main', folder: 'honey-pot', token: 'x', key: 'AAAA', salt: 'AAAA', iter: 1000, files: {}, head: null, last: Date.now() };
     await open('main', 'today', { [`${KEY}:cloud`]: cloud });
     w.fetch = async () => new w.Response('{"message":"Bad credentials"}', { status: 401 });
     await wait(600);

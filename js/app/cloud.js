@@ -10,7 +10,11 @@
 
   const KEY = `${S.KEY}:cloud`;
   const API = 'https://api.github.com';
-  const FOLDER = 'pregnancy-desk';
+  const FOLDER = 'honey-pot';
+  // 新建 Token 的页面可以用网址先填好：名字、有效期 1 年、Contents 读写（write 包括 read），只剩选仓库
+  const TOKEN_URL = `https://github.com/settings/personal-access-tokens/new?${new URLSearchParams({
+    name: '蜜罐云同步', description: '蜜罐 App 的云同步：读写存数据的那个仓库', expires_in: '366', contents: 'write',
+  })}`;
   // 测试里会改小
   const settings = { iter: 600000, debounce: 4000, maxWait: 30000, poll: 3 * 60 * 1000, showAfter: 30 * 1000 };
 
@@ -538,11 +542,10 @@
         <details class="cloud-help">
           <summary>怎么创建 Token</summary>
           <ol>
-            <li>打开 <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub 新建 Fine-grained token</a> 的页面（Settings → Developer settings）</li>
-            <li>名字随便写，比如「蜜罐」；有效期选长一点，到期后这里会提示换新的</li>
-            <li>Repository access 选「Only select repositories」，只选存数据的这个仓库</li>
-            <li>Permissions 里把「Contents」改成「Read and write」，别的不用动</li>
-            <li>生成以后复制（只显示这一次），粘贴到上面</li>
+            <li>点 <a href="${TOKEN_URL}" target="_blank" rel="noopener">这里打开 GitHub 新建 Token 的页面</a>，名字、有效期（1 年）和权限都已经填好了</li>
+            <li>Repository access 选「Only select repositories」，再选存数据的那个仓库</li>
+            <li>看一眼下面的 Permissions：应该有一项「Contents」是「Read and write」。没有的话点「Add permissions」，选「Contents」，再改成「Read and write」</li>
+            <li>点「Generate token」，复制（只显示这一次），粘贴到上面。到期以后这里会提示换新的</li>
           </ol>
         </details>
         <div class="field-row">
