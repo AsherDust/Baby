@@ -127,8 +127,11 @@ iframe.onload = async () => {
     await nav('#/');
     log(/大排畸 B 超：窗口期还剩 3 天/.test($('.panel-today').textContent), '首屏提醒窗口期还剩 3 天');
     await nav('#/checkups');
-    $('[data-action="toggle-done"][data-id="anomaly"]').click();
+    const doneBtn = $('[data-action="toggle-done"][data-id="anomaly"]');
+    doneBtn.focus();
+    doneBtn.click();
     log(state().checkups.find((c) => c.id === 'anomaly').done, '标记单项完成');
+    log(d.activeElement !== doneBtn && d.activeElement.matches('[data-action="toggle-done"][data-id="anomaly"]'), '重画以后键盘焦点还在这个按钮上（按钮没有 id）', d.activeElement.outerHTML.slice(0, 80));
     $('[data-action="undo"]').click();
     log(!state().checkups.find((c) => c.id === 'anomaly').done, '标记完成也能撤销');
     $('[data-action="toggle-done"][data-id="anomaly"]').click();

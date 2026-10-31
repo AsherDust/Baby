@@ -175,7 +175,7 @@ button.ms-open:hover { background: var(--honey-glow); }
 .exam-watch { margin-top: 6px; color: var(--ink-2); }
 .vx-compact { grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; padding: 6px 2px; }
 .vx-compact .vx-dot { margin-top: 0; }
-.vx-compact .link { font-size: 13px; }
+.vx-compact .link { font-size: 13px; white-space: nowrap; }
 
 /* ---------- 体温、用药 ---------- */
 

@@ -20,14 +20,15 @@
   const CURVES = [[-1.881, 'P3'], [-1.036, 'P15'], [0, 'P50'], [1.036, 'P85'], [1.881, 'P97']];
   // 出生时量的数比之后的范围窄
   const BIRTH_RANGE = { weight: [0.5, 6.5], length: [30, 65], head: [20, 45] };
-  const BOTTLE_ML = [5, 400];
+  const BOTTLE_ML = [5, 500];
   const PUMP_ML = 500;
   // 存奶按中国疾控中心的建议（比美国 CDC 保守）：冷藏不超过 2 天，冷冻不超过 3 个月；
   // 冷冻的拿到冷藏室解冻，解冻后 24 小时内用完、不能再冻
   const STASH_PLACES = [{ id: 'fridge', name: '冷藏' }, { id: 'freezer', name: '冷冻' }];
   const STASH_LIFE = { fridge: 2 * 86400000, freezer: 90 * 86400000, thawed: 86400000 };
   const STASH_SOON = { fridge: 12 * 3600000, freezer: 14 * 86400000, thawed: 6 * 3600000 };
-  const STASH_ML = [5, 500];
+  // 用掉一袋就记一次瓶喂，袋子能记的量不能超出瓶喂的范围
+  const STASH_ML = BOTTLE_ML;
   const TEMP_RANGE = [34, 43];
   const NAME_MAX = 12;
   const TEXT_MAX = 40;
@@ -593,7 +594,7 @@
   function useStash(b, id, now) {
     const removed = removeStash(b, id);
     if (!removed) return null;
-    const log = insert(b, { id: newId('bo'), type: 'bottle', start: now, ml: Math.min(removed.bag.ml, BOTTLE_ML[1]), milk: 'breast', note: '存奶' });
+    const log = insert(b, { id: newId('bo'), type: 'bottle', start: now, ml: removed.bag.ml, milk: 'breast', note: '存奶' });
     return { ...removed, log };
   }
 

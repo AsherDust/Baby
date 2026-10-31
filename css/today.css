@@ -158,5 +158,6 @@
 }
 
 @media (max-width: 720px), (pointer: coarse) {
-  .quick-form input { font-size: 20px; }
+  .quick-form input { height: 44px; font-size: 20px; }
+  .quick-form .btn-sm { height: 44px; }
 }

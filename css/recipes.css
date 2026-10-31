@@ -85,7 +85,7 @@
 @media (max-width: 720px) {
   .meal-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   /* 手机上筛选的小按钮一排一行，左右滑着看，别占半屏 */
-  .recipe-library .recipe-chips { flex-wrap: nowrap; margin: 0 -18px; padding: 0 18px 2px; overflow-x: auto; scrollbar-width: none; }
+  .recipe-library .recipe-chips { flex-wrap: nowrap; margin: -4px -18px; padding: 4px 18px 6px; overflow-x: auto; scrollbar-width: none; }
   .recipe-library .recipe-chips::-webkit-scrollbar { display: none; }
   .recipe-library .chip { flex: none; }
   .recipe-items { grid-template-columns: minmax(0, 1fr); }

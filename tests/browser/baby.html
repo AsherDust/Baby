@@ -225,7 +225,8 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
 
     // ---- 哄睡声音 ----
     let plays = 0;
-    w.HTMLMediaElement.prototype.play = function () { plays += 1; return Promise.resolve(); };
+    let player = null;
+    w.HTMLMediaElement.prototype.play = function () { plays += 1; player = this; return Promise.resolve(); };
     w.HTMLMediaElement.prototype.pause = function () {};
     await nav('#/tools/noise');
     log(text($('.page-title')) === '哄睡声音' && $$('.noise-kind').length === 4 && $('#noise-white[aria-pressed="true"]') && $('#noise-timer-30[aria-pressed="true"]') && /2 米/.test(text($('.fineprint'))), '哄睡声音：四种声音，默认白噪音、30 分钟，提醒放远一点');
@@ -237,9 +238,16 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(plays === 1 && on && on.until === fakeNow + 15 * 60000 && /正在放粉红噪音/.test(text($('.noise-now'))) && blobs[0] && blobs[0].type === 'audio/wav' && blobs[0].size === 44 + 4 * 22050 * 2, '放粉红噪音，15 分钟后停；声音是现场生成的 WAV', `${plays} ${blobs[0] && blobs[0].size}`);
     await click('#noise-brown');
     log(plays === 2 && w.Baby.app.ui.noiseOn.until === on.until && /正在放棕色噪音/.test(text($('.noise-now'))), '换成棕色噪音接着放，时间不重新算');
+    const loud = w.Baby.app.ui.noiseVolume;
+    later(14.9);
+    await wait(1200);
+    log(player.volume < loud / 2, '最后 15 秒慢慢变小声', `${player.volume} / ${loud}`);
+    await click('#noise-timer-30');
+    await wait(1200);
+    log(Math.abs(player.volume - loud) < 1e-6 && w.Baby.app.ui.noiseOn.until === fakeNow + 30 * 60000, '变小声时又改成 30 分钟：音量回到原来的', `${player.volume} / ${loud}`);
     await nav('#/');
     log(/棕色噪音 · 还剩/.test(text($('.live-bar'))), '在别的页面也挂着');
-    later(16);
+    later(31);
     await wait(1200);
     log(!w.Baby.app.ui.noiseOn && /时间到了/.test(toastText()), '时间到了自动停', toastText());
 
@@ -325,6 +333,12 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
 
     // ---- 体温、用药 ----
     await nav('#/baby/health');
+    d.getElementById('bt-value').value = '45';
+    $('form[data-form="baby-temp"]').requestSubmit();
+    const terr = $('form[data-form="baby-temp"] .form-error');
+    const tfield = d.getElementById('bt-value');
+    log(terr.getAttribute('role') === 'alert' && !terr.hidden && tfield.getAttribute('aria-invalid') === 'true' && tfield.getAttribute('aria-describedby') === terr.id && d.activeElement === tfield,
+      '体温填错：读屏会念出来，输入框标成填错了，光标放回去', terr.textContent);
     d.getElementById('bt-value').value = '38.4';
     $('form[data-form="baby-temp"]').requestSubmit();
     await wait(40);

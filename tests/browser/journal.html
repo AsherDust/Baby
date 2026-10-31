@@ -121,6 +121,13 @@ iframe.onload = async () => {
     $(`[data-action="edit-journal"][data-id="${low.id}"]`).click();
     sheet().querySelector('[data-action="delete-journal"]').click();
     log(!sheet().open && state().journal.length === 1 && /删掉了这条心情/.test(toastText()), '删掉一条');
+    const undoBtn = d.querySelector('#toast [data-action="undo"]');
+    undoBtn.focus();
+    await wait(6500);
+    log(d.getElementById('toast').classList.contains('show') && w.Baby.app.ui.undo, '键盘焦点在「撤销」上时，提示条先不收起');
+    undoBtn.blur();
+    await wait(1000);
+    log(d.getElementById('toast').classList.contains('show') && w.Baby.app.ui.undo, '焦点离开后再留一会儿');
     $('[data-action="undo"]').click();
     log(state().journal.length === 2 && state().journal[1].id === low.id, '撤销删除，回到原来的位置');
 

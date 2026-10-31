@@ -21,18 +21,38 @@
     const btn = button ? `<button type="button" class="toast-btn" data-action="${button.action}">${esc(button.label)}</button>`
       : undo ? '<button type="button" class="toast-btn" data-action="undo">撤销</button>' : '';
     toastBox.innerHTML = `
-      <div class="toast toast-${tone}" role="status">
+      <div class="toast toast-${tone}" role="${tone === 'oops' ? 'alert' : 'status'}">
         <span class="toast-bee">${tone === 'oops' ? A.beeWorried : A.bee}</span>
         <span class="toast-msg">${esc(message)}</span>
         ${btn}
       </div>`;
     toastBox.classList.add('show');
+    toastHeld = false;
+    hideToastIn(button ? 10000 : undo ? 6000 : 3200);
+  }
+
+  // 鼠标停在提示上、键盘焦点在「撤销」上时先不收起，离开后至少再留 2 秒。
+  // 手指点不算：手机上点过的地方会一直算「悬停」
+  let toastEnds = 0;
+  let toastHeld = false;
+  function hideToastIn(ms) {
     clearTimeout(toastTimer);
+    toastEnds = Date.now() + ms;
     toastTimer = setTimeout(() => {
+      if (toastHeld) return;
       toastBox.classList.remove('show');
       ui.undo = null;
-    }, button ? 10000 : undo ? 6000 : 3200);
+    }, ms);
   }
+  const holdToast = () => { toastHeld = true; };
+  const releaseToast = () => {
+    toastHeld = false;
+    if (toastBox.classList.contains('show')) hideToastIn(Math.max(2000, toastEnds - Date.now()));
+  };
+  toastBox.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') holdToast(); });
+  toastBox.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !toastBox.contains(document.activeElement)) releaseToast(); });
+  toastBox.addEventListener('focusin', holdToast);
+  toastBox.addEventListener('focusout', (e) => { if (!toastBox.contains(e.relatedTarget)) releaseToast(); });
 
   const oops = (message) => toast(message, null, null, 'oops');
 

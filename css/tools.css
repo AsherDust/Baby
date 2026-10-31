@@ -315,4 +315,5 @@
   .bag-add-form input { height: 42px; }
   .kick-row { grid-template-columns: minmax(0, 1fr) auto 4.5em 40px; }
   .ctx-table th:last-child, .ctx-table td:last-child { width: 44px; }
+  .bag-check { min-height: 44px; }
 }

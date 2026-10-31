@@ -13,6 +13,14 @@
   let afterBack = '';
 
   function showDialog(dialog) {
+    // 读屏时报面板里的标题（例如「血糖 · 10月12日」），没有标题才用 index.html 里写的名字
+    const title = dialog.querySelector('h2');
+    if (title) {
+      title.id = title.id || `${dialog.id}-title`;
+      dialog.setAttribute('aria-labelledby', title.id);
+    } else {
+      dialog.removeAttribute('aria-labelledby');
+    }
     if (!dialog.open) dialog.showModal();
     if (history.state && history.state.sheet) return;
     try {
@@ -431,11 +439,24 @@
     showDialog(medDialog);
   }
 
+  // 出错时读屏会念出来；只有一个输入框的表单（记体重、血糖、体温……）把它标成填错了，光标放回去
   function formError(form, message) {
     const el = form.querySelector('.form-error');
     if (!el) return;
+    el.setAttribute('role', 'alert');
+    el.id = el.id || `${form.dataset.form || 'form'}-error`;
     el.textContent = message;
     el.hidden = !message;
+    const fields = [...form.querySelectorAll('input:not([type=hidden]):not([type=radio]):not([type=checkbox]), textarea')]
+      .filter((f) => f.getClientRects().length);
+    for (const f of fields) {
+      f.removeAttribute('aria-invalid');
+      if (f.getAttribute('aria-describedby') === el.id) f.removeAttribute('aria-describedby');
+    }
+    if (!message || fields.length !== 1) return;
+    fields[0].setAttribute('aria-invalid', 'true');
+    if (!fields[0].hasAttribute('aria-describedby')) fields[0].setAttribute('aria-describedby', el.id);
+    fields[0].focus({ preventScroll: true });
   }
 
   Object.assign(app, {

@@ -696,7 +696,7 @@
     const today = picks.length ? `
       <article class="card baby-food-today">
         <header class="card-head"><h2 class="card-title">${A.icon.bowl}今天可以做</h2></header>
-        <ul class="dish-list">${picks.map((r) => viewFoodRow(r)).join('')}</ul>
+        <ul class="dish-list">${picks.map((r) => viewFoodRow(r, 'food-today')).join('')}</ul>
         ${picks.some((r) => Bb.newFoods(FOOD, b, r).length) ? '<p class="hint">带「新」的是第一次吃的食材，这几天先别再加别的新食材。</p>' : '<p class="hint">这几天先吃熟悉的，过两三天再加新食材。</p>'}
       </article>` : '';
     const stages = BOOK.foodStages.map((s) => {
@@ -738,13 +738,14 @@
       <p class="fineprint">参考《中国 7～24 月龄婴幼儿喂养指南（2022）》。早产、过敏体质、长得慢的宝宝，什么时候加、加什么听医生的。</p>`;
   }
 
-  function viewFoodRow(r) {
+  /** 今天推荐的和全部辅食里会有同一道，id 前缀分开 */
+  function viewFoodRow(r, prefix = 'food') {
     const fresh = kid() ? Bb.newFoods(FOOD, kid(), r) : [];
     const bad = kid() ? Bb.reactionsIn(kid(), r) : [];
     const tags = [...r.good.map((g) => tagName[g]), ...r.allergens.map((a) => `含${allergenName[a]}`)];
     return `
       <li class="dish">
-        <button type="button" class="dish-open" id="food-${r.id}" data-action="baby-food-open" data-id="${r.id}">
+        <button type="button" class="dish-open" id="${prefix}-${r.id}" data-action="baby-food-open" data-id="${r.id}">
           ${foodDot(r)}
           <span class="dish-name">${esc(r.name)}${bad.length ? `<span class="tag tag-lv-high">有过反应：${bad.map(esc).join('、')}</span>` : fresh.length ? `<span class="tag tag-next">新：${fresh.map(esc).join('、')}</span>` : ''}</span>
           <span class="dish-meta">${r.minutes} 分钟 · ${tags.join(' · ')}</span>

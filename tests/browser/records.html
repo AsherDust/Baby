@@ -138,6 +138,8 @@ iframe.onload = async () => {
 
     cell('2026-10-12', 'fasting').click();
     log(sheet().open && sheetForm().elements.value.value === '5.6' && /目标 <5\.3/.test(sheet().textContent), '点格子弹出面板，带出原值和目标');
+    const sheetTitle = d.getElementById(sheet().getAttribute('aria-labelledby'));
+    log(sheetTitle && sheetTitle.tagName === 'H2' && sheet().contains(sheetTitle) && /血糖/.test(sheetTitle.textContent), '读屏报的面板名字是它的标题', sheetTitle && sheetTitle.textContent);
     log(isSheetEntry(), '弹出面板时记了一条历史');
     sheetForm().elements.value.value = '5.0';
     sheetForm().requestSubmit();

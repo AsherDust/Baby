@@ -380,4 +380,16 @@ input::placeholder, textarea::placeholder { color: var(--placeholder); }
   .icon-btn-sm svg { width: 16px; height: 16px; }
   .chip { height: 36px; padding: 0 14px; font-size: 13px; }
   .chip-icon { width: 36px; padding: 0; }
+  /* 小按钮样子不变，叠一层透明的 ::after，能点到的范围撑到至少 44×44。
+     牙齿图挨得太近，撑大了会点到隔壁的牙，没放进来（28×28 也够 WCAG 要求的 24） */
+  :where(.chip, .icon-btn-sm, .btn-sm, .link, .back, .brand, .pill-btn, .bag-add, .ex-name, .story-card-close, .meal-chip, .seg label, .pick, .extra-done, summary:not(.story-shelf > summary)) { position: relative; }
+  :where(.chip, .icon-btn-sm, .btn-sm, .link, .back, .brand, .pill-btn, .bag-add, .ex-name, .story-card-close, .meal-chip, .seg label, .pick, .extra-done, summary:not(.story-shelf > summary))::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
 }

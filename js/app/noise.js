@@ -46,17 +46,17 @@
     ui.noiseOn = null;
   }
 
-  /** 到时间停下；最后 15 秒慢慢变小（iPhone 上网页改不了音量，就到点直接停） */
+  /** 到时间停下；最后 15 秒慢慢变小，变小时又加了时间或者改成不定时，音量回到原来的（iPhone 上网页改不了音量，就到点直接停） */
   function tick() {
     const on = ui.noiseOn;
-    if (!on || !on.until) return;
-    const left = on.until - Date.now();
+    if (!on) return;
+    const left = on.until ? on.until - Date.now() : Infinity;
     if (left <= 0) {
       stopNoise();
       app.render();
       app.toast('时间到了，声音停了');
-    } else if (left < FADE_MS && audio) {
-      audio.volume = ui.noiseVolume * (left / FADE_MS);
+    } else if (audio) {
+      audio.volume = ui.noiseVolume * Math.min(1, left / FADE_MS);
     }
   }
 

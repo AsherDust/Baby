@@ -23,7 +23,7 @@
       if (el.id && !ui.clearInputs.includes(el.id) && el.value !== el.defaultValue) kept[el.id] = el.value;
     });
     ui.clearInputs = [];
-    const focusId = ui.focusNext || (root.contains(document.activeElement) ? document.activeElement.id : '');
+    const focus = ui.focusNext ? { id: ui.focusNext } : focusOf(document.activeElement);
     ui.focusNext = '';
 
     root.innerHTML = app.state ? viewApp() : viewOnboarding();
@@ -32,7 +32,8 @@
       const el = document.getElementById(id);
       if (el) el.value = value;
     }
-    if (focusId) document.getElementById(focusId)?.focus({ preventScroll: true });
+    const back = !focus ? null : focus.id ? document.getElementById(focus.id) : root.querySelectorAll(focus.sel)[focus.index];
+    if (back) back.focus({ preventScroll: true });
     drawCharts();
     paintClocks(Date.now());
     syncWakeLock();
@@ -47,6 +48,17 @@
     } else {
       document.title = '蜜罐';
     }
+  }
+
+  // 重画后把键盘焦点放回原来那个元素：有 id 的按 id 找；按钮多半没有 id，按 data-action、data-id 和第几个找
+  function focusOf(el) {
+    if (!el || !root.contains(el)) return null;
+    if (el.id) return { id: el.id };
+    const action = el.getAttribute('data-action');
+    if (!action) return null;
+    const id = el.getAttribute('data-id');
+    const sel = `[data-action="${CSS.escape(action)}"]${id == null ? '' : `[data-id="${CSS.escape(id)}"]`}`;
+    return { sel, index: [...root.querySelectorAll(sel)].indexOf(el) };
   }
 
   function currentRoute() {

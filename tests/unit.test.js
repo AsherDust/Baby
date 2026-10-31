@@ -1575,7 +1575,7 @@ test('补记和修改：每种记录的校验，睡到第二天早上的按第�
   const r = (type, f) => Bb.readLog(type, { date: '2026-10-12', time: '08:00', ...f }, now);
   eq(r('breast', { left: '', right: '' }).error, '两边一共喂了几分钟？填 1–120 之间的数');
   eq([r('breast', { left: '8', right: '6' }).left, r('breast', { left: '8', right: '6' }).end], [480, tAt('2026-10-12', '08:14')]);
-  eq(r('bottle', { ml: '1000' }).error, '喝了多少毫升？填 5–400 之间的数');
+  eq(r('bottle', { ml: '1000' }).error, '喝了多少毫升？填 5–500 之间的数');
   eq(r('food', { text: ' ' }).error, '吃了什么？写一下');
   eq(r('diaper', {}).error, '选一下是尿了还是便了');
   eq(r('temp', { value: '45' }).error, '体温填 34–43 之间的数，例如 36.8');
@@ -1807,6 +1807,9 @@ test('吸奶和存奶：冷藏 2 天、冷冻 3 个月、解冻后 24 小时；�
   Bb.removeLog(b, used.log.id);
   Bb.restoreStash(b, used);
   eq(b.stash.map((x) => x.ml), [90, 120], '撤销放回原处');
+  const big = Bb.addStash(b, { ml: 450, at, place: 'fridge' });
+  eq(Bb.useStash(b, big.id, at + 3600000).log.ml, 450, '一大袋用掉，记的就是这么多');
+  eq(Bb.normalize(JSON.parse(JSON.stringify(b))).logs.filter((l) => l.ml === 450).length, 1, '重新打开也还在');
   const raw = { ...newborn(), stash: [{ id: 'mk-1', ml: '100', at, place: 'fridge', thawedAt: at }, { id: 'mk-2', ml: 1000, at, place: 'freezer' }, { id: 'BAD', ml: 50, at, place: 'fridge' }],
     logs: [{ id: 'pu-1', type: 'pump', start: at, left: '70', right: 0 }, { id: 'pu-2', type: 'pump', start: at, left: 0, right: 0 }] };
   const n = Bb.normalize(raw);

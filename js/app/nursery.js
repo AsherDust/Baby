@@ -294,9 +294,12 @@
     toast(message, undo);
   }
 
+  // info.text 是转义过的 HTML，提示条会再转义一次，先变回纯文字
   function logMessage(e) {
     const info = babyLogInfo(e, Date.now());
-    return `${info.name}记好了：${info.text.replace(/<[^>]+>/g, '')}`;
+    const t = document.createElement('template');
+    t.innerHTML = info.text;
+    return `${info.name}记好了：${t.content.textContent}`;
   }
 
   const babyForms = {

@@ -109,4 +109,6 @@ button.shelf-item:hover, .shelf-item[aria-current="true"] { border-color: var(--
   .story-shelf > summary::after { right: 22px; }
   .shelf-group { padding: 4px 18px 16px; }
   .shelf-list { grid-template-columns: minmax(0, 1fr); }
+  .shelf-item { min-height: 44px; }
+  .story-voice { height: 44px; }
 }
