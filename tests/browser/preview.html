@@ -24,10 +24,10 @@ const today = p.get('today') || '2026-10-12';
 localStorage.clear();
 const seeded = seedScene(scenario);
 if (seeded && p.get('profile')) Object.assign(seeded.profile, JSON.parse(p.get('profile')));
-if (seeded) localStorage.setItem('pregnancy-desk:v1', JSON.stringify(seeded));
+if (seeded) localStorage.setItem('honey-pot:v1', JSON.stringify(seeded));
 const cloudMode = p.get('cloud');
 if (['ok', 'error', 'offline'].includes(cloudMode)) {
-  localStorage.setItem('pregnancy-desk:v1:cloud', JSON.stringify({
+  localStorage.setItem('honey-pot:v1:cloud', JSON.stringify({
     repo: 'AsherDust/BabySync', branch: 'main', folder: 'honey-pot', token: 'x', key: btoa('k'.repeat(32)), salt: 'AAAA', iter: 1000, files: {}, head: 'h1', last: Date.now() - 3600e3,
   }));
 }
@@ -40,7 +40,7 @@ document.querySelector('iframe').addEventListener('load', (e) => {
     const ua = `Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1${p.get('ios') === 'wechat' ? ' MicroMessenger/8.0.50' : ''}`;
     const props = { userAgent: ua, platform: 'iPhone', standalone: p.get('ios') === 'app' };
     for (const [k, v] of Object.entries(props)) Object.defineProperty(fw.navigator, k, { value: v, configurable: true });
-    fw.dispatchEvent(new fw.StorageEvent('storage', { key: 'pregnancy-desk:v1' }));
+    fw.dispatchEvent(new fw.StorageEvent('storage', { key: 'honey-pot:v1' }));
   }
   // mute=1：假装声音放得出来（无头浏览器不让自动放声音），截哄睡声音正在放的样子
   if (p.get('mute')) fw.HTMLMediaElement.prototype.play = () => Promise.resolve();

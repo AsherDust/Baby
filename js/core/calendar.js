@@ -111,7 +111,7 @@
     }
 
     return {
-      uid: `${ck.id}@pregnancy-desk`,
+      uid: `${ck.id}@honey-pot`,
       title: `产检 · ${ck.title}`,
       description: lines.join('\n'),
       date: status.date,
@@ -128,7 +128,7 @@
     if (row.note) lines.push(row.note);
     lines.push('带上预防接种证；打完在接种门诊留观 30 分钟。');
     return {
-      uid: `${row.id}@pregnancy-desk-baby`,
+      uid: `${row.id}@honey-pot-baby`,
       title: `打疫苗 · ${title}`,
       description: lines.join('\n'),
       date: row.booked || row.due,
@@ -146,7 +146,7 @@
     lines.push(`地点：${row.where}`, `查什么：${row.items.join('；')}`);
     if (row.note) lines.push(row.note);
     return {
-      uid: `${row.id}@pregnancy-desk-exam`,
+      uid: `${row.id}@honey-pot-exam`,
       title: `体检 · ${row.name}`,
       description: lines.join('\n'),
       date: row.booked || row.from,

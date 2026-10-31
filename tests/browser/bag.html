@@ -29,7 +29,7 @@ const nav = async (hash) => {
   if (w.location.hash === hash) return;
   await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
 };
-const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const state = () => JSON.parse(w.localStorage.getItem('honey-pot:v1'));
 const item = (id) => state().bag.find((b) => b.id === id);
 const toastText = () => d.getElementById('toast').textContent;
 const reload = () => new Promise((r) => { iframe.onload = r; w.location.reload(); }).then(bind);
@@ -116,13 +116,13 @@ iframe.onload = async () => {
 
     const old = state();
     delete old.bag;
-    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(old));
+    w.localStorage.setItem('honey-pot:v1', JSON.stringify(old));
     await reload();
     log($$('.bag-item').length === 35 && $$('.bag-item.is-done').length === 0, '没有待产包的老数据，打开后自动补上默认清单');
 
     const s2 = state();
     s2.profile.dueDate = '2027-01-29';
-    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(s2));
+    w.localStorage.setItem('honey-pot:v1', JSON.stringify(s2));
     await reload();
     log(/32 周起/.test($('.card-bag .card-meta').textContent), '24 周时卡片里提示 32 周起准备');
     await nav('#/');

@@ -37,7 +37,7 @@ const nav = async (hash) => {
   if (w.location.hash === hash) return;
   await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
 };
-const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const state = () => JSON.parse(w.localStorage.getItem('honey-pot:v1'));
 const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
 const reload = () => new Promise((r) => { iframe.onload = r; w.location.reload(); }).then(bind);
 const sheet = () => d.getElementById('sheet-dialog');
@@ -251,7 +251,7 @@ iframe.onload = async () => {
 
     const old = state();
     delete old.bp; delete old.glucose; delete old.ultrasounds; delete old.prefs;
-    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(old));
+    w.localStorage.setItem('honey-pot:v1', JSON.stringify(old));
     await reload();
     log($('.card-us .empty'), '没有这几项的老数据也能打开');
     await nav('#/records/glucose');

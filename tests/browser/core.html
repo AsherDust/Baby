@@ -30,7 +30,7 @@ const nav = async (hash) => {
   if (w.location.hash === hash) return;
   await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
 };
-const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const state = () => JSON.parse(w.localStorage.getItem('honey-pot:v1'));
 const toastText = () => d.getElementById('toast').textContent;
 
 iframe.onload = async () => {
@@ -157,7 +157,7 @@ iframe.onload = async () => {
     sd.querySelector('[data-action="export-backup"]').click();
     log(downloads.some((n) => /备份-2026-10-12\.json$/.test(n)), '导出备份', downloads.join());
     const backup = JSON.parse(await blobs[blobs.length - 1].text());
-    log(backup.app === 'pregnancy-desk' && backup.weights.length === 2 && backup.checkups.length === 17, '备份内容完整');
+    log(backup.app === 'honey-pot' && backup.weights.length === 2 && backup.checkups.length === 17, '备份内容完整');
     sd.querySelector('[data-action="close-dialog"]').click();
 
     await nav('#/checkups');
@@ -180,7 +180,7 @@ iframe.onload = async () => {
 
     $('[data-action="open-settings"]').click();
     d.getElementById('settings-dialog').querySelector('[data-action="clear-all"]').click();
-    log(!!$('form[data-form="onboard"]') && !w.localStorage.getItem('pregnancy-desk:v1'), '清空数据回到引导页');
+    log(!!$('form[data-form="onboard"]') && !w.localStorage.getItem('honey-pot:v1'), '清空数据回到引导页');
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }

@@ -817,7 +817,7 @@ test('日历：全天产检带前一晚 8 点和当天 8 点提醒', () => {
   ok(ics.startsWith('BEGIN:VCALENDAR\r\n') && ics.endsWith('END:VCALENDAR\r\n'));
   ok(!/[^\r]\n/.test(ics), '必须用 CRLF 换行');
   const unfolded = ics.replace(/\r\n /g, '');
-  for (const s of ['UID:nt@pregnancy-desk', 'DTSTAMP:20260701T020304Z', 'DTSTART;VALUE=DATE:20260717', 'DTEND;VALUE=DATE:20260718', 'SUMMARY:产检 · NT 检查', 'TRIGGER:-PT4H', 'TRIGGER:PT8H', '建议日期']) {
+  for (const s of ['UID:nt@honey-pot', 'DTSTAMP:20260701T020304Z', 'DTSTART;VALUE=DATE:20260717', 'DTEND;VALUE=DATE:20260718', 'SUMMARY:产检 · NT 检查', 'TRIGGER:-PT4H', 'TRIGGER:PT8H', '建议日期']) {
     ok(unfolded.includes(s), `缺少 ${s}`);
   }
 });

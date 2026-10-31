@@ -28,7 +28,7 @@ const nav = async (hash) => {
   if (w.location.hash === hash) return;
   await new Promise((r) => { w.addEventListener('hashchange', () => r(), { once: true }); w.location.hash = hash; });
 };
-const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const state = () => JSON.parse(w.localStorage.getItem('honey-pot:v1'));
 const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
 const reload = () => new Promise((r) => { iframe.onload = r; w.location.reload(); }).then(bind);
 const composer = () => $('form[data-form="journal"]');
@@ -127,7 +127,7 @@ iframe.onload = async () => {
     for (let i = 0; i < 45; i += 1) {
       s.journal.push({ id: `j-old-${i}`, date: w.Baby.dates.addDays('2026-10-01', -i), time: '20:00', mood: moods[i % 6], text: `第 ${i} 天` });
     }
-    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(s));
+    w.localStorage.setItem('honey-pot:v1', JSON.stringify(s));
     await reload();
     await nav('#/journal');
     log($$('.mood-entry').length === 20 && /还有 27 条/.test($('[data-action="journal-more"]').textContent), '一次先显示 20 条', `${$$('.mood-entry').length}`);

@@ -27,7 +27,7 @@
   function split(state) {
     const logs = state.baby ? state.baby.logs : [];
     const main = state.baby ? { ...state, baby: { ...state.baby, logs: [] } } : state;
-    const parts = { [MAIN]: JSON.stringify({ app: 'pregnancy-desk', ...main }) };
+    const parts = { [MAIN]: JSON.stringify({ app: Baby.storage.APP, ...main }) };
     const months = {};
     for (const l of logs) (months[monthOf(l.start)] = months[monthOf(l.start)] || []).push(l);
     for (const m of Object.keys(months).sort()) parts[`logs-${m}.json`] = JSON.stringify(months[m]);

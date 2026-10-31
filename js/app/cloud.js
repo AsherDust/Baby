@@ -172,7 +172,7 @@
     const body = canZip ? await pipe(bytes(plain), new CompressionStream('gzip')) : bytes(plain);
     const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: bytes(name) }, await aesKey(c), body);
     return JSON.stringify({
-      app: 'pregnancy-desk',
+      app: S.APP,
       v: 1,
       kdf: { name: 'PBKDF2', hash: 'SHA-256', iter: c.iter, salt: c.salt },
       cipher: 'AES-GCM',
@@ -189,7 +189,7 @@
     } catch (e) {
       // 下面统一报
     }
-    if (!env || env.app !== 'pregnancy-desk' || env.cipher !== 'AES-GCM' || !env.kdf) throw new CloudError('云端的文件不是蜜罐存的，或者坏了', 'format');
+    if (!env || ![S.APP, S.LEGACY].includes(env.app) || env.cipher !== 'AES-GCM' || !env.kdf) throw new CloudError('云端的文件不是蜜罐存的，或者坏了', 'format');
     return env;
   }
 

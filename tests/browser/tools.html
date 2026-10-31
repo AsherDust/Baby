@@ -40,7 +40,7 @@ function bind() {
 const $ = (s) => d.querySelector(s);
 const $$ = (s) => [...d.querySelectorAll(s)];
 const text = (s) => ($(s) ? $(s).textContent.replace(/\s+/g, ' ').trim() : '');
-const state = () => JSON.parse(w.localStorage.getItem('pregnancy-desk:v1'));
+const state = () => JSON.parse(w.localStorage.getItem('honey-pot:v1'));
 const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const nav = async (hash) => {
@@ -212,7 +212,7 @@ iframe.onload = async () => {
     const shifted = state();
     shifted.kicks[1].start -= 2 * 60 * MIN;
     shifted.kicks[1].taps = shifted.kicks[1].taps.map((x) => x - 2 * 60 * MIN);
-    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(shifted));
+    w.localStorage.setItem('honey-pot:v1', JSON.stringify(shifted));
     await reload();
     log(state().kicks[1].end === shifted.kicks[1].start + 60 * MIN && !$('.tool.is-live'), '关着页面过了 1 小时，再打开时自动收尾');
     // 半夜两点前跑的话，往前挪两小时就到了昨天
@@ -222,7 +222,7 @@ iframe.onload = async () => {
     const old = state();
     delete old.kicks;
     delete old.contractions;
-    w.localStorage.setItem('pregnancy-desk:v1', JSON.stringify(old));
+    w.localStorage.setItem('honey-pot:v1', JSON.stringify(old));
     await reload();
     log(/今天还没数/.test(text('.tool[data-tool="kicks"]')), '没有这两项的老数据也能打开');
 
