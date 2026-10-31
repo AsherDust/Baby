@@ -9,14 +9,14 @@
 
   const W = 640;
   const row = (label, value) => (value ? `<tr><th>${label}</th><td>${value}</td></tr>` : '');
-  const part = (title, body, note = '') => `
+  // 没有记录的一块整个不显示
+  const part = (title, body, note = '') => (body ? `
     <section class="rp-part">
       <h2>${title}</h2>
       ${body}
       ${note ? `<p class="rp-note">${note}</p>` : ''}
-    </section>`;
+    </section>` : '');
   const table = (head, rows) => `<table class="rp-table"><thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
-  const empty = (text) => `<p class="rp-empty">${text}</p>`;
   const num1 = (n) => String(Math.round(n * 10) / 10);
 
   function viewReportTool() {
@@ -56,7 +56,7 @@
         ${row('孕前 BMI', plan && plan.applies ? `${plan.bmi}（${plan.name}，整个孕期建议长 ${plan.total[0]}～${plan.total[1]} kg）` : '')}
       </table>`;
 
-    let weight = empty('还没有体重记录。');
+    let weight = '';
     if (ws.latest) {
       const level = gain ? `，${{ ok: '在推荐范围内', high: '比推荐长得快', low: '比推荐长得慢' }[gain.level]}（这时推荐累计 ${num1(gain.range[0])}～${num1(gain.range[1])} kg）` : '';
       weight = `
@@ -71,7 +71,7 @@
         const level = M.bpLevel(r);
         return `<tr class="${level === 'high' || level === 'severe' ? 'rp-high' : ''}"><td>${D.formatDate(r.date)} ${r.time}</td><td>${r.sys}/${r.dia}</td><td>${r.pulse || ''}</td><td>${esc(r.note || '')}</td></tr>`;
       }))
-      : empty('还没有血压记录。');
+      : '';
 
     const after = s.prefs.glucoseAfter;
     const since = D.addDays(today, -6);
@@ -84,7 +84,7 @@
         const level = M.glucoseLevel(v, g.id, after);
         return `<td class="${level === 'ok' ? '' : `rp-${level}`}">${v}</td>`;
       }).join('')}</tr>`))
-      : empty('最近 7 天没有血糖记录。');
+      : '';
 
     // 药：怀孕以来吃过的都列上，停了很久的医生也要知道；补剂：正在吃的和最近一个月停掉的
     const monthAgo = D.addDays(today, -30);
@@ -99,14 +99,14 @@
           : `${day(r.med.start)}～${day(r.med.end)}<br><small>孕 ${gaOf(r.startGA)}～${gaOf(r.endGA)} 周</small>`;
         return `<tr><td>${esc(r.med.name)}${r.med.dose ? `<br><small>${esc(r.med.dose)}</small>` : ''}</td><td>${when}</td><td>${esc(r.med.note)}</td></tr>`;
       }))
-      : empty('怀孕以来没记过吃药。');
+      : '';
     const supplements = rows.filter((r) => r.med.kind !== 'medicine' && (r.ongoing || (r.med.end && r.med.end >= monthAgo)));
     const supplementTable = supplements.length
       ? table(['补剂', '用法', '从', '到'], supplements.map((r) => `<tr><td>${esc(r.med.name)}</td><td>${esc(r.med.dose)}</td><td>${D.formatDate(r.med.start)}</td><td>${r.ongoing ? '还在吃' : D.formatDate(r.med.end)}</td></tr>`))
-      : empty('没有正在吃的补剂。');
+      : '';
 
     const us = s.ultrasounds.filter((u) => u.date <= today).slice(-1)[0];
-    let usBody = empty('还没有 B 超记录。');
+    let usBody = '';
     if (us) {
       const fields = C.US_FIELDS.filter((f) => us.values[f.id] != null);
       usBody = `
@@ -124,10 +124,10 @@
     return `
       ${part('基本情况', basics)}
       ${part('体重', weight)}
-      ${part('血压', bpTable, bp.length ? `最近 7 天量了 ${bpSum.count} 次${bpSum.high ? `，${bpSum.high} 次偏高（≥140/90）` : ''}；标红的是偏高的。` : '')}
-      ${part('血糖（mmol/L）', glTable, days.length ? `餐后按 ${after} 小时测；目标空腹 ≤5.3，餐后 ≤${M.glucoseTarget('breakfast', after)}，睡前 ≤6.7。最近 7 天 ${glSum.high} 次偏高${glSum.low ? `、${glSum.low} 次偏低` : ''}，标红的是超出目标的。` : '')}
-      ${part('用药', drugTable, drugs.length ? '怀孕以来吃过的药都在这里，包括已经停了的。' : '')}
-      ${part('补剂', supplementTable, supplements.length ? '正在吃的，和最近一个月停掉的。' : '')}
+      ${part('血压', bpTable, `最近 7 天量了 ${bpSum.count} 次${bpSum.high ? `，${bpSum.high} 次偏高（≥140/90）` : ''}；标红的是偏高的。`)}
+      ${part('血糖（mmol/L）', glTable, `餐后按 ${after} 小时测；目标空腹 ≤5.3，餐后 ≤${M.glucoseTarget('breakfast', after)}，睡前 ≤6.7。最近 7 天 ${glSum.high} 次偏高${glSum.low ? `、${glSum.low} 次偏低` : ''}，标红的是超出目标的。`)}
+      ${part('用药', drugTable, '怀孕以来吃过的药都在这里，包括已经停了的。')}
+      ${part('补剂', supplementTable, '正在吃的，和最近一个月停掉的。')}
       ${part('最近一次 B 超', usBody)}
       ${others.length ? part('其它', `<ul class="rp-list">${others.map((t) => `<li>${t}</li>`).join('')}</ul>`) : ''}`;
   }
@@ -149,7 +149,7 @@
 
     const rows = Bb.growthRows(b, STD);
     const latest = rows[rows.length - 1];
-    let growth = empty('还没量过身长体重。');
+    let growth = '';
     if (latest) {
       const maxDay = Math.min(730, Math.max(183, age.days + 61));
       const chart = (metric) => {
@@ -165,7 +165,7 @@
     const week = Bb.weekSummary(b, today, now);
     const weekTable = week.some((d) => d.has)
       ? table(['日期', '喂奶', '睡觉', '尿布'], week.slice().reverse().map((d) => `<tr><td>${D.formatDate(d.date)}${d.date === today ? '（今天）' : ''}</td><td>${d.feeds ? `${d.feeds} 次${d.breastMin ? `，亲喂 ${d.breastMin} 分钟` : ''}${d.bottleMl ? `，瓶喂 ${d.bottleMl} 毫升` : ''}` : ''}</td><td>${d.sleepMin ? `${num1(d.sleepMin / 60)} 小时` : ''}</td><td>${d.diapers ? `${d.diapers} 片（尿 ${d.pee}，便 ${d.poo}）` : ''}</td></tr>`))
-      : empty('最近 7 天没有记录。');
+      : '';
 
     const since = D.addDays(today, -13);
     const recent = b.logs.filter((l) => Bb.dayOf(l.start) >= since && Bb.dayOf(l.start) <= today);
@@ -174,11 +174,11 @@
     const siteName = Object.fromEntries(BB.feverSites);
     const tempTable = temps.length
       ? table(['时间', '体温', '量的哪里'], temps.map((l) => `<tr class="${['low', 'mid', 'high'].includes(Bb.tempLevel(BB, l.value, l.site)) ? 'rp-high' : ''}"><td>${when(l)}</td><td>${l.value}℃</td><td>${siteName[l.site] || ''}</td></tr>`))
-      : empty('最近两周没有量体温的记录。');
+      : '';
     const meds = recent.filter((l) => l.type === 'med').reverse();
     const medTable = meds.length
       ? table(['时间', '药', '剂量'], meds.map((l) => `<tr><td>${when(l)}</td><td>${esc(l.name)}</td><td>${esc(l.dose)}</td></tr>`))
-      : empty('最近两周没有用药记录。');
+      : '';
 
     const vax = Bb.vaccineRows(b, BB, today);
     const nextVax = Bb.nextVaccine(vax);
@@ -194,7 +194,7 @@
       </ul>`;
 
     let food = '';
-    if (age.months >= 6 || Object.keys(b.tried).length) {
+    if (Object.keys(b.tried).length || Object.keys(b.foodNotes).length) {
       const feel = (f) => Object.entries(b.foodNotes).filter(([, v]) => v.feel === f).map(([n, v]) => `${esc(n)}${v.note ? `（${esc(v.note)}）` : ''}`);
       const reacted = feel('reaction');
       food = part('辅食', `
@@ -207,7 +207,7 @@
 
     return `
       ${part('基本情况', basics)}
-      ${part('生长', growth, latest ? '括号里是 WHO 儿童生长标准的百分位。' : '')}
+      ${part('生长', growth, '括号里是 WHO 儿童生长标准的百分位。')}
       ${part('最近 7 天', weekTable, '按家里记下来的算，没记全的那几天会偏少。')}
       ${part('体温（最近两周）', tempTable)}
       ${part('用药（最近两周）', medTable)}

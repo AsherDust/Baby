@@ -441,6 +441,14 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await nav('#/journal');
     log(/产后情绪起伏很常见/.test(text($('.mood-care'))) && /伤害宝宝/.test(text($('.mood-care'))) && /42 天复查/.test(text($('.mood-care'))), '产后的说法：夜里让家人分担，42 天复查时跟医生说说', text($('.mood-care')));
 
+    // ---- 就诊小结：没有记录的那块不显示 ----
+    const heads = () => $$('#report .rp-part h2').map((h) => h.textContent);
+    await open('fresh', 'tools/report');
+    log(heads()[0] === '基本情况' && !heads().some((h) => ['体重', '用药', '补剂'].includes(h)) && $$('#report .rp-part').every((p) => p.children.length > 1),
+      '孕期：没记体重、没记用药，这几块不显示', heads().join());
+    await open('baby', 'tools/report');
+    log(heads().includes('体温（最近两周）') && !heads().includes('辅食'), '宝宝：还没开始吃辅食，不显示辅食这块', heads().join());
+
     log(errors.length === 0, '没有报错', errors.join(' | '));
   } catch (err) {
     log(false, `出错：${err.message}`, err.stack);

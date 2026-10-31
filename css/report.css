@@ -11,7 +11,6 @@
 .rp-part h2 { margin: 0 0 8px; font-size: 16px; }
 .rp-part p { margin: 0 0 8px; font-size: 14px; }
 .rp-note { font-size: 12.5px !important; color: var(--ink-3); }
-.rp-empty { color: var(--ink-3); }
 .rp-kv, .rp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .rp-kv th { width: 7.5em; padding: 4px 8px 4px 0; text-align: left; font-weight: 400; color: var(--ink-3); vertical-align: top; }
 .rp-kv td { padding: 4px 0; }
@@ -48,6 +47,6 @@ td.rp-low { color: var(--sky-deep); font-weight: 600; }
   .rp-charts { grid-template-columns: 1fr 1fr; }
   .rp-head h1, .rp-part h2, .rp-table td, .rp-kv td, .rp-list { color: #000000; }
   .rp-table small { font-size: 8.5pt; }
-  .rp-note, .rp-head p, .rp-kv th, .rp-foot, .rp-empty, .rp-table small { color: #444444 !important; }
+  .rp-note, .rp-head p, .rp-kv th, .rp-foot, .rp-table small { color: #444444 !important; }
   .rp-high td, td.rp-high, .rp-high-text { color: #B00020; }
 }
