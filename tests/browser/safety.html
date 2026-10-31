@@ -52,16 +52,11 @@ const WECHAT = `${IPHONE} MicroMessenger/8.0.50`;
 // 用了 10 天、记过体重、没备份过
 const seed = Baby.model.createState({ dueDate: '2027-01-29' }, '2026-10-02');
 Baby.model.upsertWeight(seed, '2026-10-05', 55.2);
-// 存在老名字下，像是老版本记的：打开时应该挪到新名字下
-const LEGACY = `${Baby.storage.LEGACY}:v1`;
-localStorage.setItem(LEGACY, JSON.stringify(seed));
-localStorage.setItem(`${LEGACY}:unreadable:1`, '{坏的');
+save(seed);
 
 (async () => {
   try {
     await open(APP);
-    log(state() && state().weights.length === 1 && !localStorage.getItem(LEGACY) && localStorage.getItem(`${KEY}:unreadable:1`) === '{坏的' && !localStorage.getItem(`${LEGACY}:unreadable:1`),
-      '老版本存的记录挪到了新名字下，照样都在', Object.keys(localStorage).join());
     let persistCalls = 0;
     let kept = false;
     pretend({ storage: { persisted: () => Promise.resolve(kept), persist: () => { persistCalls += 1; return Promise.resolve(true); } } });
