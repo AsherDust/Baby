@@ -783,6 +783,42 @@ test('normalize：老数据没有待产包时补上默认清单，删光了的�
   ]);
 });
 
+test('内置的产检、待产包：说明文字按编号从内容里拿，只存编号的读得出；产检的标题、检查项目、准备事项改过的照用', () => {
+  const s = M.createState({ dueDate: DUE });
+  const before = JSON.stringify(s);
+  const slim = M.slim(s);
+  eq(JSON.stringify(s), before, '不改原来的');
+  eq(slim.checkups.find((c) => c.id === 'nt'), { id: 'nt', date: null, time: '', done: false }, '内置的产检只留编号、日期、做没做');
+  eq(slim.bag.find((b) => b.id === 'diapers'), { id: 'diapers', done: false }, '内置的待产包只留编号、勾没勾');
+  eq(M.normalize(JSON.parse(JSON.stringify(slim))), s, '只存编号的读回来和带说明文字的一样');
+
+  const ogtt = s.checkups.find((c) => c.id === 'ogtt');
+  M.updateCheckup(s, 'ogtt', { title: ogtt.title, date: '2026-10-13', time: '', items: ogtt.items.slice(), prep: ogtt.prep });
+  eq(M.slim(s).checkups.find((c) => c.id === 'ogtt'), { id: 'ogtt', date: '2026-10-13', time: '', done: false }, '打开产检、只改了日期就保存：别的不算改过');
+  M.updateCheckup(s, 'nt', { title: 'NT 和早唐', date: '2026-07-20', time: '08:30', items: ['NT 超声'], prep: '' });
+  eq(M.slim(s).checkups.find((c) => c.id === 'nt'), { id: 'nt', date: '2026-07-20', time: '08:30', done: false, title: 'NT 和早唐', items: ['NT 超声'], prep: '' },
+    '改过的标题、检查项目，清空的准备事项都存着');
+  eq(M.normalize(JSON.parse(JSON.stringify(M.slim(s)))), s, '改过的读回来不变');
+
+  const old = JSON.parse(JSON.stringify(s));
+  Object.assign(old.checkups.find((c) => c.id === 'w28'), { tip: '以前存的说明', start: 1, end: 2, target: 1 });
+  Object.assign(old.bag.find((b) => b.id === 'diapers'), { group: 'docs', name: '以前存的名字', note: '以前的备注' });
+  const back = M.normalize(old);
+  eq(back.checkups.find((c) => c.id === 'w28'), s.checkups.find((c) => c.id === 'w28'), '小贴士、孕周窗口以内容为准');
+  eq(back.bag.find((b) => b.id === 'diapers'), s.bag.find((b) => b.id === 'diapers'), '待产包的分类、名字、备注以内容为准');
+
+  const mine = M.addCheckup(s, { title: '牙科检查', date: '2026-11-01', items: [] });
+  const item = M.addBagItem(s, 'baby', '安抚奶嘴');
+  eq([M.slim(s).checkups.find((c) => c.id === mine.id), M.slim(s).bag.find((b) => b.id === item.id)], [mine, item], '自己加的照原样存');
+
+  const retired = M.normalize({
+    profile: { dueDate: DUE },
+    checkups: [{ id: 'retired', title: '以前的内置', target: 100 }, { id: 'retired-slim', date: '2026-11-01' }],
+    bag: [{ id: 'old-item', group: 'mom', name: '以前的物品' }, { id: 'old-slim', done: true }],
+  });
+  eq([retired.checkups.map((c) => c.id), retired.bag.map((b) => b.id)], [['retired'], ['old-item']], '内容里没有的编号：带文字的照用，只有编号的读不出来就不要');
+});
+
 test('备份：导出再导入一致，坏文件给出中文错误', () => {
   const s = M.createState({ dueDate: DUE, preWeight: 52 });
   M.upsertWeight(s, '2026-10-12', 56.2);
@@ -1960,6 +1996,16 @@ test('辅食食谱：编号唯一，阶段、营养、易过敏的都登记过�
   ok(FOOD.recipes.filter((r) => r.stage === 6 && r.good.includes('iron')).length >= 3, '6 个月要有好几样补铁的');
 });
 
+test('辅食食材的名字就是编号：吃过的、标记都按名字存，名字不能随手改', () => {
+  const NAMES = ['强化铁米粉', '猪肉', '牛肉', '猪肝', '南瓜', '胡萝卜', '西兰花', '土豆', '苹果', '香蕉', '鸡蛋', '大米', '鲈鱼', '菠菜', '小米', '鸡肉',
+    '豆腐', '小油菜', '面条', '番茄', '红薯', '燕麦片', '面粉', '西葫芦', '三文鱼', '虾仁', '馄饨皮', '洋葱', '饺子皮', '白菜', '香菇'];
+  const used = new Set(FOOD.recipes.flatMap((r) => r.items.map((i) => i[0])).filter((n) => !FOOD.plain.includes(n)));
+  const gone = NAMES.filter((n) => !used.has(n));
+  ok(!gone.length, `这些食材名不见了：${gone.join('、')}。宝宝的 tried、foodNotes 用名字当键，改名要在读记录时把旧名字换成新的；换语言只换显示的名字`);
+  const added = [...used].filter((n) => !NAMES.includes(n));
+  ok(!added.length, `新加的食材，名字加进上面的名单：${added.join('、')}`);
+});
+
 test('辅食菜名前的小圆点：和孕期食谱同名的食材同一个颜色，除了水奶油淀粉每样都有颜色；粥、软饭、面条取肉和菜', () => {
   const hex = /^#[0-9A-F]{6}$/;
   const colors = { ...BOOK.colors, ...FOOD.colors };
@@ -2127,6 +2173,29 @@ test('合并：对方删掉的这台也删；这台删过的不会加回来；�
   eq(back.state.weights.length, 1, '对方那台：这台撤销了删除，就不跟着删');
   eq(back.state.bp, [], '对方那台：这台删掉的血压也删了');
   eq(back.state.journal.map((e) => e.id), [e2.id], '对方那台：自己删过的不加回来，这台后来改过的那条宁可留着');
+});
+
+test('合并：内置的产检、待产包，删过的标记按只留编号的样子签的也认', () => {
+  const base = M.createState({ dueDate: DUE });
+  const removeSlim = (s, field, tag, id, slim) => {
+    const [x] = s[field].splice(s[field].findIndex((y) => y.id === id), 1);
+    Mg.drop(s.removed, `${tag}:${id}`, slim(x));
+  };
+  const has = (s, field, id) => s[field].some((x) => x.id === id);
+  const mine = viaFile(base);
+  const other = viaFile(base);
+  removeSlim(other, 'checkups', 'checkup', 'nt', C.slimCheckup);
+  removeSlim(other, 'bag', 'bag', 'diapers', C.slimBagItem);
+  const r = Mg.merge(mine, viaFile(other));
+  ok(!has(r.state, 'checkups', 'nt') && !has(r.state, 'bag', 'diapers'), '对方删掉的这台也删');
+  const back = Mg.merge(viaFile(other), viaFile(mine));
+  ok(!has(back.state, 'checkups', 'nt') && !has(back.state, 'bag', 'diapers'), '对方那台：自己删过的不加回来');
+  mine.checkups.find((c) => c.id === 'anomaly').date = '2026-10-20';
+  removeSlim(other, 'checkups', 'checkup', 'anomaly', C.slimCheckup);
+  ok(has(Mg.merge(mine, viaFile(other)).state, 'checkups', 'anomaly'), '这台填过日期的不跟着删');
+  const third = viaFile(base);
+  M.removeCheckup(third, 'w28');
+  ok(!has(Mg.merge(viaFile(base), viaFile(third)).state, 'checkups', 'w28'), '按带说明文字的样子签的（现在的写法）照样认');
 });
 
 test('合并：宝宝 — 这台还没有就整个拿来，同一个宝宝逐项合，出生日期不一样要说', () => {
@@ -2428,6 +2497,20 @@ test('云同步：只传变了的文件，某个月的记录全删了就删掉�
   files['README.md'] = { sha: 'y', hash: 'z' };
   eq(Sy.changes(Sy.split(s), files).remove, [], '别的文件不碰');
   ok(Sy.hash('a') !== Sy.hash('b') && Sy.hash('蜜罐') === Sy.hash('蜜罐'), '指纹');
+});
+
+test('云同步：main.json 里内置的产检、待产包带不带说明文字算同一份，只存编号的拼回来一样', () => {
+  const s = viaFile(fullState());
+  const parts = Sy.split(s);
+  const slimText = JSON.stringify(M.slim(JSON.parse(parts['main.json'])));
+  ok(slimText.length < parts['main.json'].length - 2000, `说明文字确实省掉了：${parts['main.json'].length} → ${slimText.length}`);
+  eq(Sy.join({ ...parts, 'main.json': slimText }), s);
+  eq(Sy.changes(parts, { 'main.json': { sha: 'x', hash: Sy.fingerprint('main.json', slimText) } }).upload.includes('main.json'), false, '云端是只存编号的写法、内容一样：不传');
+  const edited = JSON.parse(slimText);
+  edited.checkups.find((c) => c.id === 'nt').title = '改过的名字';
+  ok(Sy.fingerprint('main.json', JSON.stringify(edited)) !== Sy.fingerprint('main.json', slimText), '用户改过的算变了');
+  edited.checkups.find((c) => c.id === 'nt').title = 'NT 检查';
+  eq(Sy.fingerprint('main.json', JSON.stringify(edited)), Sy.fingerprint('main.json', slimText), '改回和内置一样的算没改');
 });
 
 // 同步的总表（merge.js 的 SCHEMA）：一个字段一行，[路径, 怎么办]

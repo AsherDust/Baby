@@ -27,11 +27,12 @@
    * 判断要不要重新传用的指纹，只看内容：
    * - 字段的顺序、空着的字段不算（刚记下的和读出来整理过的，字不一样内容一样）
    * - main.json 里每台设备自己的东西不算（哪些是共用的见 core/merge.js）：现在不上传了，以前传上去的文件里可能还有
+   * - main.json 里内置的产检、待产包带不带说明文字不算（新旧版本写法不一样）
    * 不然拉完云端以后总觉得「变了」，又传一次
    */
   function fingerprint(name, text) {
     const raw = JSON.parse(text);
-    return hash(JSON.stringify(Baby.merge.canon(name === MAIN ? Baby.merge.shareable(raw) : raw)));
+    return hash(JSON.stringify(Baby.merge.canon(name === MAIN ? Baby.merge.shareable(Baby.model.slim(raw)) : raw)));
   }
 
   /** 新手机从云端恢复：每台设备自己的东西用这台的初始值（和新建记录时一样），只带共用的那几项（以前传上去的文件里可能还有别的） */

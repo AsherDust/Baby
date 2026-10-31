@@ -201,6 +201,10 @@
   // 删的时间；以前的标记只记了哪天，按那天一早算（撤销、重记在同一天的话，算后来的）
   const removedAt = (t) => (Number.isFinite(t.at) ? t.at : new Date(`${t.on}T00:00:00`).getTime());
 
+  // 删过的标记是不是这一条：内置的产检、待产包按只留编号和用户改的样子签的也认，说明文字换了说法、换了语言也对得上
+  const SLIM = { checkup: (x) => Baby.content.slimCheckup(x), bag: (x) => Baby.content.slimBagItem(x) };
+  const signedAs = (t, tag, x) => t.sig === sign(x) || (tag in SLIM && t.sig === sign(SLIM[tag](x)));
+
   /** 读存储和备份时清理删过的标记：格式不对的、半年以前的不要 */
   function clean(raw, today = D.today()) {
     const out = {};
@@ -342,7 +346,7 @@
     const out = mine.filter((x) => {
       const id = `${tag}:${key(x)}`;
       const t = ctx.removed.other[id];
-      if (t && !otherKeys.has(key(x)) && t.sig === sign(x) && removedAt(t) > (ctx.edits.mine[id] || 0)) {
+      if (t && !otherKeys.has(key(x)) && signedAs(t, tag, x) && removedAt(t) > (ctx.edits.mine[id] || 0)) {
         n.dropped += 1;
         return false;
       }
@@ -357,7 +361,7 @@
         continue;
       }
       const t = ctx.removed.mine[id];
-      if (t && t.sig === sign(x) && removedAt(t) > (ctx.edits.other[id] || 0)) continue;
+      if (t && signedAs(t, tag, x) && removedAt(t) > (ctx.edits.other[id] || 0)) continue;
       at.set(k, out.length);
       out.push(x);
       n.added += 1;

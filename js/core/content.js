@@ -377,6 +377,38 @@
     return BAG.map(([group, id, name, note]) => ({ id, group, name, note, done: false, custom: false }));
   }
 
+  // 内置的产检、待产包，说明文字按编号从这里拿：改了说法、换了语言，记录跟着变。
+  // 产检的标题、检查项目、准备事项用户能改，记录里有就用记录里的
+  const CHECKUP_OWN = ['title', 'items', 'prep'];
+  const checkupById = new Map(CHECKUPS.map((c) => [c.id, c]));
+  const bagById = new Map(BAG.map(([group, id, name, note]) => [id, { id, group, name, note }]));
+  const builtin = (byId, x) => (x && typeof x === 'object' && x.custom !== true && byId.get(x.id)) || null;
+
+  /** 内置的产检补上说明文字和孕周窗口 */
+  function fillCheckup(c) {
+    const base = builtin(checkupById, c);
+    if (!base) return c;
+    const out = { ...c, ...base, items: base.items.slice() };
+    for (const k of CHECKUP_OWN) if (c[k] !== undefined) out[k] = c[k];
+    return out;
+  }
+
+  /** 内置的产检只留编号、日期、做没做，和用户改得跟内置不一样的几项 */
+  function slimCheckup(c) {
+    const base = builtin(checkupById, c);
+    if (!base) return c;
+    const out = { id: c.id, date: c.date, time: c.time, done: c.done };
+    for (const k of CHECKUP_OWN) if (c[k] !== undefined && JSON.stringify(c[k]) !== JSON.stringify(base[k])) out[k] = c[k];
+    return out;
+  }
+
+  // 内置的待产包物品改不了名字，分类、名字、备注都按编号拿
+  const fillBagItem = (b) => {
+    const base = builtin(bagById, b);
+    return base ? { ...b, ...base } : b;
+  };
+  const slimBagItem = (b) => (builtin(bagById, b) ? { id: b.id, done: b.done } : b);
+
   // 记完、做完时提示条上的话，同一件事几种说法轮着用；{baby} 换成宝宝小名。
   // 体重、血压、血糖这些数值只说记好了，不评价；胎动偏少、出错时也不说俏皮话
   const CHEERS = {
@@ -445,6 +477,10 @@
     momAt,
     defaultCheckups,
     defaultBag,
+    fillCheckup,
+    slimCheckup,
+    fillBagItem,
+    slimBagItem,
     searchFoods,
   };
 })();

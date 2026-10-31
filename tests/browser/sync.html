@@ -462,6 +462,32 @@ const sinceCalls = () => {
     res = await sync();
     log(res.ok, '文件换回来以后同步照常');
 
+    // ---- 以后的版本：内置的产检、待产包只存编号，不带说明文字 ----
+    // 照 cloud.js 的格式加密，当成别的手机传上去的
+    const sealAs = async (name, plain) => {
+      const c = cloud();
+      const bin64 = (b) => { let s = ''; b.forEach((x) => { s += String.fromCharCode(x); }); return btoa(s); };
+      const zipped = new Uint8Array(await new Response(new Blob([enc.encode(plain)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+      const key = await crypto.subtle.importKey('raw', Uint8Array.from(atob(c.key), (ch) => ch.charCodeAt(0)), 'AES-GCM', false, ['encrypt']);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(name) }, key, zipped));
+      return JSON.stringify({ app: 'honey-pot', v: 1, kdf: { name: 'PBKDF2', hash: 'SHA-256', iter: c.iter, salt: c.salt }, cipher: 'AES-GCM', iv: bin64(iv), zip: 'gzip', data: bin64(data) });
+    };
+    const slimMain = w.Baby.model.slim(JSON.parse(w.Baby.sync.split(w.Baby.app.state)['main.json']));
+    log(!w.Baby.app.state.checkups.find((c) => c.id === 'w41').done && !w.Baby.app.state.bag.find((b) => b.id === 'diapers').done, '41 周产检、纸尿裤这台还没勾');
+    slimMain.checkups.find((c) => c.id === 'w41').done = true;
+    slimMain.bag.find((b) => b.id === 'diapers').done = true;
+    await repo.commitOther('honey-pot/main.json', await sealAs('main.json', JSON.stringify(slimMain)));
+    calls = sinceCalls();
+    res = await sync();
+    const w41 = w.Baby.app.state.checkups.find((c) => c.id === 'w41');
+    const diapers = w.Baby.app.state.bag.find((b) => b.id === 'diapers');
+    log(res.ok && w41.done && w41.title === '41 周产检' && /引产/.test(w41.items.join()) && w41.target === 287 && diapers.done && diapers.name === '新生儿纸尿裤',
+      '云端只存了编号：说明文字照常有，对方勾的合进来', JSON.stringify(w41));
+    log(!calls().some((c) => c.method === 'PATCH'), '和云端的只是写法不同：不再传一次', calls().map((c) => `${c.method} ${c.path}`).join());
+    log(state().checkups.find((c) => c.id === 'w41').title === '41 周产检' && state().bag.find((b) => b.id === 'diapers').name === '新生儿纸尿裤',
+      '这台存的还是带说明文字的写法，没更新的旧版本也读得懂');
+
     // ---- 拉下来的记录存不下：照实说，下次再合 ----
     // 先传一条体重上去，再让这台回到传之前（记录和同步进度都退回去）：云端就比这台多一条
     const cfgBefore = localStorage.getItem(CLOUD);

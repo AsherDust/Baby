@@ -145,8 +145,9 @@
     };
   }
 
-  function normalizeCheckup(c) {
-    if (!c || typeof c !== 'object' || typeof c.id !== 'string' || !c.id) return null;
+  function normalizeCheckup(raw) {
+    if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string' || !raw.id) return null;
+    const c = C.fillCheckup(raw);
     const title = text(c.title, 40);
     const days = (v) => (Number.isInteger(v) && v >= 0 && v <= 320 ? v : null);
     const target = days(c.target);
@@ -168,8 +169,9 @@
     };
   }
 
-  function normalizeBagItem(b) {
-    if (!b || typeof b !== 'object' || typeof b.id !== 'string' || !b.id) return null;
+  function normalizeBagItem(raw) {
+    if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string' || !raw.id) return null;
+    const b = C.fillBagItem(raw);
     const name = text(b.name, BAG_NAME_MAX);
     if (!name) return null;
     return {
@@ -362,6 +364,14 @@
       edits: Mg.cleanEdits(raw.edits),
       notified,
     };
+  }
+
+  /** 内置的产检、待产包只留编号和用户自己填的、改的，说明文字读的时候按编号补（content.js） */
+  function slim(state) {
+    const out = { ...state };
+    if (Array.isArray(state.checkups)) out.checkups = state.checkups.map(C.slimCheckup);
+    if (Array.isArray(state.bag)) out.bag = state.bag.map(C.slimBagItem);
+    return out;
   }
 
   // ---- 体重 ----
@@ -1253,6 +1263,7 @@
     dueDateError,
     createState,
     normalize,
+    slim,
     upsertWeight,
     removeWeight,
     weightSummary,
