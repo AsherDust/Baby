@@ -339,7 +339,7 @@
         </form>
         <div class="gl-target">
           <div class="gl-after" role="group" aria-label="餐后按几小时测">${afterBtn(1)}${afterBtn(2)}</div>
-          <p>目标：空腹 ≤5.3 · 餐后 ${after} 小时 ≤${M.glucoseTarget('lunch', after)} · 睡前 ≤6.7</p>
+          <p>目标：空腹 &lt;5.3 · 餐后 ${after} 小时 &lt;${M.glucoseTarget('lunch', after)} · 睡前 &lt;6.7</p>
         </div>
         <div class="gl-wrap">
           <table class="gl-table">

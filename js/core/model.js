@@ -39,7 +39,8 @@
 
   // 血压：孕期 ≥140/90 算高，≥160/110 算严重
   const BP_RANGE = { sys: [60, 250], dia: [30, 150], pulse: [30, 220] };
-  // 血糖（mmol/L）：低于 3.3 偏低；餐后按 1 小时还是 2 小时测，目标不一样
+  // 血糖（mmol/L）：低于 3.3 偏低；《妊娠期高血糖诊治指南（2022）》的目标是空腹 <5.3、餐后 1 小时 <7.8、2 小时 <6.7，
+  // 到了目标值就算偏高。睡前按餐后 2 小时的算
   const GLUCOSE_RANGE = [1, 33.3];
   const GLUCOSE_LOW = 3.3;
 
@@ -405,6 +406,8 @@
     const { preWeight: kg, height: cm } = profile;
     if (kg == null || cm == null) return null;
     if (cm < GAIN_CM_MIN || kg > GAIN_KG_MAX) return { applies: false };
+    // 按显示出来的一位小数分档：标准里的界线也写到一位（24.0），显示「24.0」就算超重，两边对得上；
+    // 差的这零点零几，身高量差 1 厘米 BMI 就差 0.3
     const bmi = Math.round((kg / (cm / 100) ** 2) * 10) / 10;
     return { applies: true, bmi, ...C.WEIGHT_GAIN.find((g) => bmi < g.below) };
   }
@@ -948,10 +951,10 @@
     return after === 1 ? 7.8 : 6.7;
   }
 
-  /** low 低于 3.3 / high 高于目标 / ok */
+  /** low 低于 3.3 / high 到了目标值 / ok */
   function glucoseLevel(value, slot, after) {
     if (value < GLUCOSE_LOW) return 'low';
-    return value > glucoseTarget(slot, after) ? 'high' : 'ok';
+    return value >= glucoseTarget(slot, after) ? 'high' : 'ok';
   }
 
   function glucoseError(f, today) {
@@ -1043,11 +1046,11 @@
     return { record, index };
   }
 
-  /** 超出一般范围时返回 low / high；只判断有公认范围的几项 */
+  /** 超出一般范围时返回 low / high；只判断有公认范围的几项。羊水按《妇产科学》：AFI ≤5 或最大深度 ≤2 偏少，AFI ≥25 或最大深度 ≥8 偏多 */
   function usFlag(id, value) {
     if (id === 'fhr') return value < 110 ? 'low' : value > 160 ? 'high' : null;
-    if (id === 'afi') return value < 5 ? 'low' : value >= 25 ? 'high' : null;
-    if (id === 'dvp') return value < 2 ? 'low' : value >= 8 ? 'high' : null;
+    if (id === 'afi') return value <= 5 ? 'low' : value >= 25 ? 'high' : null;
+    if (id === 'dvp') return value <= 2 ? 'low' : value >= 8 ? 'high' : null;
     return null;
   }
 

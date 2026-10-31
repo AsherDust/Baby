@@ -866,10 +866,10 @@
 
   // ---------- 体温 ----------
 
-  /** cool 偏低 / normal / low 低热 / mid 中等发热 / high 高热；按部位换算 */
-  function tempLevel(book, value, site) {
+  /** cool 偏低 / normal / low 低热 / mid 中等发热 / high 高热；按部位换算。days：量的时候出生几天，新生儿偏低的线高一些 */
+  function tempLevel(book, value, site, days = null) {
     const [, , from] = book.feverSites.find(([id]) => id === site) || book.feverSites[0];
-    if (value < from - 1.5) return 'cool';
+    if (value < from - (days != null && days < book.newbornDays ? 1 : 1.5)) return 'cool';
     const over = Math.round((value - from) * 10) / 10;
     if (over < 0) return 'normal';
     if (over < 0.6) return 'low';
@@ -878,6 +878,8 @@
   }
 
   const isFever = (level) => level === 'low' || level === 'mid' || level === 'high';
+  /** 记下的一次体温：按量的那天宝宝出生几天算 */
+  const tempOf = (book, b, l) => tempLevel(book, l.value, l.site, D.diffDays(b.birthDate, dayOf(l.start)));
 
   // ---------- 辅食 ----------
 
@@ -1024,6 +1026,7 @@
     milestoneRows,
     addMoment,
     tempLevel,
+    tempOf,
     isFever,
     foodStage,
     newFoods,

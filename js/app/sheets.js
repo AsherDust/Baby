@@ -72,7 +72,7 @@
       <form class="dialog-body" data-form="glucose-cell" data-date="${date}" data-slot="${slot}" novalidate>
         ${dialogHead(`${s.name}血糖`, D.formatDate(date, { weekday: true, relativeTo: ui.today }))}
         <label class="field">
-          <span>血糖 <small>mmol/L · 目标 ≤${target}</small></span>
+          <span>血糖 <small>mmol/L · 目标 &lt;${target}</small></span>
           <input id="sheet-gl" name="value" inputmode="decimal" autocomplete="off" placeholder="5.2" value="${entry ? glText(entry.value) : ''}">
         </label>
         <p class="form-error" hidden></p>

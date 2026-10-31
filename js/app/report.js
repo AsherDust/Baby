@@ -125,7 +125,7 @@
       ${part('基本情况', basics)}
       ${part('体重', weight)}
       ${part('血压', bpTable, `最近 7 天量了 ${bpSum.count} 次${bpSum.high ? `，${bpSum.high} 次偏高（≥140/90）` : ''}；标红的是偏高的。`)}
-      ${part('血糖（mmol/L）', glTable, `餐后按 ${after} 小时测；目标空腹 ≤5.3，餐后 ≤${M.glucoseTarget('breakfast', after)}，睡前 ≤6.7。最近 7 天 ${glSum.high} 次偏高${glSum.low ? `、${glSum.low} 次偏低` : ''}，标红的是超出目标的。`)}
+      ${part('血糖（mmol/L）', glTable, `餐后按 ${after} 小时测；目标空腹 &lt;5.3，餐后 &lt;${M.glucoseTarget('breakfast', after)}，睡前 &lt;6.7。最近 7 天 ${glSum.high} 次偏高${glSum.low ? `、${glSum.low} 次偏低` : ''}，标红的是超出目标的。`)}
       ${part('用药', drugTable, '怀孕以来吃过的药都在这里，包括已经停了的。')}
       ${part('补剂', supplementTable, '正在吃的，和最近一个月停掉的。')}
       ${part('最近一次 B 超', usBody)}
@@ -173,7 +173,7 @@
     const temps = recent.filter((l) => l.type === 'temp').reverse();
     const siteName = Object.fromEntries(BB.feverSites);
     const tempTable = temps.length
-      ? table(['时间', '体温', '量的哪里'], temps.map((l) => `<tr class="${['low', 'mid', 'high'].includes(Bb.tempLevel(BB, l.value, l.site)) ? 'rp-high' : ''}"><td>${when(l)}</td><td>${l.value}℃</td><td>${siteName[l.site] || ''}</td></tr>`))
+      ? table(['时间', '体温', '量的哪里'], temps.map((l) => `<tr class="${Bb.isFever(Bb.tempOf(BB, b, l)) ? 'rp-high' : ''}"><td>${when(l)}</td><td>${l.value}℃</td><td>${siteName[l.site] || ''}</td></tr>`))
       : '';
     const meds = recent.filter((l) => l.type === 'med').reverse();
     const medTable = meds.length

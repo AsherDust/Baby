@@ -580,8 +580,8 @@ test('血压：按日期时间排，分级，最近 7 天汇总', () => {
 
 test('血糖：目标值和分级（餐后 1 小时 / 2 小时）', () => {
   eq([M.glucoseTarget('fasting', 2), M.glucoseTarget('lunch', 2), M.glucoseTarget('lunch', 1), M.glucoseTarget('night', 1)], [5.3, 6.7, 7.8, 6.7]);
-  eq(M.glucoseLevel(5.3, 'fasting', 2), 'ok', '等于目标值不算高');
-  eq(M.glucoseLevel(5.4, 'fasting', 2), 'high');
+  eq([M.glucoseLevel(5.2, 'fasting', 2), M.glucoseLevel(5.3, 'fasting', 2)], ['ok', 'high'], '目标是小于 5.3：等于也算偏高');
+  eq([M.glucoseLevel(7.7, 'lunch', 1), M.glucoseLevel(7.8, 'lunch', 1), M.glucoseLevel(6.6, 'lunch', 2), M.glucoseLevel(6.7, 'night', 2)], ['ok', 'high', 'ok', 'high'], '餐后、睡前也一样');
   eq(M.glucoseLevel(7.2, 'dinner', 2), 'high');
   eq(M.glucoseLevel(7.2, 'dinner', 1), 'ok');
   eq(M.glucoseLevel(3.2, 'breakfast', 2), 'low');
@@ -622,6 +622,7 @@ test('B 超：校验、取整、标出超出一般范围的', () => {
   const a = M.addUltrasound(s, f({ bpd: '48.26', fl: '35', efw: '412.6', afi: ' 4,5 ' }));
   eq(a.values, { bpd: 48.3, fl: 35, afi: 4.5, efw: 413 });
   eq([M.usFlag('afi', 4.5), M.usFlag('afi', 12), M.usFlag('afi', 25), M.usFlag('fhr', 170), M.usFlag('dvp', 1.5), M.usFlag('bpd', 1)], ['low', null, 'high', 'high', 'low', null]);
+  eq([M.usFlag('afi', 5), M.usFlag('afi', 5.1), M.usFlag('dvp', 2), M.usFlag('dvp', 2.1), M.usFlag('dvp', 8)], ['low', null, 'low', null, 'high'], '羊水正好 5、2 也算偏少');
   const b = M.addUltrasound(s, f({ crl: '45' }, { date: '2026-07-17' }));
   const rows = M.ultrasoundRows(s);
   eq(rows.map((r) => [r.record.id, r.ga, r.prev && r.prev.id]), [[a.id, 154, b.id], [b.id, 84, null]]);
@@ -1908,6 +1909,11 @@ test('里程碑：这阵子会的、还早的、一般已经会了的；记下�
 test('体温：按部位分正常、低热、中等、高热，偏低单独提醒', () => {
   eq([36.8, 37.6, 38.5, 39.2, 35.5].map((v) => Bb.tempLevel(BOOKB, v, 'armpit')), ['normal', 'low', 'mid', 'high', 'cool']);
   eq([37.9, 38.2, 39.1].map((v) => Bb.tempLevel(BOOKB, v, 'ear')), ['normal', 'low', 'mid']);
+  eq([36.3, 36.5].map((v) => Bb.tempLevel(BOOKB, v, 'armpit', 10)), ['cool', 'normal'], '新生儿腋下低于 36.5℃ 就算偏低（WHO）');
+  eq([36.3, 35.9].map((v) => Bb.tempLevel(BOOKB, v, 'armpit', 60)), ['normal', 'cool'], '满月以后还是低于 36℃ 才算');
+  const kid = { birthDate: '2026-10-01' };
+  eq([Bb.tempOf(BOOKB, kid, { value: 36.3, site: 'armpit', start: tAt('2026-10-20', '08:00') }), Bb.tempOf(BOOKB, kid, { value: 36.3, site: 'armpit', start: tAt('2026-11-15', '08:00') })],
+    ['cool', 'normal'], '按量的那天宝宝多大算');
   eq([Bb.isFever('low'), Bb.isFever('normal'), Bb.isFever('cool')], [true, false, false]);
 });
 

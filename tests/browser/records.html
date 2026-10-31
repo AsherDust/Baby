@@ -127,7 +127,7 @@ iframe.onload = async () => {
     submit('form[data-form="add-glucose"]', { value: '7.5' });
     log(cell('2026-10-12', 'lunch').classList.contains('is-high'), '午餐后 7.5 按 2 小时算偏高');
     $('[data-action="glucose-after"][data-after="1"]').click();
-    log(state().prefs.glucoseAfter === 1 && cell('2026-10-12', 'lunch').classList.contains('is-ok') && /餐后 1 小时 ≤7\.8/.test(text('.gl-target')), '换成餐后 1 小时，目标变成 7.8');
+    log(state().prefs.glucoseAfter === 1 && cell('2026-10-12', 'lunch').classList.contains('is-ok') && /餐后 1 小时 <7\.8/.test(text('.gl-target')), '换成餐后 1 小时，目标变成 7.8');
     submit('form[data-form="add-glucose"]', { value: '7.0' });
     log(state().glucose.filter((g) => g.slot === 'lunch').length === 1 && state().glucose.find((g) => g.slot === 'lunch').value === 7, '同一天同一时间点再记会覆盖');
     $('[data-action="undo"]').click();
@@ -137,7 +137,7 @@ iframe.onload = async () => {
     log(/有低于 3\.3/.test(text('.card-glucose')) === false, '更早的低血糖不算进最近 7 天');
 
     cell('2026-10-12', 'fasting').click();
-    log(sheet().open && sheetForm().elements.value.value === '5.6' && /目标 ≤5\.3/.test(sheet().textContent), '点格子弹出面板，带出原值和目标');
+    log(sheet().open && sheetForm().elements.value.value === '5.6' && /目标 <5\.3/.test(sheet().textContent), '点格子弹出面板，带出原值和目标');
     log(isSheetEntry(), '弹出面板时记了一条历史');
     sheetForm().elements.value.value = '5.0';
     sheetForm().requestSubmit();

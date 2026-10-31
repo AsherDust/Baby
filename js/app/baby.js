@@ -73,7 +73,7 @@
         return { icon: A.icon.diaper, name: '换尿布', text: `${l.pee && l.poo ? '尿和便' : l.pee ? '尿' : '便'}${c ? ` · ${c[1]}` : ''}`, alert: c ? c[2] : '' };
       }
       case 'temp': {
-        const level = Bb.tempLevel(BOOK, l.value, l.site);
+        const level = Bb.tempOf(BOOK, kid(), l);
         return { icon: A.icon.thermo, name: '体温', text: `${l.value}℃ · ${siteName[l.site]} · ${LEVEL_NAMES[level]}`, warn: level !== 'normal' };
       }
       case 'pump':
@@ -608,9 +608,11 @@
     const temps = b.logs.filter((l) => l.type === 'temp').slice(-30).reverse();
     const meds = b.logs.filter((l) => l.type === 'med').slice(-30).reverse();
     const last = temps[0];
-    const level = last ? Bb.tempLevel(BOOK, last.value, last.site) : null;
-    const advice = last && Bb.isFever(level) && now - last.start < 24 * 3600000
-      ? `<p class="rec-alert rec-alert-${level === 'high' || ageNow().days < 90 ? 'severe' : 'high'}">${A.icon.alert}<span>${ageNow().days < 90 ? '3 个月以下的宝宝发热，尽快去医院。' : BOOK.feverAdvice}</span></p>` : '';
+    const level = last ? Bb.tempOf(BOOK, b, last) : null;
+    const lately = last && now - last.start < 24 * 3600000;
+    const advice = lately && Bb.isFever(level)
+      ? `<p class="rec-alert rec-alert-${level === 'high' || ageNow().days < 90 ? 'severe' : 'high'}">${A.icon.alert}<span>${ageNow().days < 90 ? '3 个月以下的宝宝发热，尽快去医院。' : BOOK.feverAdvice}</span></p>`
+      : lately && level === 'cool' ? `<p class="rec-alert rec-alert-high">${A.icon.alert}<span>${BOOK.coolAdvice}</span></p>` : '';
     const row = (l) => viewLogRow(l, now).replace('class="blog-time">', `class="blog-time">${Bb.dayOf(l.start) === Bb.dayOf(now) ? '' : `${D.formatDate(Bb.dayOf(l.start))} `}`);
     const recentMeds = [...new Set(meds.map((m) => m.name))].slice(0, 4);
     const fills = [...new Set(['维生素 D', ...recentMeds])].slice(0, 5);

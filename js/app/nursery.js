@@ -476,8 +476,9 @@
       if (read.error) return formError(form, read.error);
       const e = Bb.addLog(b, read);
       ui.clearInputs.push('bt-value');
-      const level = Bb.tempLevel(BOOK, e.value, e.site);
-      saved(Bb.isFever(level) ? `${e.value}℃ 记下了，有点发热，注意看下面的提醒` : `${e.value}℃ 记下了`, () => Bb.removeLog(b, e.id));
+      const level = Bb.tempOf(BOOK, b, e);
+      const note = Bb.isFever(level) ? '，有点发热，注意看下面的提醒' : level === 'cool' ? '，有点偏低，注意看下面的提醒' : '';
+      saved(`${e.value}℃ 记下了${note}`, () => Bb.removeLog(b, e.id));
     },
 
     'baby-med'(form) {

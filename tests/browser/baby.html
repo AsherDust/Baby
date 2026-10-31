@@ -329,6 +329,12 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     $('form[data-form="baby-temp"]').requestSubmit();
     await wait(40);
     log(/有点发热/.test(toastText()) && /3 个月以下的宝宝发热，尽快去医院/.test(text($('.rec-alert'))) && /中等发热/.test(text($('.temp-now'))), '发热：3 个月以下提醒尽快去医院', text($('.temp-now')));
+    d.getElementById('bt-value').value = '36.2';
+    $('form[data-form="baby-temp"]').requestSubmit();
+    await wait(40);
+    log(/有点偏低/.test(toastText()) && /加件衣服/.test(text($('.rec-alert'))) && /偏低/.test(text($('.temp-now'))), '新生儿腋下 36.2℃：算偏低，提醒保暖', `${toastText()} | ${text($('.temp-now'))}`);
+    await click('#toast [data-action="undo"]');
+    log(/中等发热/.test(text($('.temp-now'))), '撤销后回到上一次的体温');
     await click('[data-action="baby-med-fill"]');
     log(d.getElementById('bm-name').value === '维生素 D', '点「维生素 D」填好药名');
     $('form[data-form="baby-med"]').requestSubmit();
