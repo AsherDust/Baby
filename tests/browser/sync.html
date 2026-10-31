@@ -13,7 +13,7 @@ const TODAY = '2026-10-12';
 const KEY = 'pregnancy-desk:v1';
 const CLOUD = `${KEY}:cloud`;
 const TOKEN = 'github_pat_good';
-const PASSWORD = 'honeypot1';
+const PASSWORD = '246810';
 const iframe = document.createElement('iframe');
 iframe.style.cssText = 'width:390px;height:844px';
 document.body.appendChild(iframe);
@@ -215,7 +215,11 @@ const sinceCalls = () => {
     const tokenLink = new URL($('form[data-form="cloud-setup"] .cloud-help a').href);
     log(tokenLink.pathname === '/settings/personal-access-tokens/new' && tokenLink.searchParams.get('contents') === 'write' && tokenLink.searchParams.get('expires_in') === '366',
       '「怎么创建 Token」的链接先填好了 Contents 读写和 1 年有效期', tokenLink.href);
-    fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: PASSWORD, confirm: 'honeypot2' });
+    fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: 'honeypot', confirm: 'honeypot' });
+    log(/6 位数字/.test(formError()), '加密密码要 6 位数字', formError());
+    fill({ password: '24681', confirm: '24681' });
+    log(/6 位数字/.test(formError()), '5 位也不行', formError());
+    fill({ password: PASSWORD, confirm: '246811' });
     log(/两次输的密码不一样/.test(formError()), '两次密码不一样时提示', formError());
     fill({ repo: 'https://github.com/AsherDust/BabySync', token: 'github_pat_bad', password: PASSWORD, confirm: PASSWORD });
     await until(() => /Token/.test(formError()));
@@ -233,7 +237,7 @@ const sinceCalls = () => {
     log(calls().some((c) => c.method === 'PATCH') && !calls().some((c) => c.method === 'PUT'), '仓库不是空的：用一次提交传上去');
     const env = JSON.parse(remote('main.json'));
     log(env.cipher === 'AES-GCM' && env.kdf.name === 'PBKDF2' && env.zip === 'gzip' && !/叶酸|dueDate|豆豆/.test(remote('main.json')), '云端是加密过的乱码，看不到记录', remote('main.json').slice(0, 80));
-    log(cloud().key && !JSON.stringify(cloud()).includes(PASSWORD), '这台手机记下钥匙，不存密码');
+    log(cloud().key && !('password' in cloud()) && !Object.values(cloud()).includes(PASSWORD), '这台手机记下钥匙，不存密码');
     log(/记录已经传上去/.test(toastText()) && $('.cloud-badge.cloud-idle'), '提示传好了，页头出现小云朵', toastText());
     await openSettings();
     log(/AsherDust\/BabySync/.test(text('.settings-cloud')) && /已同步 · (今天|\d+月\d+日) \d\d:\d\d/.test(text('.settings-cloud .cloud-state')) && /云端也有一份/.test(text('#settings-dialog')),
@@ -262,7 +266,7 @@ const sinceCalls = () => {
     log($('.onboard-import [data-action="cloud-setup"]'), '开始页有「从云端恢复」');
     $('.onboard-import [data-action="cloud-setup"]').click();
     await until(setupOpen);
-    fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: 'wrongpass', confirm: 'wrongpass' });
+    fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: '135790', confirm: '135790' });
     await until(() => /密码/.test(formError()));
     log(/密码不对/.test(formError()), '密码不对解不开云端的数据', formError());
     fill({ password: PASSWORD, confirm: PASSWORD });
