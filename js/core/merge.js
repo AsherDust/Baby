@@ -45,6 +45,46 @@
   ];
   const profileOf = (p) => ({ dueDate: p.dueDate, preWeight: p.preWeight, height: p.height, nickname: p.nickname });
   const birthOf = (b) => ({ name: b.name, sex: b.sex, birthDate: b.birthDate, birthTime: b.birthTime });
+  // 设置里两台手机共用的：餐后几小时测血糖
+  const sharedPrefs = (p) => ({ glucoseAfter: p.glucoseAfter });
+
+  // 藏在别的结构里、两台手机要同步的几样：拍平成 { 编号: 值 }，记改过的时间、合并都和疫苗那些一样，
+  // 去掉的也会跟着去掉（只取并集的话，一台取消了收藏，另一台合并回来又加上了）
+  const setOf = (ids) => Object.fromEntries(ids.map((id) => [id, true]));
+  const keepOrder = (old, m) => [...old.filter((id) => has(m, id)), ...Object.keys(m).filter((id) => !old.includes(id))];
+  const splitKey = (k) => [k.slice(0, k.indexOf('/')), k.slice(k.indexOf('/') + 1)];
+  const FLAT = [
+    {
+      tag: 'menu',
+      label: '食谱里换过的菜',
+      get: (s) => Object.fromEntries(Object.entries(s.meals.days).flatMap(([day, picks]) => Object.entries(picks).map(([slot, id]) => [`${day}/${slot}`, id]))),
+      put: (s, m) => {
+        s.meals.days = {};
+        for (const [k, id] of Object.entries(m)) {
+          const [day, slot] = splitKey(k);
+          (s.meals.days[day] = s.meals.days[day] || {})[slot] = id;
+        }
+      },
+    },
+    {
+      tag: 'bought',
+      label: '买菜清单',
+      get: (s) => setOf(Object.entries(s.meals.bought).flatMap(([day, names]) => names.map((n) => `${day}/${n}`))),
+      put: (s, m) => {
+        const old = s.meals.bought;
+        s.meals.bought = {};
+        for (const k of Object.keys(m)) {
+          const [day, name] = splitKey(k);
+          (s.meals.bought[day] = s.meals.bought[day] || []).push(name);
+        }
+        for (const day of Object.keys(s.meals.bought)) s.meals.bought[day] = keepOrder(old[day] || [], setOf(s.meals.bought[day]));
+      },
+    },
+    { tag: 'fav', label: '收藏的菜', get: (s) => setOf(s.meals.favorites), put: (s, m) => { s.meals.favorites = keepOrder(s.meals.favorites, m); } },
+    { tag: 'avoid', label: '忌口', get: (s) => setOf(s.meals.avoid), put: (s, m) => { s.meals.avoid = keepOrder(s.meals.avoid, m); } },
+    { tag: 'story-fav', label: '收藏的故事', get: (s) => setOf(s.stories.favorites), put: (s, m) => { s.stories.favorites = keepOrder(s.stories.favorites, m); } },
+    { tag: 'story-block', label: '不想听的故事', get: (s) => setOf(s.stories.blocked), put: (s, m) => { s.stories.blocked = keepOrder(s.stories.blocked, m); } },
+  ];
 
   // 同一条记录刚记下时和存过一遍再读出来，字段的顺序、空着的字段可能不一样，指纹不能跟着变
   function canon(v) {
@@ -124,7 +164,11 @@
     out.info = { full: true, each: text(Object.entries(info)) };
     return out;
   }
-  const topShape = (s) => shapeOf(s, LISTS, [], profileOf(s.profile));
+  function topShape(s) {
+    const out = shapeOf(s, LISTS, [], { ...profileOf(s.profile), ...sharedPrefs(s.prefs) });
+    for (const f of FLAT) out[f.tag] = { full: true, each: new Map(Object.entries(f.get(s)).map(([k, v]) => [k, JSON.stringify(v)])) };
+    return out;
+  }
   const babyShape = (b) => shapeOf(b, BABY_LISTS, BABY_MAPS, birthOf(b));
 
   function stamp(store, before, after, now) {
@@ -318,14 +362,16 @@
     tally(ctx.stats, '预产期和资料', { ...counts(), updated: taken.length }, '项');
     if (due) ctx.notes.push(`两边的预产期不一样，用的是${taken.includes('dueDate') ? '对方后来改的' : '这台手机上的'}`);
 
+    const prefs = fields(out.prefs, theirs.prefs, Object.keys(sharedPrefs(out.prefs)), [], ctx);
+    tally(ctx.stats, '餐后测血糖的时间', { ...counts(), updated: prefs.length }, '项');
+
     for (const [tag, field, label, key = byId] of LISTS) out[field] = list(out[field], theirs[field], tag, label, key, ctx, FILLS[tag]);
 
-    const meals = out.meals;
-    const favs = theirs.meals.favorites.filter((id) => !meals.favorites.includes(id));
-    meals.favorites.push(...favs);
-    tally(ctx.stats, '收藏的菜', { ...counts(), added: favs.length });
-    for (const [day, v] of Object.entries(theirs.meals.days)) if (!meals.days[day]) meals.days[day] = v;
-    for (const [day, v] of Object.entries(theirs.meals.bought)) meals.bought[day] = [...new Set([...(meals.bought[day] || []), ...v])];
+    for (const f of FLAT) {
+      const m = f.get(out);
+      map(m, f.get(theirs), f.tag, f.label, ctx);
+      f.put(out, m);
+    }
     for (const [day, k] of Object.entries(theirs.pelvic.days)) if ((out.pelvic.days[day] || 0) < k) out.pelvic.days[day] = k;
 
     if (!out.baby && theirs.baby) {

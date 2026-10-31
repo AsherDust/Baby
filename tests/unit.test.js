@@ -2307,6 +2307,37 @@ test('合并：上万条记录，保存时比一遍、合并都不慢', () => {
   eq([r.dropped, r.state.baby.logs.length], [1, 10000]);
 });
 
+test('合并：食谱换过的菜、收藏、买菜清单、忌口、收藏和不想听的故事，加的去掉的都跟着同步；餐后几小时测按后改的', () => {
+  const t0 = Date.now() - 60e3;
+  const base = viaFile(M.createState({ dueDate: DUE }));
+  base.meals.favorites = ['fish-soup', 'egg-custard'];
+  base.meals.bought = { '2026-10-12': ['鸡蛋', '牛奶'] };
+  base.meals.days = { '2026-10-12': { 'lunch-main': 'fish-soup' } };
+  base.stories.favorites = ['prose-01'];
+  const mine = viaFile(base);
+  const dad = viaFile(base);
+  Mg.track(mine, t0);
+  Mg.track(dad, t0);
+  dad.meals.favorites = ['fish-soup'];
+  dad.meals.bought['2026-10-12'] = ['鸡蛋'];
+  dad.meals.days['2026-10-12']['lunch-main'] = 'egg-custard';
+  dad.meals.avoid = ['spicy'];
+  dad.stories.blocked = ['prose-03'];
+  dad.prefs.glucoseAfter = 1;
+  Mg.track(dad, t0 + 1000);
+  mine.stories.favorites = ['prose-01', 'prose-02'];
+  Mg.track(mine, t0 + 2000);
+  const r = Mg.merge(mine, viaFile(dad));
+  const s = r.state;
+  eq([s.meals.favorites, s.meals.bought['2026-10-12'], s.meals.days['2026-10-12']['lunch-main'], s.meals.avoid],
+    [['fish-soup'], ['鸡蛋'], 'egg-custard', ['spicy']], '爸爸取消的收藏、取消的勾、换的菜、加的忌口');
+  eq([s.stories.favorites, s.stories.blocked, s.prefs.glucoseAfter], [['prose-01', 'prose-02'], ['prose-03'], 1], '故事的收藏两边的都在，不想听的加上了，餐后改成 1 小时');
+  eq([statOf(r, '收藏的菜').dropped, statOf(r, '买菜清单').dropped, statOf(r, '食谱里换过的菜').updated, statOf(r, '餐后测血糖的时间').updated], [1, 1, 1, 1]);
+  const back = Mg.merge(viaFile(dad), viaFile(s)).state;
+  eq([back.meals.favorites, back.stories.favorites], [['fish-soup'], ['prose-01', 'prose-02']], '爸爸那台合回去：取消的收藏不会被加回来');
+  eq(Object.keys(mine.edits).filter((k) => /^(story-fav|fav|avoid|bought|menu|info:glucoseAfter)/.test(k)), ['story-fav:prose-02'], '保存时记下故事收藏改的时间');
+});
+
 test('合并：旧备份没有删过的标记照样能合；标记半年后清掉，最多留 500 个', () => {
   const old = clone(M.createState({ dueDate: DUE }));
   delete old.removed;
@@ -2367,10 +2398,17 @@ test('云同步：只传变了的文件，某个月的记录全删了就删掉�
   M.upsertWeight(s, '2026-10-11', 56);
   eq(sync(), { upload: ['main.json'], remove: [] }, '记了体重只传 main.json');
   s.prefs.storyCardHidden = '2026-10-12';
+  s.prefs.lastBackup = '2026-10-12';
   s.notified['x'] = '2026-10-12';
   s.stories.rate = 1.2;
+  s.stories.done['prose-01'] = '2026-10-11';
+  eq(sync(), { upload: [], remove: [] }, '只是这台设备自己的设置、弹过的提醒、故事读到哪、语速变了：不传');
+  s.prefs.glucoseAfter = s.prefs.glucoseAfter === 1 ? 2 : 1;
+  eq(sync().upload, ['main.json'], '餐后几小时测血糖两台共用，改了要传');
   s.meals.avoid = ['spicy'];
-  eq(sync(), { upload: [], remove: [] }, '只是这台设备自己的设置、提醒、故事进度、忌口变了：不传');
+  eq(sync().upload, ['main.json'], '忌口改了要传');
+  s.stories.favorites.push('prose-02');
+  eq(sync().upload, ['main.json'], '收藏的故事改了要传');
   s.journal[0] = Object.fromEntries(Object.entries(s.journal[0]).reverse());
   s.baby.logs[0] = { ...s.baby.logs[0], extra: '' };
   eq(sync(), { upload: [], remove: [] }, '只是字段顺序变了、多了个空字段：内容一样不传');

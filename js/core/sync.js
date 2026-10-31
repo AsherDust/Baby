@@ -26,16 +26,18 @@
   /**
    * 判断要不要重新传用的指纹，只看内容：
    * - 字段的顺序、空着的字段不算（刚记下的和读出来整理过的，字不一样内容一样）
-   * - main.json 里每台设备自己的东西（设置、弹过的提醒、故事读到哪、忌口）不算，合并时这些都留本机的
+   * - main.json 里每台设备自己的东西不算：设置（餐后几小时测血糖除外）、弹过的提醒、
+   *   睡前故事读到哪、语速声音（收藏和不想听的除外）。合并时这些都留本机的
    * 不然拉完云端以后总觉得「变了」，又传一次
    */
   function fingerprint(name, text) {
     const raw = JSON.parse(text);
     if (name === MAIN) {
-      delete raw.prefs;
+      const prefs = raw.prefs || {};
+      const stories = raw.stories || {};
+      raw.prefs = { glucoseAfter: prefs.glucoseAfter };
+      raw.stories = { favorites: stories.favorites, blocked: stories.blocked };
       delete raw.notified;
-      delete raw.stories;
-      if (raw.meals) delete raw.meals.avoid;
     }
     return hash(JSON.stringify(Baby.merge.canon(raw)));
   }
