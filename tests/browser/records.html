@@ -270,6 +270,23 @@ iframe.onload = async () => {
     await nav('#/records/glucose');
     log($('[data-action="glucose-after"][data-after="2"]').getAttribute('aria-pressed') === 'true', '老数据默认按餐后 2 小时');
 
+    // ---- 体重记录多了：显示全部、收起；窗口大小变了重画图表 ----
+    await nav('#/records/weight');
+    for (let i = 1; i <= 12; i += 1) w.Baby.model.upsertWeight(w.Baby.app.state, w.Baby.dates.addDays('2026-10-12', -7 * i), 55 - i * 0.2);
+    w.Baby.app.persist();
+    w.Baby.app.render();
+    const rows = () => $$('.wl-row').length;
+    const fewer = rows();
+    $('[data-action="toggle-weights"]').click();
+    const more = rows();
+    log(more > fewer && /收起/.test(text('[data-action="toggle-weights"]')), '点「显示全部」：都列出来', `${fewer} → ${more}`);
+    $('[data-action="toggle-weights"]').click();
+    log(rows() === fewer, '再点「收起」');
+    const chartBefore = $('#weight-chart svg');
+    w.dispatchEvent(new w.Event('resize'));
+    await wait(200);
+    log($('#weight-chart svg') && $('#weight-chart svg') !== chartBefore, '窗口大小变了：重画图表');
+
     // ---- 撤销：记血压、记体重 ----
     await nav('#/records/bp');
     // 上一项是老格式的数据，还没存过时可能没有这几个字段

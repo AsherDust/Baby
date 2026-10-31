@@ -250,6 +250,16 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     later(31);
     await wait(1200);
     log(!w.Baby.app.ui.noiseOn && /时间到了/.test(toastText()), '时间到了自动停', toastText());
+    await nav('#/tools/noise');
+    await click('#noise-timer-0');
+    await click('#noise-start');
+    log(w.Baby.app.ui.noiseOn && w.Baby.app.ui.noiseOn.until === null && /一直放/.test(text($('.noise-now'))), '选「一直放」：不定时', text($('.noise-now')));
+    const volume = d.getElementById('noise-volume');
+    volume.value = '0.3';
+    volume.dispatchEvent(new w.Event('input', { bubbles: true }));
+    log(w.Baby.app.ui.noiseVolume === 0.3 && Math.abs(player.volume - 0.3) < 1e-6, '拖音量条：马上变小声', `${w.Baby.app.ui.noiseVolume} ${player.volume}`);
+    await click('#noise-stop');
+    log(!w.Baby.app.ui.noiseOn && $('#noise-start'), '点「停下」就停');
 
     // ---- 成长档案 ----
     await nav('#/baby/growth');
@@ -685,6 +695,18 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await send(birth);
     log(baby().name === '小豆' && baby().birthTime === '07:10' && state().profile.nickname === '小豆'
       && baby().growth.find((g) => g.date === baby().birthDate).weight === 3.4 && !sheet().open, '改出生信息：小名、出生时间、出生体重', JSON.stringify([baby().name, baby().birthTime]));
+
+    // ---- 「已经打完」「已经做过」展开着的话，重画以后也展开 ----
+    await nav('#/baby/vaccines');
+    $('#vx-done').open = true;
+    await wait(10);
+    w.Baby.app.render();
+    log(w.Baby.app.ui.vaccinesDoneOpen && $('#vx-done').open, '「已经打完」展开着：重画以后还展开');
+    await nav('#/baby/exams');
+    $('#ex-done').open = true;
+    await wait(10);
+    w.Baby.app.render();
+    log(w.Baby.app.ui.examsDoneOpen && $('#ex-done').open, '「已经做过」展开着：重画以后还展开');
 
     // ---- 填错时的提示（面板和表单里的） ----
     const wrong = async (name, show, formSel, values, expect) => {

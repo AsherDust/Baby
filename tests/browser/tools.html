@@ -136,7 +136,28 @@ iframe.onload = async () => {
     await wait(1200);
     log($('.kick-result-drop') && /比你最近平均的 [\d.]+ 次少了一半多/.test(text('.kick-result')) && /尽快去医院/.test(text('.kick-result')),
       '数满 1 小时，不到平时的一半：提醒尽快去医院', text('.kick-result'));
-    w.Baby.app.state.kicks = kicksBefore;
+    w.Baby.app.state.kicks = kicksBefore.map((k) => ({ ...k, taps: k.taps.slice() }));
+    fakeNow = T + 61 * MIN;
+    w.Baby.app.persist();
+    w.Baby.app.render();
+    // 数满 1 小时、次数正常：提示里带一句夸奖；中途屏幕常亮被系统收回了，再要一次
+    const fine = T + 70 * MIN;
+    fakeNow = fine;
+    click('[data-action="start-kicks"]');
+    await wait(0);
+    const asked = locks.length;
+    await locks[asked - 1].release();
+    w.Baby.app.render();
+    await wait(0);
+    log(held() === 1 && locks.length === asked + 1, '屏幕常亮被系统收回了：再要一次', `持有 ${held()}，要过 ${locks.length} 次`);
+    for (const m of [1, 8, 15, 22]) {
+      fakeNow = fine + m * MIN;
+      click('#kick-tap');
+    }
+    fakeNow = fine + 61 * MIN;
+    await wait(1200);
+    log(/1 小时到啦，这次胎动 4 次，./.test(toastText()), '数满 1 小时、次数正常：提示里带一句夸奖', toastText());
+    w.Baby.app.state.kicks = kicksBefore.map((k) => ({ ...k, taps: k.taps.slice() }));
     fakeNow = T + 61 * MIN;
     w.Baby.app.persist();
     w.Baby.app.render();

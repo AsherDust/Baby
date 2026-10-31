@@ -324,6 +324,13 @@ iframe.onload = async () => {
     await nav('#/tools/story');
     log(await loaded() && title(), '没有故事记录的老数据也能打开');
 
+    // ---- 点「停止」：不读了，朗读条收起 ----
+    click('[data-action="story-play"]');
+    await wait(0);
+    const wasReading = Boolean($('.story-player'));
+    click('.story-player [data-action="story-stop"]');
+    log(wasReading && !$('.story-player') && !w.Baby.app.ui.reading && !current, '点「停止」：不读了，朗读条收起');
+
     // ---- 只剩一篇能挑、不能朗读、能挑的都被隐藏了（只改页面里的数据） ----
     const st = w.Baby.app.state.stories;
     const ids = w.Baby.storyIndex.stories.map((x) => x.id);

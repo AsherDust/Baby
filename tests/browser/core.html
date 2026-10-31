@@ -256,6 +256,41 @@ iframe.onload = async () => {
     appUi.today = realToday;
     w.Baby.app.render();
 
+    // ---- 页面开着过了午夜：切回前台时换到新的一天 ----
+    const realDay = w.Baby.dates.today;
+    w.Baby.dates.today = () => '2026-10-13';
+    d.dispatchEvent(new w.Event('visibilitychange'));
+    await wait(0);
+    log(appUi.today === '2026-10-13' && /10月13日/.test($('.topbar-date').textContent), '过了午夜切回来：换到新的一天', $('.topbar-date').textContent);
+    w.Baby.dates.today = realDay;
+    d.dispatchEvent(new w.Event('visibilitychange'));
+    await wait(0);
+
+    // ---- 点当前所在的底部菜单：回到页面顶部 ----
+    let scrolled = null;
+    const realScroll = w.scrollTo;
+    const fakeScroll = (o) => { scrolled = o; };
+    w.scrollTo = fakeScroll;
+    $('.tab[aria-current="page"]').dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+    w.scrollTo = realScroll;
+    log(scrolled && scrolled.top === 0, '点当前所在的底部菜单：回到页面顶部');
+
+    // ---- 新版本在后台下载好了：提示更新 ----
+    w.navigator.serviceWorker.dispatchEvent(new w.MessageEvent('message', { data: 'update-ready' }));
+    await wait(0);
+    log(/有新版本了/.test(toastText()) && $('#toast [data-action="reload-app"]'), '新版本下载好了：提示「更新」');
+
+    // ---- 按 Esc 关面板：历史也退回去 ----
+    await nav('#/checkups');
+    $('[data-action="edit-checkup"][data-id="ogtt"]').click();
+    const ckd = d.getElementById('checkup-dialog');
+    const backed = new Promise((r) => w.addEventListener('popstate', () => setTimeout(r, 0), { once: true }));
+    ckd.dispatchEvent(new w.Event('cancel'));
+    ckd.close();
+    await backed;
+    log(!ckd.open && !(w.history.state && w.history.state.sheet), '按 Esc 关面板：历史也退回去');
+    await nav('#/');
+
     $('[data-action="open-settings"]').click();
     d.getElementById('settings-dialog').querySelector('[data-action="clear-all"]').click();
     log(!!$('form[data-form="onboard"]') && !w.localStorage.getItem('honey-pot:v1'), '清空数据回到引导页');
