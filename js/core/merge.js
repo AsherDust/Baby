@@ -350,5 +350,5 @@
     };
   }
 
-  Baby.merge = { sign, drop, clean, cleanEdits, track, merge };
+  Baby.merge = { canon, sign, drop, clean, cleanEdits, track, merge };
 })();

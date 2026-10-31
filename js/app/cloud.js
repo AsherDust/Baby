@@ -39,6 +39,43 @@
 
   let config = loadConfig();
 
+  // 这台设备：随机编号 + 能改的名字，写进每次提交的说明，GitHub 上看得出是哪台传的。
+  // iPhone 上 Safari 和主屏幕图标是分开的两份存储，各算一台
+  const DEVICE_KEY = `${S.KEY}:device`;
+  const DEVICE_NAME_MAX = 20;
+
+  function guessName() {
+    const ua = navigator.userAgent;
+    const os = /iPad/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? 'iPad'
+      : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? '安卓手机' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows 电脑' : '电脑';
+    const browser = /MicroMessenger/.test(ua) ? '微信' : /EdgA?\//.test(ua) ? 'Edge' : /Firefox|FxiOS/.test(ua) ? 'Firefox'
+      : /CriOS|Chrome/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : '';
+    const standalone = navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+    return standalone ? `${os} · 主屏幕` : browser ? `${os} · ${browser}` : os;
+  }
+
+  function saveDevice(d) {
+    try {
+      localStorage.setItem(DEVICE_KEY, JSON.stringify(d));
+    } catch (e) {
+      // 存不下就每次打开重新起一个编号，不影响同步
+    }
+  }
+
+  function loadDevice() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DEVICE_KEY));
+      if (d && /^[0-9a-f]{6}$/.test(d.id)) return { id: d.id, name: String(d.name || '').trim().slice(0, DEVICE_NAME_MAX) || guessName() };
+    } catch (e) {
+      // 坏了就重新起一个
+    }
+    const d = { id: [...crypto.getRandomValues(new Uint8Array(3))].map((x) => x.toString(16).padStart(2, '0')).join(''), name: guessName() };
+    saveDevice(d);
+    return d;
+  }
+
+  const device = loadDevice();
+
   // 同步途中断开或者改了设置，旧的那份不能再写回去
   function keep(c) {
     if (config !== c) return;
@@ -259,7 +296,7 @@
       }
       const plain = await unseal(c, f.name, await blobText(c, f.sha));
       texts[f.name] = plain;
-      files[f.name] = { sha: f.sha, hash: Sy.hash(plain) };
+      files[f.name] = { sha: f.sha, hash: Sy.fingerprint(f.name, plain) };
     }));
     let result = null;
     if (Object.keys(texts).length) {
@@ -274,7 +311,7 @@
     return result;
   }
 
-  const stamp = () => `蜜罐同步 ${D.localISO(new Date())} ${hhmm(Date.now())}`;
+  const stamp = () => `蜜罐同步 · ${device.name}（${device.id}） · ${D.localISO(new Date())} ${hhmm(Date.now())}`;
 
   /** 把这台变了的文件传上去；分支被别的手机抢先推了返回 false */
   async function push(c, head) {
@@ -290,7 +327,7 @@
       const first = sealed.find((s) => s.name === Sy.MAIN) || sealed[0];
       parent = await bootstrap(c, first.name, first.text, stamp());
       if (!parent) return false;
-      c.files[first.name] = { sha: await blobSha(first.text), hash: Sy.hash(parts[first.name]) };
+      c.files[first.name] = { sha: await blobSha(first.text), hash: Sy.fingerprint(first.name, parts[first.name]) };
       c.head = parent;
       keep(c);
       sealed.splice(sealed.indexOf(first), 1);
@@ -298,7 +335,7 @@
     }
     const made = await commit(c, parent, sealed, remove, stamp());
     if (!made) return false;
-    for (const s of sealed) c.files[s.name] = { sha: await blobSha(s.text), hash: Sy.hash(parts[s.name]) };
+    for (const s of sealed) c.files[s.name] = { sha: await blobSha(s.text), hash: Sy.fingerprint(s.name, parts[s.name]) };
     for (const n of remove) delete c.files[n];
     c.head = made;
     keep(c);
@@ -509,6 +546,7 @@
       <section class="settings-data settings-cloud">
         <h3>云同步</h3>
         <p class="hint">加密后存在 GitHub 仓库 <b>${esc(config.repo)}</b>${config.folder ? ` 的「${esc(config.folder)}」文件夹` : ''}里，GitHub 上看到的只是乱码。打开时自动拉最新的，改了自动传上去。</p>
+        <p class="hint">这台设备：${esc(device.name)}（编号 ${device.id}）</p>
         <p class="hint cloud-state${status.state === 'error' ? ' cloud-state-error' : ''}" aria-live="polite">${esc(statusText())}</p>
         <div class="btn-row">
           <button type="button" class="btn btn-ghost btn-sm" data-action="cloud-sync">立即同步</button>
@@ -537,6 +575,10 @@
             <input name="branch" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(c ? c.branch : '')}">
           </label>
         </div>
+        <label class="field">
+          <span>这台设备叫 <small>提交到 GitHub 时写上，编号 ${device.id}</small></span>
+          <input name="device" maxlength="${DEVICE_NAME_MAX}" autocomplete="off" value="${esc(device.name)}" placeholder="${esc(guessName())}">
+        </label>
         <label class="field">
           <span>GitHub Token</span>
           <input name="token" type="password" autocomplete="off" spellcheck="false" placeholder="${c ? '已经存了，不换就空着' : 'github_pat_…'}">
@@ -576,6 +618,8 @@
       const f = readForm(form);
       if (f.error) return formError(form, f.error);
       formError(form, '');
+      device.name = String(form.elements.device.value || '').trim().slice(0, DEVICE_NAME_MAX) || guessName();
+      saveDevice(device);
       const button = form.querySelector('button:not([type="button"])');
       button.disabled = true;
       button.textContent = '连接中…';
@@ -634,6 +678,6 @@
     cloudSynced: () => Boolean(config && config.last && Date.now() - config.last < 7 * 24 * 3600 * 1000 && status.state !== 'error'),
     cloudChanged: changed,
     cloudOff: disconnect,
-    cloud: { settings, status, syncNow, config: () => config },
+    cloud: { settings, status, syncNow, config: () => config, device },
   });
 })();

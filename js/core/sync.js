@@ -23,6 +23,23 @@
     return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
   }
 
+  /**
+   * 判断要不要重新传用的指纹，只看内容：
+   * - 字段的顺序、空着的字段不算（刚记下的和读出来整理过的，字不一样内容一样）
+   * - main.json 里每台设备自己的东西（设置、弹过的提醒、故事读到哪、忌口）不算，合并时这些都留本机的
+   * 不然拉完云端以后总觉得「变了」，又传一次
+   */
+  function fingerprint(name, text) {
+    const raw = JSON.parse(text);
+    if (name === MAIN) {
+      delete raw.prefs;
+      delete raw.notified;
+      delete raw.stories;
+      if (raw.meals) delete raw.meals.avoid;
+    }
+    return hash(JSON.stringify(Baby.merge.canon(raw)));
+  }
+
   /** 拆成 { 文件名: 明文 } */
   function split(state) {
     const logs = state.baby ? state.baby.logs : [];
@@ -30,7 +47,9 @@
     const parts = { [MAIN]: JSON.stringify({ app: Baby.storage.APP, ...main }) };
     const months = {};
     for (const l of logs) (months[monthOf(l.start)] = months[monthOf(l.start)] || []).push(l);
-    for (const m of Object.keys(months).sort()) parts[`logs-${m}.json`] = JSON.stringify(months[m]);
+    // 同一时刻的两条按编号排，同样的记录在每台手机上拆出来的字一模一样
+    const order = (a, b) => a.start - b.start || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    for (const m of Object.keys(months).sort()) parts[`logs-${m}.json`] = JSON.stringify(months[m].sort(order));
     return parts;
   }
 
@@ -51,10 +70,10 @@
    * upload 新的、变了的；remove 云端还有、这边已经没有的（比如某个月的记录全删了）
    */
   function changes(parts, files) {
-    const upload = Object.keys(parts).filter((n) => !files[n] || files[n].hash !== hash(parts[n]));
+    const upload = Object.keys(parts).filter((n) => !files[n] || files[n].hash !== fingerprint(n, parts[n]));
     const remove = Object.keys(files).filter((n) => isPart(n) && !parts[n]);
     return { upload, remove };
   }
 
-  Baby.sync = { MAIN, isPart, hash, split, join, changes };
+  Baby.sync = { MAIN, isPart, hash, fingerprint, split, join, changes };
 })();

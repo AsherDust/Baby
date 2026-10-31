@@ -176,7 +176,8 @@ const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' 
 const settled = () => until(() => !['syncing', 'pending'].includes(status()));
 const remote = (name) => repo.blobs.get(repo.files()[`honey-pot/${name}`]);
 const names = () => Object.keys(repo.files()).sort();
-const snapshot = () => ({ [KEY]: localStorage.getItem(KEY), [CLOUD]: localStorage.getItem(CLOUD) });
+// 一台手机存着的全部：记录、云同步设置、设备编号
+const snapshot = () => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]));
 const fill = (values) => {
   const form = $('form[data-form="cloud-setup"]');
   Object.entries(values).forEach(([k, v]) => { form.elements[k].value = v; });
@@ -231,10 +232,14 @@ const sinceCalls = () => {
     await until(() => /只能读/.test(formError()));
     log(/只能读/.test(formError()), 'Token 没有写入权限时提示', formError());
     repo.push = true;
+    log($('form[data-form="cloud-setup"] [name="device"]').value === w.Baby.app.cloud.device.name && /^[0-9a-f]{6}$/.test(w.Baby.app.cloud.device.id), '这台设备有编号，名字先猜一个', $('form[data-form="cloud-setup"] [name="device"]').value);
     let calls = sinceCalls();
-    fill({ token: TOKEN });
+    fill({ token: TOKEN, device: '妈妈的手机' });
     await until(() => !setupOpen());
     await settled();
+    const momId = w.Baby.app.cloud.device.id;
+    const message = (calls().find((c) => c.path === '/git/commits') || { body: {} }).body.message || '';
+    log(message.includes('妈妈的手机') && message.includes(momId), '提交说明里写着是哪台设备传的', message);
     log(status() === 'idle' && names().join() === 'README.md,honey-pot/main.json', '连上以后传上去：仓库里多了 honey-pot/main.json', `${status()} ${names()}`);
     log(calls().some((c) => c.method === 'PATCH') && !calls().some((c) => c.method === 'PUT'), '仓库不是空的：用一次提交传上去');
     const env = JSON.parse(remote('main.json'));
@@ -242,6 +247,7 @@ const sinceCalls = () => {
     log(cloud().key && !('password' in cloud()) && !Object.values(cloud()).includes(PASSWORD), '这台手机记下钥匙，不存密码');
     log(/记录已经传上去/.test(toastText()) && $('.cloud-badge.cloud-idle'), '提示传好了，页头出现小云朵', toastText());
     await openSettings();
+    log(text('.settings-cloud').includes(`这台设备：妈妈的手机（编号 ${momId}）`), '设置里写着这台设备的名字和编号', text('.settings-cloud'));
     log(/AsherDust\/BabySync/.test(text('.settings-cloud')) && /已同步 · (今天|\d+月\d+日) \d\d:\d\d/.test(text('.settings-cloud .cloud-state')) && /云端也有一份/.test(text('#settings-dialog')),
       '设置里写着仓库和上次同步的时间', text('.settings-cloud'));
     await closeSettings();
@@ -271,7 +277,7 @@ const sinceCalls = () => {
     fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: '蜜罐honey2025!', confirm: '蜜罐honey2025!' });
     await until(() => /密码/.test(formError()));
     log(/密码不对/.test(formError()), '密码不对解不开云端的数据', formError());
-    fill({ password: PASSWORD, confirm: PASSWORD });
+    fill({ password: PASSWORD, confirm: PASSWORD, device: '爸爸的手机' });
     await until(() => $('.hero'));
     await settled();
     log($('.hero') && state() && state().weights.some((x) => x.date === TODAY && x.kg === 56.4) && /拿下来了/.test(toastText()), '新手机从云端恢复，直接进首页', toastText());
@@ -284,14 +290,28 @@ const sinceCalls = () => {
     await settled();
     await until(() => remote('main.json') && status() === 'idle');
     const patches = calls().filter((c) => c.method === 'PATCH');
+    const dadMessage = (calls().find((c) => c.path === '/git/commits') || { body: {} }).body.message || '';
+    log(dadMessage.includes('爸爸的手机') && !dadMessage.includes(momId), '爸爸的手机传的写着爸爸的手机，编号不一样', dadMessage);
     log(status() === 'idle' && patches.length === 2 && names().includes('README.md'), '分支被抢先推了：重新拉、再推一次，别人的文件不动', `${status()} ${patches.length}`);
     const dad = snapshot();
 
     // ---- 妈妈的手机重新打开：自动拉到爸爸记的 ----
-    await open(null, mom);
+    // 妈妈手机上这台设备自己的东西（关掉的故事卡片、弹过的提醒）和云端不一样，但记录本身没改
+    const momState = JSON.parse(mom[KEY]);
+    momState.prefs.storyCardHidden = TODAY;
+    momState.notified = { ...momState.notified, 'test-reminder': TODAY };
+    calls = sinceCalls();
+    await open(null, { ...mom, [KEY]: JSON.stringify(momState) });
     await until(() => /合进来了/.test(toastText()));
     await settled();
     log(state().journal.some((e) => e.text === '爸爸今天哄睡成功') && /加了 1 条/.test(toastText()), '打开时自动拉云端的，爸爸记的合进来了', toastText());
+    log(w.Baby.app.cloud.device.id === momId, '重新打开还是同一个设备编号');
+    log(!calls().some((c) => ['PATCH', 'PUT', 'POST'].includes(c.method)), '只是拉到了新的，这台没改记录：不提交', JSON.stringify(calls().filter((c) => c.path === '/git/trees').map((c) => c.body.tree.map((e) => e.path))));
+    calls = sinceCalls();
+    w.Baby.app.state.notified['test-reminder-2'] = TODAY;
+    w.Baby.app.persist();
+    await settled();
+    log(!calls().some((c) => c.method !== 'GET'), '这台设备自己的东西变了（弹过一个提醒）也不提交', JSON.stringify(calls().map((c) => `${c.method} ${c.path}`)));
 
     // ---- 妈妈删掉那条，爸爸那边也没了 ----
     const entry = w.Baby.app.state.journal.find((e) => e.text === '爸爸今天哄睡成功');

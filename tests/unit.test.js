@@ -2355,7 +2355,7 @@ test('云同步：只传变了的文件，某个月的记录全删了就删掉�
   const sync = () => {
     const parts = Sy.split(s);
     const c = Sy.changes(parts, files);
-    c.upload.forEach((n) => { files[n] = { sha: 'x', hash: Sy.hash(parts[n]) }; });
+    c.upload.forEach((n) => { files[n] = { sha: 'x', hash: Sy.fingerprint(n, parts[n]) }; });
     c.remove.forEach((n) => { delete files[n]; });
     return c;
   };
@@ -2366,6 +2366,14 @@ test('云同步：只传变了的文件，某个月的记录全删了就删掉�
   eq(sync(), { upload: [month], remove: [] }, '改了一条日常记录只传那个月');
   M.upsertWeight(s, '2026-10-11', 56);
   eq(sync(), { upload: ['main.json'], remove: [] }, '记了体重只传 main.json');
+  s.prefs.storyCardHidden = '2026-10-12';
+  s.notified['x'] = '2026-10-12';
+  s.stories.rate = 1.2;
+  s.meals.avoid = ['spicy'];
+  eq(sync(), { upload: [], remove: [] }, '只是这台设备自己的设置、提醒、故事进度、忌口变了：不传');
+  s.journal[0] = Object.fromEntries(Object.entries(s.journal[0]).reverse());
+  s.baby.logs[0] = { ...s.baby.logs[0], extra: '' };
+  eq(sync(), { upload: [], remove: [] }, '只是字段顺序变了、多了个空字段：内容一样不传');
   Bb.removeLog(s.baby, s.baby.logs[0].id);
   eq(sync(), { upload: ['main.json'], remove: [month] }, '那个月没有记录了：删掉文件，删过的标记在 main.json');
   files['README.md'] = { sha: 'y', hash: 'z' };
