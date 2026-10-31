@@ -2006,6 +2006,8 @@ test('离线缓存清单里有页面用到的每个文件，清单里的文件�
   const assets = [...PAGE.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
   const icons = JSON.parse(readFile('manifest.webmanifest')).icons.map((i) => i.src);
   eq([...assets, ...icons].filter((f) => !files.includes(f)), [], '清单里缺了');
+  eq(files.filter((f) => !['./', 'index.html', ...assets, ...icons].includes(f)), [], '页面已经不用了，清单里还留着');
+  eq(files.filter((f, i) => files.indexOf(f) !== i), [], '清单里重复了');
   eq(files.filter((f) => f !== './' && !readFile(f, 'binary').length), [], '这些文件是空的');
 });
 
@@ -2649,6 +2651,33 @@ test('合并：撤销删除再保存，删过的标记就去掉了', () => {
   Bb.restoreLog(s.baby, log);
   Mg.track(s);
   eq([s.removed, s.baby.removed], [{}, {}], '撤销后保存，标记去掉');
+});
+
+test('合并：删掉的「第一次」、自费疫苗留标记，旧文件带不回来；撤销以后两台都还在', () => {
+  const t0 = Date.now() - 60e3;
+  const base = viaFile(fullState());
+  const mo = Bb.addMoment(base.baby, '第一次去公园', '2026-10-01');
+  const xv = Bb.addExtraVaccine(base.baby, { name: '13 价肺炎', date: '2026-10-05', done: true });
+  const mine = viaFile(base);
+  const dad = viaFile(base);
+  Mg.track(mine, t0);
+  Mg.track(dad, t0);
+  const m = Bb.removeMoment(mine.baby, mo.id);
+  const x = Bb.removeExtraVaccine(mine.baby, xv.id);
+  Mg.track(mine, t0 + 1000);
+  ok(mine.baby.removed[`moment:${mo.id}`] && mine.baby.removed[`xv:${xv.id}`], '删了有标记');
+  const r = Mg.merge(mine, viaFile(dad), { converge: true }).state;
+  eq([r.baby.moments.some((v) => v.id === mo.id), r.baby.extraVaccines.some((v) => v.id === xv.id)], [false, false], '对方没删的旧文件不会带回来');
+  const dad2 = Mg.merge(dad, viaFile(mine), { converge: true }).state;
+  eq([dad2.baby.moments.some((v) => v.id === mo.id), dad2.baby.extraVaccines.some((v) => v.id === xv.id)], [false, false], '对方跟着删了');
+  mine.baby.moments.splice(m.index, 0, m.item);
+  mine.baby.extraVaccines.splice(x.index, 0, x.item);
+  Mg.track(mine, Date.now() + 1000);
+  eq(mine.baby.removed, {}, '撤销后保存，标记去掉');
+  const r2 = Mg.merge(mine, viaFile(dad2), { converge: true }).state;
+  eq([r2.baby.moments.some((v) => v.id === mo.id), r2.baby.extraVaccines.some((v) => v.id === xv.id)], [true, true], '撤销了的不会被对方的标记再删掉');
+  const back = Mg.merge(viaFile(dad2), viaFile(r2), { converge: true }).state;
+  eq([back.baby.moments.some((v) => v.id === mo.id), back.baby.extraVaccines.some((v) => v.id === xv.id)], [true, true], '对方也拿回来了');
 });
 
 test('云同步：没变的月份不下载也合得对', () => {

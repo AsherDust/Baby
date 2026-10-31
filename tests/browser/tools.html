@@ -23,6 +23,7 @@ function bind() {
   w = iframe.contentWindow;
   d = iframe.contentDocument;
   w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
   w.confirm = () => true;
   w.alert = (m) => errors.push(`alert(${m})`);
   const real = w.Date.now.bind(w.Date);

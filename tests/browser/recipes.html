@@ -19,6 +19,7 @@ function bind() {
   w = iframe.contentWindow;
   d = iframe.contentDocument;
   w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
 }
 const open = (scene, route) => {
   localStorage.clear();

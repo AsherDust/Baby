@@ -44,6 +44,7 @@ function bind() {
   w = iframe.contentWindow;
   d = iframe.contentDocument;
   w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
   w.confirm = () => true;
   w.alert = (m) => errors.push(`alert(${m})`);
   const real = w.Date.now.bind(w.Date);
@@ -164,10 +165,26 @@ iframe.onload = async () => {
     };
     pickVoice('com.apple.voice.compact.zh-CN.Tingting');
     log(lastSaid().voice.voiceURI === 'com.apple.voice.compact.zh-CN.Tingting' && $('.story-voice[data-lang="zh"]').selectedIndex === 1, '同名的标准版也选得上');
-    state().stories.voices.zh = 'Tingting';
-    log(w.Baby.app.voiceFor('zh').name === 'Tingting', '以前存的声音名字也认');
+    // 以前只存声音的名字；拿一个不排第一的声音试，认不出来就会退回排第一的 Tingting
+    VOICES[0].voiceURI = 'com.apple.voice.compact.zh-TW.Meijia';
+    w.Baby.app.state.stories.voices.zh = 'Meijia';
+    log(w.Baby.app.voiceFor('zh').voiceURI === 'com.apple.voice.compact.zh-TW.Meijia', '以前存的声音名字也认', JSON.stringify(w.Baby.app.voiceFor('zh')));
+    delete VOICES[0].voiceURI;
     pickVoice('Meijia');
     log(state().stories.voices.zh === 'Meijia' && lastSaid().voice.name === 'Meijia', '换声音马上用上');
+    // 打开页面时声音列表可能在脚本加载到一半时到：这时后面文件里的函数还没有，先不画
+    const badge = w.Baby.app.viewCloudBadge;
+    const playing = w.Baby.app.ui.reading;
+    const shown = $('#app').innerHTML;
+    const errorsBefore = errors.length;
+    delete w.Baby.app.viewCloudBadge;
+    w.Baby.app.started = false;
+    w.Baby.app.ui.reading = null;
+    w.speechSynthesis.dispatchEvent(new w.Event('voiceschanged'));
+    w.Baby.app.viewCloudBadge = badge;
+    w.Baby.app.started = true;
+    w.Baby.app.ui.reading = playing;
+    log(errors.length === errorsBefore && $('#app').innerHTML === shown, '脚本还没加载完时声音列表先到了：先不画，也不报错', errors.slice(errorsBefore).join(' | '));
 
     // 读到最后
     for (let i = 0; i < 40 && $('.story-player'); i += 1) {

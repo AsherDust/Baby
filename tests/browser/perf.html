@@ -2,53 +2,117 @@
 <script src="guard.js"></script>
 <script src="load-core.js"></script>
 <script>
-localStorage.clear();
-const M = Baby.model;
-const D = Baby.dates;
-const s = M.createState({ dueDate: '2027-01-29', preWeight: 52, nickname: '豆豆' });
-const today = '2026-12-20';
-const day = (n) => D.addDays(today, -n);
-for (let i = 250; i >= 0; i--) M.upsertWeight(s, day(i), Math.round((52 + (250 - i) * 0.05 + Math.sin(i) * 0.3) * 10) / 10);
-for (let i = 60; i >= 0; i--) {
-  M.addBp(s, { date: day(i), time: '08:00', sys: 110 + (i % 9), dia: 70 + (i % 7), pulse: 80, note: '' });
-  M.addBp(s, { date: day(i), time: '20:30', sys: 115 + (i % 11), dia: 74 + (i % 5), pulse: 84, note: '' });
-}
-for (let i = 90; i >= 0; i--) for (const slot of ['fasting', 'breakfast', 'lunch', 'dinner', 'night']) M.setGlucose(s, { date: day(i), slot, value: (5 + (i % 7) * 0.3).toFixed(1) });
-for (let i = 0; i < 12; i++) M.addUltrasound(s, { date: day(240 - i * 20), values: { bpd: String(20 + i * 6), hc: String(80 + i * 20), ac: String(70 + i * 18), fl: String(10 + i * 5), fhr: '145' }, placenta: '后壁 0 级', note: '' });
-const now = Date.now();
-s.kicks = Array.from({ length: 60 }, (_, i) => {
-  const start = now - (i + 1) * 86400000;
-  return { id: `k${i}`, start, end: start + 3600000, taps: Array.from({ length: 10 }, (_, j) => start + (j + 1) * 300000) };
-});
-const raw = JSON.stringify(s);
-localStorage.setItem('honey-pot:v1', raw);
+// 记录很多的时候读写、各页重画、云同步要多久：孕期记满一整个孕期，宝宝记了两年日常。
+// 每项有个宽松的上限（平时的十倍左右），超了才算没通过；测得的数字 run.sh 会列出来。
+// 计时放在同一个任务里一口气测完：无头 Chrome 的虚拟时间里，换个任务 performance.now() 就不走了
+const { model: M, baby: Bb, dates: D, storage: S, sync: Sy, merge: Mg } = Baby;
+const out = [];
+const show = (head = 'RUNNING') => { document.getElementById('out').textContent = `${head}\n${out.join('\n')}`; };
+const log = (ok, name, extra = '') => { out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`); show(); };
+const note = (text) => { out.push(`NOTE ${text}`); show(); };
+const time = (fn, runs = 5) => {
+  fn();
+  const t0 = performance.now();
+  for (let i = 0; i < runs; i += 1) fn();
+  return (performance.now() - t0) / runs;
+};
+const measure = (slow, label, limit, fn, runs) => {
+  const ms = time(fn, runs);
+  note(`${label}：${ms.toFixed(1)} ms`);
+  if (ms > limit) slow.push(`${label} ${ms.toFixed(1)} ms，上限 ${limit} ms`);
+};
 
-const out = [`数据量：${(raw.length / 1024).toFixed(0)} KB（体重 ${s.weights.length}，血压 ${s.bp.length}，血糖 ${s.glucose.length}，B 超 ${s.ultrasounds.length}，胎动 ${s.kicks.length} 次）`];
+// 孕期：体重天天称、血压一天两次、血糖一天五次，B 超和胎动也都记着
+function pregnancy() {
+  const today = '2026-12-20';
+  const s = M.createState({ dueDate: '2027-01-29', preWeight: 52, nickname: '豆豆' });
+  const day = (n) => D.addDays(today, -n);
+  for (let i = 250; i >= 0; i -= 1) M.upsertWeight(s, day(i), Math.round((52 + (250 - i) * 0.05 + Math.sin(i) * 0.3) * 10) / 10);
+  for (let i = 60; i >= 0; i -= 1) {
+    M.addBp(s, { date: day(i), time: '08:00', sys: 110 + (i % 9), dia: 70 + (i % 7), pulse: 80, note: '' });
+    M.addBp(s, { date: day(i), time: '20:30', sys: 115 + (i % 11), dia: 74 + (i % 5), pulse: 84, note: '' });
+  }
+  for (let i = 90; i >= 0; i -= 1) for (const slot of ['fasting', 'breakfast', 'lunch', 'dinner', 'night']) M.setGlucose(s, { date: day(i), slot, value: (5 + (i % 7) * 0.3).toFixed(1) });
+  for (let i = 0; i < 12; i += 1) M.addUltrasound(s, { date: day(240 - i * 20), values: { bpd: String(20 + i * 6), hc: String(80 + i * 20), ac: String(70 + i * 18), fl: String(10 + i * 5), fhr: '145' }, placenta: '后壁 0 级', note: '' });
+  const now = Date.now();
+  s.kicks = Array.from({ length: 60 }, (_, i) => {
+    const start = now - (i + 1) * 86400000;
+    return { id: `k${i}`, start, end: start + 3600000, taps: Array.from({ length: 10 }, (_, j) => start + (j + 1) * 300000) };
+  });
+  note(`孕期：体重 ${s.weights.length}，血压 ${s.bp.length}，血糖 ${s.glucose.length}，B 超 ${s.ultrasounds.length}，胎动 ${s.kicks.length} 次`);
+  return { s, today, routes: ['#/', '#/records/weight', '#/records/bp', '#/records/glucose', '#/records/meds', '#/checkups/schedule', '#/checkups/ultrasound', '#/tools/kicks', '#/tools/weeks', '#/tools/report'] };
+}
+
+// 宝宝两岁：每天喂八次、换七次尿布、睡四觉，每月量一次身高体重
+function toddler() {
+  const today = '2026-10-12';
+  const s = M.createState({ dueDate: '2024-10-15', preWeight: 52, height: 160, nickname: '豆豆' });
+  s.baby = Bb.born({ name: '豆豆', sex: 'girl', birthDate: '2024-10-12', birthTime: '06:40', weight: '3.2', length: '50', head: '34' });
+  const b = s.baby;
+  const days = D.diffDays('2024-10-12', today);
+  const at = (day, hm) => Bb.msAt(day, hm);
+  let n = 0;
+  const add = (fields) => { b.logs.push({ id: `l-${(n += 1).toString(36)}`, note: '', ...fields }); };
+  for (let i = 1; i <= days; i += 1) {
+    const day = D.addDays('2024-10-12', i);
+    ['02:00', '05:00', '08:00', '11:00', '14:00', '17:00', '20:00', '23:00'].forEach((hm, k) => (k % 2
+      ? add({ type: 'bottle', start: at(day, hm), ml: 120, milk: 'formula' })
+      : add({ type: 'breast', start: at(day, hm), end: at(day, hm) + 15 * 60000, left: 450, right: 450, side: null, since: null })));
+    ['03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'].forEach((hm, k) => add({ type: 'diaper', start: at(day, hm), pee: true, poo: k === 2, color: k === 2 ? 'yellow' : '' }));
+    [['00:30', '04:30'], ['09:30', '11:00'], ['13:30', '15:00'], ['19:30', '23:50']].forEach(([a, z]) => add({ type: 'sleep', start: at(day, a), end: at(day, z) }));
+    if (i % 30 === 0) Bb.setGrowth(b, { date: day, weight: String(3.2 + i * 0.012), length: String(50 + i * 0.04), head: String(34 + i * 0.012) });
+  }
+  b.logs.sort((x, y) => x.start - y.start);
+  note(`宝宝两岁：日常记录 ${b.logs.length} 条`);
+  return { s, today, routes: ['#/', '#/baby', '#/baby/growth', '#/baby/vaccines', '#/baby/food', '#/journal', '#/tools/report', '#/records/weight'] };
+}
+
 const iframe = document.createElement('iframe');
 iframe.style.cssText = 'width:390px;height:844px';
-iframe.src = `../../index.html?today=${today}`;
-iframe.onload = () => {
-  const w = iframe.contentWindow;
-  const time = (fn, n = 15) => {
-    fn();
-    const t0 = performance.now();
-    for (let i = 0; i < n; i++) fn();
-    return (performance.now() - t0) / n;
-  };
-  const parse = time(() => w.Baby.model.normalize(JSON.parse(w.localStorage.getItem('honey-pot:v1'))));
-  const save = time(() => w.localStorage.setItem('honey-pot:v1', JSON.stringify(w.Baby.model.normalize(JSON.parse(raw)))));
-  out.push(`读出并整理一次数据：${parse.toFixed(2)} ms；存一次：${save.toFixed(2)} ms`);
-  for (const route of ['#/', '#/records/weight', '#/records/bp', '#/records/glucose', '#/records/meds', '#/checkups/schedule', '#/checkups/ultrasound', '#/tools/kicks', '#/tools/weeks']) {
-    w.location.hash = route;
-    const ms = time(() => {
-      w.dispatchEvent(new w.StorageEvent('storage', { key: 'honey-pot:v1' }));
-      void w.document.body.offsetHeight;
-    });
-    const nodes = w.document.getElementById('app').getElementsByTagName('*').length;
-    out.push(`${route.padEnd(24)} 重画一次 ${(ms - parse).toFixed(1).padStart(5)} ms，页面元素 ${nodes}`);
-  }
-  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
-};
 document.body.appendChild(iframe);
+// 先把页面关掉再动本地存储，免得旧页面收到 storage 事件
+const open = async (raw, today) => {
+  await new Promise((r) => { iframe.onload = r; iframe.src = 'about:blank'; });
+  localStorage.clear();
+  localStorage.setItem(S.KEY, raw);
+  await new Promise((r) => { iframe.onload = r; iframe.src = `../../index.html?today=${today}&n=${Math.random()}`; });
+  return iframe.contentWindow;
+};
+
+async function run(label, { s, today, routes }, extra) {
+  const raw = JSON.stringify(M.normalize(JSON.parse(JSON.stringify(s))));
+  note(`${label}的数据 ${(raw.length / 1024).toFixed(0)} KB`);
+  const w = await open(raw, today);
+  const slow = [];
+  measure(slow, `${label}·读出并整理一次`, 50, () => M.normalize(JSON.parse(w.localStorage.getItem(S.KEY))));
+  for (const route of routes) {
+    w.history.replaceState(null, '', route);
+    measure(slow, `${label}·${route} 重画一次`, 30, () => { w.Baby.app.render(); void w.document.body.offsetHeight; });
+  }
+  measure(slow, `${label}·保存一次（含记下改过的）`, 60, () => w.Baby.app.persist());
+  if (extra) extra(w, slow);
+  log(!slow.length, `${label}：每项都在上限以内`, slow.join('；'));
+}
+
+(async () => {
+  try {
+    await run('孕期', pregnancy());
+    const kid = toddler();
+    await run('宝宝', kid, (w, slow) => {
+      const state = M.normalize(JSON.parse(JSON.stringify(kid.s)));
+      measure(slow, '宝宝·云同步拆文件', 100, () => Sy.split(state));
+      measure(slow, '宝宝·判断要传哪些（算指纹）', 100, () => Sy.changes(Sy.split(state), {}));
+      const other = M.normalize(JSON.parse(JSON.stringify(kid.s)));
+      Bb.addLog(other.baby, Bb.readLog('diaper', { date: kid.today, time: '10:00', pee: true }, Bb.msAt(kid.today, '10:05')));
+      measure(slow, '宝宝·合并一次', 160, () => Mg.merge(state, other), 3);
+      w.history.replaceState(null, '', '#/');
+      w.Baby.app.render();
+      measure(slow, '宝宝·点一下记尿布（保存 + 重画）', 100, () => { w.document.getElementById('diaper-pee').click(); void w.document.body.offsetHeight; }, 3);
+    });
+  } catch (e) {
+    log(false, '出错了', e && e.stack || String(e));
+  }
+  show('DONE');
+})();
 </script>
 </body></html>

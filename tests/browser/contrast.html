@@ -133,7 +133,11 @@ const SHEETS = [
 
 (async () => {
   try {
-    log(true, DARK ? '深色模式' : '浅色模式');
+    // run.sh 按深色跑时网址上带 ?dark：浏览器没切过去的话，这一遍其实又查了一次浅色
+    const wantDark = new URLSearchParams(location.search).has('dark');
+    await open('main', 'today');
+    const pageLum = lum(backgrounds(d.body).under[0]);
+    log(DARK === wantDark && pageLum < 0.2 === wantDark, wantDark ? '按深色模式查：页面底色是深的' : '按浅色模式查：页面底色是浅的', `深色 ${DARK}，底色亮度 ${pageLum.toFixed(2)}`);
     let bad = [];
     for (const [scene, route] of PAGES) {
       await open(scene, route);

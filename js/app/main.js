@@ -142,6 +142,7 @@
 
   // 上次关页面时没数完的，打开时直接按满 1 小时收尾，不再弹提示
   if (app.state && M.settleKicks(app.state, Date.now())) persist();
+  app.started = true;
   render();
   scrollToNow();
   checkNotifications();

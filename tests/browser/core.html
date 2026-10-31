@@ -17,6 +17,7 @@ function bind() {
   w = iframe.contentWindow;
   d = iframe.contentDocument;
   w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
   w.confirm = () => true;
   w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
   w.URL.revokeObjectURL = () => {};
@@ -120,11 +121,17 @@ iframe.onload = async () => {
     log(/有 4 次产检/.test($('.past-strip')?.textContent || ''), '提示 4 次过去的产检没标完成');
     $('[data-action="mark-past-done"]').click();
     log(state().checkups.filter((c) => ['early-us', 'booking', 'nt', 'screening'].includes(c.id)).every((c) => c.done) && !$('.past-strip'), '一键标记过去的产检');
+    $('[data-action="undo"]').click();
+    log(state().checkups.filter((c) => ['early-us', 'booking', 'nt', 'screening'].includes(c.id)).every((c) => !c.done) && $('.past-strip'), '一键标记也能撤销');
+    $('[data-action="mark-past-done"]').click();
     await nav('#/');
     log(/大排畸 B 超：窗口期还剩 3 天/.test($('.panel-today').textContent), '首屏提醒窗口期还剩 3 天');
     await nav('#/checkups');
     $('[data-action="toggle-done"][data-id="anomaly"]').click();
     log(state().checkups.find((c) => c.id === 'anomaly').done, '标记单项完成');
+    $('[data-action="undo"]').click();
+    log(!state().checkups.find((c) => c.id === 'anomaly').done, '标记完成也能撤销');
+    $('[data-action="toggle-done"][data-id="anomaly"]').click();
     await nav('#/');
     log(/明天产检：糖耐量 OGTT/.test($('.panel-today').textContent), '首屏切到下一次产检');
     await nav('#/checkups');
@@ -171,6 +178,8 @@ iframe.onload = async () => {
     $('[data-action="edit-checkup"][data-id="w41"]').click();
     cd.querySelector('[data-action="delete-checkup"]').click();
     log(!state().checkups.some((c) => c.id === 'w41') && !cd.open, '删除一项产检');
+    $('[data-action="undo"]').click();
+    log(state().checkups.some((c) => c.id === 'w41'), '删除产检也能撤销');
 
     await nav('#/records/weight');
     await new Promise((r) => { iframe.onload = r; w.location.reload(); });

@@ -410,7 +410,36 @@ const sinceCalls = () => {
     await until(() => w.Baby.app.cloudOn());
     log(w.Baby.app.cloudOn(), '别的标签页又连上了，这个标签页跟着用');
 
+    // ---- 切到后台：没传的改动马上传，不再等 ----
+    const headBefore = repo.head();
+    w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.9);
+    w.Baby.app.persist();
+    Object.defineProperty(d, 'hidden', { configurable: true, get: () => true });
+    d.dispatchEvent(new w.Event('visibilitychange'));
+    log(status() === 'syncing', '有没传的改动时切到后台：马上开始传', status());
+    await settled();
+    log(repo.head() !== headBefore, '切到后台时传上去了');
+    delete d.hidden;
+
+    // ---- 已经连着，再打开云同步的设置：Token 和密码空着就沿用存着的 ----
+    const keyBefore = cloud().key;
+    if (!d.getElementById('settings-dialog').open) await openSettings();
+    $('.settings-cloud [data-action="cloud-setup"]').click();
+    await until(setupOpen);
+    const tokenField = $('form[data-form="cloud-setup"] [name="token"]');
+    log(setupOpen() && !tokenField.value && /不换就空着/.test(tokenField.placeholder), '再打开设置：Token 写着已经存了，不换就空着');
+    fill({ device: '妈妈的新手机' });
+    await until(() => !setupOpen());
+    await settled();
+    log(!setupOpen() && cloud().key === keyBefore && cloud().token === TOKEN && w.Baby.app.cloud.device.name === '妈妈的新手机' && status() === 'idle',
+      'Token 和密码空着再连：沿用存着的，只改了设备名', formError() || status());
+
     // ---- 断开 ----
+    if (!d.getElementById('settings-dialog').open) await openSettings();
+    w.confirm = () => false;
+    d.querySelector('.settings-cloud [data-action="cloud-off"]').click();
+    log(cloud() && w.Baby.app.cloudOn() && $('.cloud-badge'), '断开时点取消：还连着');
+    w.confirm = () => true;
     d.querySelector('.settings-cloud [data-action="cloud-off"]').click();
     log(!cloud() && !$('.cloud-badge') && names().includes('honey-pot/main.json') && /断开了/.test(toastText()), '断开：这台手机不再同步，云端的不动');
 

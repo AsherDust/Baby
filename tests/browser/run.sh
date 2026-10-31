@@ -3,31 +3,45 @@
 #   sh tests/browser/run.sh            全部跑
 #   sh tests/browser/run.sh records    只跑 records.html
 #   名字后面加 :dark 按深色模式跑，例如 contrast:dark
+# 页面里没接住的报错（包括刚打开时的）Chrome 会记进日志，有的话这一组也算没通过
 cd "$(dirname "$0")/../.." || exit 1
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 PORT="${PORT:-18765}"
 [ -x "$CHROME" ] || { echo "找不到 Chrome：$CHROME（可以用 CHROME=路径 指定）"; exit 1; }
+[ $# -eq 0 ] && set -- core bag meds tools records safety story journal recipes baby sync contrast contrast:dark perf
+for name in "$@"; do
+  [ -f "tests/browser/${name%:dark}.html" ] || { echo "没有这组测试：$name"; exit 1; }
+done
+# 端口上已经有别的服务时，测的就不是这份代码了
+if curl -s -o /dev/null "http://127.0.0.1:$PORT/"; then
+  echo "端口 $PORT 已经被占用了，换一个：PORT=18766 sh tests/browser/run.sh"
+  exit 1
+fi
 
 python3 -m http.server "$PORT" --bind 127.0.0.1 >/dev/null 2>&1 &
 server=$!
 work=$(mktemp -d)
-trap 'kill $server 2>/dev/null; rm -rf "$work"' EXIT INT TERM
+trap 'kill $server 2>/dev/null; pkill -f "$work/profile-" 2>/dev/null; rm -rf "$work"' EXIT
+trap 'echo; echo "中途停下了"; exit 130' INT TERM
 for _ in 1 2 3 4 5 6 7 8 9 10; do
   curl -s -o /dev/null "http://127.0.0.1:$PORT/index.html" && break
   sleep 0.3
 done
+kill -0 $server 2>/dev/null || { echo "本地服务器没起来（端口 $PORT）"; exit 1; }
 
-[ $# -eq 0 ] && set -- core bag meds tools records safety story journal recipes baby sync contrast contrast:dark
 status=0
 for name in "$@"; do
   page=${name%:dark}
   dark=''
-  [ "$page" = "$name" ] || dark=--force-dark-mode
+  query=''
+  [ "$page" = "$name" ] || { dark=--force-dark-mode; query='?dark'; }
   slot=$(echo "$name" | tr ':' '-')
   out="$work/$slot.html"
+  log="$work/$slot.log"
   # 每次用全新的浏览器资料目录，本地存储和 Service Worker 都从空白开始
   "$CHROME" --headless=new --use-mock-keychain --no-first-run --user-data-dir="$work/profile-$slot" $dark \
-    --virtual-time-budget=30000 --dump-dom "http://127.0.0.1:$PORT/tests/browser/$page.html" >"$out" 2>/dev/null &
+    --enable-logging=stderr --v=0 --virtual-time-budget=30000 \
+    --dump-dom "http://127.0.0.1:$PORT/tests/browser/$page.html$query" >"$out" 2>"$log" &
   chrome=$!
   for _ in $(seq 1 40); do
     sleep 1
@@ -37,12 +51,15 @@ for name in "$@"; do
   pkill -f "$work/profile-$slot" 2>/dev/null
   pass=$(grep -cE '^(<[^>]*>)?PASS ' "$out")
   fail=$(grep -cE '^(<[^>]*>)?FAIL ' "$out")
-  if grep -q '>DONE' "$out" && [ "$fail" -eq 0 ]; then
+  crash=$(grep -E ':CONSOLE[^]]*\] "Uncaught' "$log" | sed -E 's/^[^"]*"(.*)", source: (.*)$/\1（\2）/' | awk '!seen[$0]++')
+  if grep -q '>DONE' "$out" && [ "$fail" -eq 0 ] && [ -z "$crash" ]; then
     echo "✓ ${name}：$pass 项通过"
   else
     status=1
-    echo "✗ ${name}：$pass 项通过，$fail 项失败$(grep -q '>DONE' "$out" || echo '，没跑完')"
+    echo "✗ ${name}：$pass 项通过，$fail 项失败$(grep -q '>DONE' "$out" || echo '，没跑完')$([ -z "$crash" ] || echo '，页面有没接住的报错')"
     grep -E '^(<[^>]*>)?(FAIL |HLOG)' "$out" | sed 's/^<[^>]*>//; s/^/    /'
+    [ -z "$crash" ] || echo "$crash" | sed 's/^/    报错：/'
   fi
+  grep -E '^(<[^>]*>)?NOTE ' "$out" | sed 's/^<[^>]*>//; s/^NOTE /    /'
 done
 exit $status

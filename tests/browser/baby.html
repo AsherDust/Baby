@@ -20,6 +20,7 @@ function bind() {
   w = iframe.contentWindow;
   d = iframe.contentDocument;
   w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
   w.confirm = () => true;
   w.Date.now = () => fakeNow;
   w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
@@ -360,6 +361,10 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(/小米 · 女宝/.test(text(d.getElementById('settings-dialog'))), '设置里有宝宝信息');
     await click('#settings-dialog [data-action="baby-birth-open"]');
     await wait(60);
+    w.confirm = () => false;
+    await click('#sheet-dialog [data-action="baby-clear"]');
+    log(state().baby && state().baby.name === '小米', '清除宝宝信息点取消：什么都不变');
+    w.confirm = () => true;
     await click('#sheet-dialog [data-action="baby-clear"]');
     await wait(40);
     log(!state().baby && tabs() === '今天,记录,心情,产检,工具' && /宝宝的信息清掉了/.test(toastText()), '清除宝宝信息，回到孕期');
@@ -405,6 +410,16 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await click(`#${chips[0].id}`);
     log(sheet().open && text(sheet().querySelector('h2')) === expect[0] && sheet().querySelector('[data-action="baby-food-log"]'), '点菜名直接看做法，能记一笔');
     await click('#sheet-dialog [data-action="close-dialog"]');
+
+    // ---- 7 个月：过了时间的体检一键都记成做过了，能撤销 ----
+    await nav('#/baby/exams');
+    const examsBefore = JSON.stringify(baby().exams);
+    log(Boolean($('[data-action="exam-past-done"]')), '有过了时间还没记的体检：可以一键都记成做过了');
+    await click('[data-action="exam-past-done"]');
+    const late = Object.keys(baby().exams).filter((id) => !JSON.parse(examsBefore)[id]);
+    log(late.length > 0 && late.every((id) => baby().exams[id].done) && !$('[data-action="exam-past-done"]'), '过了时间的都记成做过了', late.join());
+    await click('#toast [data-action="undo"]');
+    log(JSON.stringify(baby().exams) === examsBefore, '一键记成做过了也能撤销');
 
     // ---- 最近 7 天 ----
     await nav('#/baby');

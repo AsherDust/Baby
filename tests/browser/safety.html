@@ -168,6 +168,48 @@ save(seed);
     bind();
     log($('.hero') && !/新版本/.test(toastText()), '点「刷新页面」重新加载');
 
+    // ---- 「确定吗？」点了取消：什么都不变 ----
+    const realConfirm = w.confirm;
+    w.confirm = () => { confirms += 1; return false; };
+    const unchanged = localStorage.getItem(KEY);
+    let promptsSoFar = confirms;
+    $('[data-action="open-settings"]').click();
+    await wait(0);
+    ['reset-checkups', 'reset-bag', 'clear-all'].forEach((a) => settings().querySelector(`[data-action="${a}"]`).click());
+    log(localStorage.getItem(KEY) === unchanged && confirms - promptsSoFar === 3 && settings().open && w.Baby.app.state,
+      '恢复默认产检、恢复默认待产包、清空全部数据：点取消什么都不变');
+    let filePicker = null;
+    const realClick = w.HTMLInputElement.prototype.click;
+    w.HTMLInputElement.prototype.click = function () { if (this.type === 'file') filePicker = this; else realClick.call(this); };
+    const other = Baby.model.createState({ dueDate: '2027-02-02' }, '2026-10-01');
+    Baby.model.upsertWeight(other, '2026-10-03', 60.5);
+    const chooseBackup = async () => {
+      promptsSoFar = confirms;
+      settings().querySelector('[data-action="import-backup"]').click();
+      Object.defineProperty(filePicker, 'files', { value: [new w.File([Baby.storage.backupText(other, new Date())], 'b.json', { type: 'application/json' })] });
+      filePicker.dispatchEvent(new w.Event('change'));
+      for (let i = 0; i < 100 && confirms === promptsSoFar; i += 1) await wait(20);
+      await wait(0);
+    };
+    await chooseBackup();
+    log(confirms - promptsSoFar === 1 && localStorage.getItem(KEY) === unchanged, '设置里导入备份点取消：现在的记录不变');
+    w.confirm = () => { confirms += 1; return true; };
+    await chooseBackup();
+    for (let i = 0; i < 100 && state().profile.dueDate !== '2027-02-02'; i += 1) await wait(20);
+    log(state().profile.dueDate === '2027-02-02' && state().weights.map((x) => x.kg).join() === '60.5' && /导入好了/.test(toastText()) && !settings().open,
+      '设置里导入备份点确定：换成备份里的记录', toastText());
+    w.HTMLInputElement.prototype.click = realClick;
+    if (w.history.state && w.history.state.sheet) await new Promise((r) => w.addEventListener('popstate', () => setTimeout(r, 0), { once: true }));
+    w.location.hash = '#/records/weight';
+    await new Promise((r) => w.addEventListener('hashchange', r, { once: true }));
+    w.confirm = () => { confirms += 1; return false; };
+    $('#w-kg').value = '80';
+    $('form[data-form="add-weight"]').requestSubmit();
+    log(state().weights.map((x) => x.kg).join() === '60.5', '体重和上次差太多、点取消：不记');
+    w.confirm = realConfirm;
+    w.location.hash = '#/';
+    await new Promise((r) => w.addEventListener('hashchange', r, { once: true }));
+
     // ---- 手机存储满了：提示没保存成功，也告诉调用的地方 ----
     const realSet = w.Storage.prototype.setItem;
     w.Storage.prototype.setItem = function (k, v) {

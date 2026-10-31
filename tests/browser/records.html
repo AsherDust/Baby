@@ -20,6 +20,7 @@ function bind() {
   w = iframe.contentWindow;
   d = iframe.contentDocument;
   w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
   w.confirm = () => true;
   w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
   w.URL.revokeObjectURL = () => {};
@@ -106,6 +107,15 @@ iframe.onload = async () => {
     await nav('#/records/glucose');
     log($$('.gl-table tbody tr').length === 7 && $$('.gl-table thead th').length === 6, '血糖表：最近 7 天 × 5 个时间点');
     log($('.gl-table tbody tr').classList.contains('is-today'), '今天在第一行');
+    const realHours = w.Date.prototype.getHours;
+    const guessed = [3, 7, 10, 13, 18, 22].map((h) => {
+      w.Date.prototype.getHours = () => h;
+      w.Baby.app.ui.glucoseSlot = null;
+      w.Baby.app.render();
+      return $('.gl-form input[name="slot"]:checked').value;
+    });
+    w.Date.prototype.getHours = realHours;
+    log(guessed.join() === 'night,fasting,breakfast,lunch,dinner,night', '没选过时就按现在几点先选好时间点：夜里、空腹、早餐后、午餐后、晚餐后', guessed.join());
     $('.gl-form input[value="fasting"]').click();
     let gf = submit('form[data-form="add-glucose"]', { value: 'abc' });
     log(/mmol/.test(formErr(gf)) && state().glucose.length === 0, '血糖不是数字会提示', formErr(gf));

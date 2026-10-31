@@ -1,0 +1,18 @@
+name: 测试
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # 逻辑测试用 macOS 自带的 JavaScriptCore，页面测试用无头 Chrome，macOS 的机器上都装好了
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: 逻辑测试
+        run: sh tests/run.sh
+      - name: 页面测试
+        run: sh tests/browser/run.sh
