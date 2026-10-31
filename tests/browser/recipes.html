@@ -138,6 +138,11 @@ const menuIds = () => $$('.dish-open').map((b) => b.dataset.id);
     sheet().querySelector('[data-action="recipe-place"]').click();
     await wait(60);
     log(state().meals.days[TOMORROW]['dinner-soup'] === soup && /放进明天晚餐了/.test(toastText()) && /已在明天晚餐/.test(text(sheet().querySelector('.recipe-in'))), '放进去了，面板里写着已在明天晚餐', toastText());
+    $('#toast [data-action="undo"]').click();
+    await wait(60);
+    log((state().meals.days[TOMORROW] || {})['dinner-soup'] !== soup && sheet().querySelector('[data-action="recipe-place"]'), '放进去也能撤销，面板里又能放了');
+    sheet().querySelector('[data-action="recipe-place"]').click();
+    await wait(60);
     sheet().querySelector('[data-action="close-dialog"]').click();
     await wait(60);
 

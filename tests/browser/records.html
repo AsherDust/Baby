@@ -270,6 +270,25 @@ iframe.onload = async () => {
     await nav('#/records/glucose');
     log($('[data-action="glucose-after"][data-after="2"]').getAttribute('aria-pressed') === 'true', '老数据默认按餐后 2 小时');
 
+    // ---- 撤销：记血压、记体重 ----
+    await nav('#/records/bp');
+    // 上一项是老格式的数据，还没存过时可能没有这几个字段
+    let kept = JSON.stringify(state().bp || []);
+    submit('form[data-form="add-bp"]', { sys: '121', dia: '79' });
+    await wait(30);
+    let changed = JSON.stringify(state().bp || []) !== kept;
+    $('[data-action="undo"]').click();
+    await wait(30);
+    log(changed && JSON.stringify(state().bp || []) === kept, '记一次血压也能撤销');
+    await nav('#/records/weight');
+    kept = JSON.stringify(state().weights || []);
+    submit('form[data-form="add-weight"]', { kg: '58.8' });
+    await wait(30);
+    changed = JSON.stringify(state().weights || []) !== kept;
+    $('[data-action="undo"]').click();
+    await wait(30);
+    log(changed && JSON.stringify(state().weights || []) === kept, '记一次体重也能撤销');
+
     // ---- 体重的两种特殊提示（只改页面里的数据，不保存） ----
     const ap = w.Baby.app;
     const profile = { ...ap.state.profile };

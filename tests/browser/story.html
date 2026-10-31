@@ -125,6 +125,12 @@ iframe.onload = async () => {
     log($('#story-shelf').open && $$('.shelf-group').length >= 8, '展开全部故事');
     click('[data-action="story-pick"][data-id="prose-01"]');
     log(title() === '匆匆' && /今晚读《匆匆》/.test(toastText()), '从目录里挑一篇', title());
+    click('#toast [data-action="undo"]');
+    await wait(30);
+    log(title() === cardTitle, '挑一篇也能撤销，回到原来那篇', title());
+    click('#story-shelf summary');
+    await wait(30);
+    click('[data-action="story-pick"][data-id="prose-01"]');
     log(!$('#story-shelf').open, '挑完收起目录');
     log(await loaded(), '散文正文下载好了');
     const paras = $$('.story-p').map((p) => p.textContent);

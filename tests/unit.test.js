@@ -2710,6 +2710,39 @@ test('云同步：没变的月份不下载也合得对', () => {
   eq([r.added, r.dropped, r.state.baby.logs.length], [1, 0, mine.baby.logs.length + 1], '九月的没下载，也没被当成删掉');
 });
 
+test('合并：两边都没记改过的时间时，疫苗、体检的「约了」「打完了」互相补上', () => {
+  const mine = viaFile(fullState());
+  const dad = viaFile(mine);
+  Bb.setVaccine(mine.baby, 'bcg', { booked: '2026-10-13' });
+  Bb.setVaccine(dad.baby, 'bcg', { done: '2026-10-14' });
+  Bb.setExam(mine.baby, 'visit', { done: '2026-08-20' });
+  Bb.setExam(dad.baby, 'visit', { booked: '2026-08-19' });
+  const b = Mg.merge(mine, viaFile(dad)).state.baby;
+  eq([b.vaccines.bcg.booked, b.vaccines.bcg.done, b.exams.visit.done, b.exams.visit.booked], ['2026-10-13', '2026-10-14', '2026-08-20', '2026-08-19']);
+});
+
+test('合并：改过的时间最多记 3000 条，多了丢最早的', () => {
+  const now = Date.UTC(2026, 9, 12);
+  const raw = Object.fromEntries(Array.from({ length: 3005 }, (_, i) => [`weight:k${i}`, now - (i + 1) * 1000]));
+  const out = Mg.cleanEdits(raw, now);
+  eq([Object.keys(out).length, 'weight:k0' in out, 'weight:k3004' in out, 'weight:k2999' in out], [3000, true, false, true]);
+});
+
+test('合并：老格式的删除标记只记了哪天，按那天零点算', () => {
+  const base = () => {
+    const s = viaFile(M.createState({ dueDate: DUE }));
+    M.upsertWeight(s, '2026-10-10', 56.2);
+    return s;
+  };
+  const other = viaFile(M.createState({ dueDate: DUE }));
+  other.removed['weight:2026-10-10'] = { on: '2026-10-11', sig: Mg.sign(base().weights[0]) };
+  const before = base();
+  before.edits['weight:2026-10-10'] = new Date('2026-10-10T20:00:00').getTime();
+  const after = base();
+  after.edits['weight:2026-10-10'] = new Date('2026-10-11T08:00:00').getTime();
+  eq([Mg.merge(before, other).state.weights.length, Mg.merge(after, other).state.weights.length], [0, 1], '零点以前改的跟着删，零点以后改的留着');
+});
+
 // ---------- 本机存储：日常记录按月存进 IndexedDB ----------
 
 function fakeLocalStorage() {
@@ -2858,6 +2891,9 @@ test('本机存储：IndexedDB 读不出来时只存其余的记录、不碰月�
   S.useStore(box);
   const got = settle(S.complete(S.load()));
   eq([S.isBroken(), S.lostMonths(), got.baby.logs.length], [false, ['2026-09'], 2], '九月在 IndexedDB 里找不到了：记下来，用剩下的');
+  S.useStore(box);
+  settle(S.complete(S.load()));
+  eq([S.lostMonths(), keysOf(LS.getItem(MONTHS)).includes('2026-09')], [[], false], '目录里去掉了，再打开不再提示');
 });
 
 test('本机存储：别的标签页改了才算变了；清除宝宝、清空全部时月份一起删；没有 IndexedDB 就一直用老办法', () => {

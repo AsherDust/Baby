@@ -165,8 +165,18 @@
       throw e;
     }
     broken = false;
-    // IndexedDB 里没有的月份找不回来了（例如浏览器只清了它）：记下来提示，接着用剩下的
+    // IndexedDB 里没有的月份找不回来了（例如浏览器只清了它）：记下来提示一次，从目录里去掉，接着用剩下的
     lost = info.missing.filter((m) => typeof got[m] !== 'string');
+    if (lost.length) {
+      const index = parsed(read(MONTHS), {});
+      lost.forEach((m) => delete index[m]);
+      try {
+        localStorage.setItem(MONTHS, JSON.stringify(index));
+      } catch (e) {
+        // 存不下就下次打开再提示一次
+      }
+      lastSig = signature();
+    }
     const parts = { ...info.parts };
     for (const m of info.missing) if (typeof got[m] === 'string') parts[m] = got[m];
     const full = assemble(info.main, parts);

@@ -43,6 +43,32 @@ const mainOf = () => JSON.parse(localStorage.getItem(KEY2) || localStorage.getIt
 const keys = (k) => Object.keys(JSON.parse(localStorage.getItem(k) || '{}')).sort();
 const logs = (w) => w.Baby.app.state.baby.logs.length;
 const monthOf = (ms) => new Date(ms).toISOString().slice(0, 7);
+const toastOf = (w) => w.document.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
+// 在测试页这边直接动 IndexedDB：删掉一个月；用更高的版本打开一次，App 用版本 1 就打不开了
+const deleteMonth = async (m) => {
+  let done = false;
+  const q = indexedDB.open('honey-pot', 1);
+  q.onsuccess = () => {
+    const tx = q.result.transaction('months', 'readwrite');
+    tx.objectStore('months').delete(m);
+    tx.oncomplete = () => {
+      q.result.close();
+      done = true;
+    };
+  };
+  q.onerror = () => { done = true; };
+  await pump(() => done);
+};
+const bumpVersion = async () => {
+  let done = false;
+  const q = indexedDB.open('honey-pot', 2);
+  q.onsuccess = () => {
+    q.result.close();
+    done = true;
+  };
+  q.onerror = () => { done = true; };
+  await pump(() => done);
+};
 const idbKeys = async () => {
   let found = null;
   const q = indexedDB.open('honey-pot', 1);
@@ -79,6 +105,13 @@ function seed() {
     // ---- 老数据搬进 IndexedDB ----
     let a = await open(tabA);
     log(logs(a) === total && 'logs' in mainOf().baby, '刚打开：日常记录还在 localStorage 里', `${logs(a)} / ${total}`);
+    a.IDBObjectStore.prototype.put = function () { throw new a.DOMException('写不进去', 'QuotaExceededError'); };
+    await wait(1600);
+    await pump(() => false, 200);
+    log(!a.Baby.storage.inIndexedDB() && 'logs' in mainOf().baby && !localStorage.getItem(MONTHS) && logs(a) === total,
+      '搬的时候 IndexedDB 写不进去：接着用 localStorage，一条没少');
+    await close(tabA);
+    a = await open(tabA);
     await wait(1600);
     await pump(() => a.Baby.storage.inIndexedDB() && a.Baby.storage.writing() === 0);
     log(!('logs' in mainOf().baby) && keys(MONTHS).join() === months.join() && !localStorage.getItem(PENDING),
@@ -125,6 +158,25 @@ function seed() {
     log(typeof b.Baby.app.ui.undo === 'function', '暂存挪进 IndexedDB 时，那个标签页不用重读，撤销还能点');
     await close(tabB);
 
+    // ---- 删光一个月：目录和 IndexedDB 里那个月都去掉 ----
+    a.Baby.app.state.baby.logs.filter((l) => monthOf(l.start) === '2026-08').forEach((l) => a.Baby.baby.removeLog(a.Baby.app.state.baby, l.id));
+    a.Baby.app.persist();
+    await pump(() => a.Baby.storage.writing() === 0 && !localStorage.getItem(PENDING));
+    log(!keys(MONTHS).includes('2026-08') && !(await idbKeys()).includes('2026-08'), '八月删光了：目录和 IndexedDB 里都去掉', keys(MONTHS).join());
+    const left8 = logs(a);
+    await close(tabA);
+    a = await open(tabA);
+    log(logs(a) === left8, '重新打开，少的就是八月那条');
+
+    // ---- IndexedDB 里少了一个月（例如浏览器只清了它）：提示一次，接着用剩下的 ----
+    await close(tabA);
+    await deleteMonth('2026-09');
+    a = await open(tabA);
+    log(/有 1 个月的宝宝日常记录没找到/.test(toastOf(a)) && !a.Baby.storage.isBroken() && logs(a) < left8, '少了九月：提示可能被浏览器清掉了，接着用剩下的', toastOf(a));
+    await close(tabA);
+    a = await open(tabA);
+    log(!/没找到/.test(toastOf(a)) && !keys(MONTHS).includes('2026-09'), '只提示一次：再打开不再提');
+
     // ---- 清空全部 ----
     a.document.querySelector('[data-action="open-settings"]').click();
     a.document.querySelector('#settings-dialog [data-action="clear-all"]').click();
@@ -133,6 +185,24 @@ function seed() {
     let left = await idbKeys();
     for (let i = 0; i < 50 && left.length; i += 1) left = await idbKeys();
     log(!left.length, 'IndexedDB 里的也清掉', left.join());
+
+    // ---- IndexedDB 读不出来：照样打开，提示重新打开；日常记录先不写进月份，也不让导出备份 ----
+    await close(tabA);
+    localStorage.setItem(KEY, JSON.stringify(seed()));
+    a = await open(tabA);
+    await wait(1600);
+    await pump(() => a.Baby.storage.inIndexedDB() && a.Baby.storage.writing() === 0);
+    await close(tabA);
+    await bumpVersion();
+    a = await open(tabA);
+    log(a.Baby.app.started && a.Baby.storage.isBroken() && /这次没读出来/.test(toastOf(a)) && a.document.querySelector('#toast [data-action="reload-app"]'),
+      'IndexedDB 读不出来：照样打开，提示「重新打开」', toastOf(a));
+    const index = localStorage.getItem(MONTHS);
+    a.document.getElementById('diaper-pee').click();
+    log(localStorage.getItem(MONTHS) === index && !localStorage.getItem(PENDING), '这时记的日常不写进月份，免得盖掉没读出来的');
+    a.document.querySelector('[data-action="open-settings"]').click();
+    a.document.querySelector('#settings-dialog [data-action="export-backup"]').click();
+    log(/先关掉蜜罐再打开/.test(toastOf(a)), '这时也不让导出备份，免得备份缺了月份', toastOf(a));
 
     log(errors.length === 0, '页面没有报错', errors.join(' | '));
   } catch (e) {

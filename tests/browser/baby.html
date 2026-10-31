@@ -492,6 +492,199 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(/最近心情不太好的日子有点多/.test(text($('.panel-today'))), '宝宝首页也提一句心情');
     await nav('#/journal');
     log(/产后情绪起伏很常见/.test(text($('.mood-care'))) && /伤害宝宝/.test(text($('.mood-care'))) && /42 天复查/.test(text($('.mood-care'))), '产后的说法：夜里让家人分担，42 天复查时跟医生说说', text($('.mood-care')));
+    await click('[data-action="mood-care-hide"]');
+    log(!$('.mood-care'), '点「过几天再说」收起');
+    await click('#toast [data-action="undo"]');
+    log($('.mood-care'), '「过几天再说」也能撤销');
+
+    // ---- 撤销：每个会改宝宝记录的动作，做完点撤销，跟原来一模一样 ----
+    // 不比修改时间和删除标记：撤销本身也算一次修改；撤销新记的会留标记，好让已经同步出去的那台也删掉
+    fakeNow = new Date(2026, 9, 12, 19, 0).getTime();
+    await open('baby-7m', 'baby');
+    // 键按名字排好再比：删掉又加回来的键会排到最后，内容其实一样
+    const sorted = (v) => (Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object'
+      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted(v[k])])) : v);
+    const same = () => JSON.stringify(sorted({ ...baby(), edits: null, removed: null }));
+    const diff = (a, b) => {
+      const x = JSON.parse(a);
+      const y = JSON.parse(b);
+      return Object.keys({ ...x, ...y }).filter((k) => JSON.stringify(x[k]) !== JSON.stringify(y[k]))
+        .map((k) => `${k}: ${JSON.stringify(x[k]).slice(0, 160)} → ${JSON.stringify(y[k]).slice(0, 160)}`).join(' | ');
+    };
+    const inSheet = (sel) => sheet().querySelector(sel);
+    const send = async (f) => {
+      f.requestSubmit();
+      await wait(40);
+    };
+    const pumpOnce = async () => {
+      await nav('#/baby');
+      await click('#log-pump');
+      const f = inSheet('form[data-form="baby-log"]');
+      f.elements.left.value = '60';
+      f.elements.right.value = '40';
+      await send(f);
+    };
+    const frozenBag = async () => {
+      await pumpOnce();
+      d.getElementById('stash-ml').value = '90';
+      $('form[data-form="stash-add"] input[name="place"][value="freezer"]').checked = true;
+      await send($('form[data-form="stash-add"]'));
+    };
+    const bookedExtra = async () => {
+      await nav('#/baby/vaccines');
+      d.getElementById('xv-name').value = '流感疫苗';
+      $('form[data-form="extra-vaccine"] input[name="done"]').checked = false;
+      d.getElementById('xv-date').value = '2026-10-20';
+      await send($('form[data-form="extra-vaccine"]'));
+    };
+    const undoCases = [
+      ['补记一次瓶喂', async () => {
+        await nav('#/baby');
+        await click('#log-bottle');
+        const f = inSheet('form[data-form="baby-log"]');
+        f.elements.ml.value = '120';
+        await send(f);
+      }],
+      ['记吸奶，存起来', pumpOnce],
+      ['存一袋冷冻的', async () => {
+        d.getElementById('stash-ml').value = '80';
+        $('form[data-form="stash-add"] input[name="place"][value="freezer"]').checked = true;
+        await send($('form[data-form="stash-add"]'));
+      }, pumpOnce],
+      ['拿去解冻', () => click('[id^="stash-thaw-"]'), frozenBag],
+      ['倒掉一袋', () => click('[id^="stash-drop-"]')],
+      ['记身长体重', async () => {
+        await nav('#/baby/growth');
+        d.getElementById('g-weight').value = '8.1';
+        await send($('form[data-form="baby-growth"]'));
+      }],
+      ['记下会爬', async () => {
+        await click('#ms-crawl');
+        await send(inSheet('form[data-form="milestone"]'));
+      }],
+      ['会坐改回还没会', async () => {
+        await click('#ms-sit');
+        await click('#sheet-dialog [data-action="milestone-clear"]');
+      }],
+      ['记一件「第一次」', async () => {
+        d.getElementById('mo-name').value = '第一次坐飞机';
+        await send($('form[data-form="baby-moment"]'));
+      }],
+      ['删掉「第一次去公园」', () => click('[data-action="moment-delete"]')],
+      ['长了一颗牙', async () => {
+        await click('#tooth-ua-l');
+        const f = inSheet('form[data-form="tooth"]');
+        f.elements.date.value = '2026-10-10';
+        await send(f);
+      }],
+      ['疫苗点「打完了」', async () => {
+        await nav('#/baby/vaccines');
+        await click('[data-action="vaccine-done"]');
+      }],
+      ['约一针疫苗', async () => {
+        await click('#vx-open-mpsva-1');
+        const f = inSheet('form[data-form="vaccine"]');
+        f.elements.booked.value = '2026-10-15';
+        await send(f);
+      }],
+      ['加一针约好的自费疫苗', bookedExtra],
+      ['自费疫苗点「打完了」', () => click('[data-action="extra-vaccine-done"]'), bookedExtra],
+      ['删掉自费疫苗', () => click('[data-action="extra-vaccine-delete"]')],
+      ['约一次体检', async () => {
+        await nav('#/baby/exams');
+        await click('#ex-book-m8');
+        const f = inSheet('form[data-form="exam"]');
+        f.elements.booked.value = '2026-11-03';
+        await send(f);
+      }],
+      ['体检点「做完了」', () => click('[data-action="exam-done"]')],
+      ['南瓜改成不爱吃', async () => {
+        await nav('#/baby/food');
+        await click('#tried-南瓜');
+        const f = inSheet('form[data-form="food-feel"]');
+        f.querySelector('input[name="feel"][value="dislike"]').checked = true;
+        await send(f);
+      }],
+      ['牛肉改回没吃过', async () => {
+        await click('#tried-牛肉');
+        await click('#sheet-dialog [data-action="tried-clear"]');
+      }],
+      ['从做法记一笔', async () => {
+        await click('#food-pumpkin-puree');
+        await click('#sheet-dialog [data-action="baby-food-log"]');
+      }],
+      ['记一次用药', async () => {
+        await nav('#/baby/health');
+        d.getElementById('bm-name').value = '布洛芬';
+        await send($('form[data-form="baby-med"]'));
+      }],
+      ['吃了维生素 D', () => click('#vitd-done'), async () => {
+        const b = w.Baby.app.state.baby;
+        b.logs = b.logs.filter((l) => !(l.type === 'med' && l.name === '维生素 D' && w.Baby.baby.dayOf(l.start) === TODAY));
+        w.Baby.app.persist();
+        await nav('#/');
+        w.Baby.app.render();
+      }],
+      ['办证清单改回还没办', async () => {
+        await nav('#/tools/papers');
+        await click('[data-action="paper-toggle"]');
+      }],
+    ];
+    for (const [name, act, setup] of undoCases) {
+      try {
+        if (setup) await setup();
+        if (sheet().open) await click('#sheet-dialog [data-action="close-dialog"]');
+        const before = same();
+        await act();
+        const changed = same() !== before;
+        await click('#toast [data-action="undo"]');
+        const after = same();
+        log(changed && after === before, `撤销「${name}」：跟原来一样`, changed ? `撤销后不一样：${diff(before, after)}` : '这一步没有改动');
+        if (sheet().open) await click('#sheet-dialog [data-action="close-dialog"]');
+      } catch (e) {
+        log(false, `撤销「${name}」`, e.message);
+      }
+    }
+
+    // ---- 改已有的记录：亲喂、辅食（带菜谱）、体温、用药，还有出生信息 ----
+    await nav('#/baby');
+    const editLog = async (pick, fill) => {
+      const l = baby().logs.find(pick);
+      await click(`#edit-${l.id}`);
+      const f = inSheet('form[data-form="baby-log"]');
+      fill(f);
+      await send(f);
+      return baby().logs.find((x) => x.id === l.id);
+    };
+    const today = (l) => w.Baby.baby.dayOf(l.start) === TODAY;
+    let edited = await editLog((l) => l.type === 'breast' && today(l), (f) => {
+      f.elements.left.value = '15';
+      f.elements.right.value = '5';
+    });
+    log(edited.left === 900 && edited.right === 300 && !sheet().open, '改一次亲喂：左 15 分钟、右 5 分钟', JSON.stringify(edited));
+    delete w.Baby.app.state.baby.tried['猪肉'];
+    w.Baby.app.persist();
+    w.Baby.app.render();
+    edited = await editLog((l) => l.type === 'food' && l.recipe === 'pork-puree', (f) => { f.elements.amount.value = '6 勺'; });
+    log(edited.amount === '6 勺' && edited.recipe === 'pork-puree' && baby().tried['猪肉'] === TODAY, '改一次带菜谱的辅食：菜里的猪肉记成吃过', JSON.stringify(edited));
+    edited = await editLog((l) => l.type === 'temp' && today(l), (f) => { f.elements.value.value = '37.2'; });
+    log(edited.value === 37.2, '改一次体温');
+    // 今天的维生素 D 在上面撤销那段里去掉了，先记一条
+    await nav('#/baby/health');
+    d.getElementById('bm-name').value = '维生素 D';
+    await send($('form[data-form="baby-med"]'));
+    await nav('#/baby');
+    edited = await editLog((l) => l.type === 'med' && today(l), (f) => { f.elements.dose.value = '2 粒'; });
+    log(edited.dose === '2 粒' && edited.name === '维生素 D', '改一次用药');
+    await nav('#/baby/growth');
+    await click('[data-action="baby-birth-open"]');
+    const birth = inSheet('form[data-form="baby-birth"]');
+    birth.elements.name.value = '小豆';
+    birth.elements.birthTime.value = '07:10';
+    birth.elements.weight.value = '3.4';
+    await send(birth);
+    log(baby().name === '小豆' && baby().birthTime === '07:10' && state().profile.nickname === '小豆'
+      && baby().growth.find((g) => g.date === baby().birthDate).weight === 3.4 && !sheet().open, '改出生信息：小名、出生时间、出生体重', JSON.stringify([baby().name, baby().birthTime]));
 
     // ---- 就诊小结：没有记录的那块不显示 ----
     const heads = () => $$('#report .rp-part h2').map((h) => h.textContent);
