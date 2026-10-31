@@ -4,7 +4,7 @@
   const { dates: D, model: M, storage: S, app } = globalThis.Baby;
   const {
     root, toastBox, DIALOGS, ui, scrollToNow, viewFoodResults, viewLibraryResults, paintClocks, render, currentRoute, drawCharts,
-    syncWakeLock, onDialogClose, closeDialog, fillFromReport, toast, say, cheer, persist, checkNotifications, forms,
+    syncWakeLock, onDialogClose, closeDialog, fillFromReport, toast, oops, say, cheer, persist, checkNotifications, forms,
     actions, stopReading, setStoryVoice, checkForUpdate
   } = app;
 
@@ -124,14 +124,23 @@
     checkForUpdate();
   });
 
-  // 同一台设备上别的标签页改了记录、云同步的设置
+  // 同一台设备上别的标签页改了记录、云同步的设置。只是把暂存挪进 IndexedDB 的不算改了；
+  // 要去 IndexedDB 取的月份取齐了再换上，连着改了几次的以最后一次为准
+  let reloads = 0;
   window.addEventListener('storage', (e) => {
     if (e.key === `${S.KEY}:cloud` || e.key === null) app.cloudReload();
-    if (e.key !== S.KEY && e.key !== null) return;
-    app.resetTransient();
-    app.state = S.load();
-    if (!app.state) DIALOGS.forEach((d) => closeDialog(d));
-    render();
+    if (e.key !== null && (!S.KEYS.includes(e.key) || !S.changedElsewhere())) return;
+    const ticket = ++reloads;
+    const apply = (state) => {
+      if (ticket !== reloads) return;
+      app.resetTransient();
+      app.state = state;
+      if (!app.state) DIALOGS.forEach((d) => closeDialog(d));
+      render();
+    };
+    const next = S.load();
+    if (S.isPartial(next)) S.complete(next).then(apply, () => {});
+    else apply(next);
   });
 
   let resizeTimer = 0;
@@ -140,13 +149,33 @@
     resizeTimer = setTimeout(drawCharts, 120);
   });
 
-  // 上次关页面时没数完的，打开时直接按满 1 小时收尾，不再弹提示
-  if (app.state && M.settleKicks(app.state, Date.now())) persist();
-  app.started = true;
-  render();
-  scrollToNow();
-  checkNotifications();
-  setInterval(clock, 1000);
+  function start() {
+    // 上次关页面时没数完的，打开时直接按满 1 小时收尾，不再弹提示
+    if (app.state && M.settleKicks(app.state, Date.now())) persist();
+    app.started = true;
+    render();
+    scrollToNow();
+    checkNotifications();
+    setInterval(clock, 1000);
+    app.markReady();
+    S.resume();
+    const lost = S.lostMonths().length;
+    if (lost) oops(`有 ${lost} 个月的宝宝日常记录没找到，可能被浏览器清掉了；开着云同步或者有备份的话，可以从那里拿回来`);
+    // 日常记录搬进 IndexedDB；网址带 ?noidb 时不搬，测试里接着用 localStorage 模拟几台手机
+    if (!/[?&]noidb\b/.test(location.search)) setTimeout(() => S.migrate(() => app.state), 1500);
+  }
+
+  if (S.isPartial(app.state)) {
+    S.complete(app.state).then((full) => {
+      app.state = full;
+      start();
+    }, () => {
+      start();
+      toast('宝宝的日常记录这次没读出来，先别记日常', null, { label: '重新打开', action: 'reload-app' }, 'oops');
+    });
+  } else {
+    start();
+  }
 
   // 通过网址打开时离线也能用；直接双击打开的本地文件不需要
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {

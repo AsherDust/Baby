@@ -2710,6 +2710,219 @@ test('云同步：没变的月份不下载也合得对', () => {
   eq([r.added, r.dropped, r.state.baby.logs.length], [1, 0, mine.baby.logs.length + 1], '九月的没下载，也没被当成删掉');
 });
 
+// ---------- 本机存储：日常记录按月存进 IndexedDB ----------
+
+function fakeLocalStorage() {
+  const m = new Map();
+  return {
+    m,
+    getItem: (k) => (m.has(k) ? m.get(k) : null),
+    setItem: (k, v) => { m.set(k, String(v)); },
+    removeItem: (k) => { m.delete(k); },
+  };
+}
+// 假的 IndexedDB：写入先排着，done() 当作写好了，fail() 当作写不进去
+function fakeStore() {
+  const data = {};
+  const jobs = [];
+  return {
+    data,
+    jobs,
+    reads: 0,
+    failRead: false,
+    read(months) {
+      this.reads += 1;
+      return this.failRead ? Promise.reject(new Error('读不出来')) : Promise.resolve(Object.fromEntries(months.map((m) => [m, data[m]])));
+    },
+    write(changes) { return new Promise((resolve, reject) => jobs.push({ changes, resolve, reject })); },
+    done() {
+      const job = jobs.shift();
+      for (const [m, v] of Object.entries(job.changes)) {
+        if (v === '[]') delete data[m];
+        else data[m] = v;
+      }
+      job.resolve();
+      drainMicrotasks();
+    },
+    fail() {
+      jobs.shift().reject(new Error('写不进去'));
+      drainMicrotasks();
+    },
+    clear() {
+      Object.keys(data).forEach((k) => delete data[k]);
+      return Promise.resolve();
+    },
+  };
+}
+const MONTHS = `${S.KEY2}:months`;
+const PENDING = `${S.KEY2}:pending`;
+const moved = (LS) => JSON.parse(LS.getItem(S.KEY2));
+const keysOf = (raw) => Object.keys(JSON.parse(raw || '{}')).sort();
+const settle = (p) => {
+  let out;
+  let err;
+  p.then((v) => { out = v; }, (e) => { err = e; });
+  drainMicrotasks();
+  if (err) throw err;
+  return out;
+};
+// 老办法存下，再搬进假的 IndexedDB；搬的时候没改，就不会再写
+function moveIn(box, s) {
+  S.save(s);
+  const moving = S.migrate(() => s);
+  box.done();
+  return settle(moving);
+}
+function threeMonths() {
+  const s = fullState();
+  Bb.addLog(s.baby, Bb.readLog('diaper', { date: '2026-08-20', time: '09:00', pee: true }, tAt('2026-10-12', '12:00')));
+  Bb.addLog(s.baby, Bb.readLog('diaper', { date: '2026-09-15', time: '09:00', pee: true }, tAt('2026-10-12', '12:00')));
+  return s;
+}
+
+test('本机存储：日常记录按月搬进 IndexedDB；搬的时候新记的也不丢，没写完就关掉也不丢', () => {
+  const LS = fakeLocalStorage();
+  globalThis.localStorage = LS;
+  const box = fakeStore();
+  S.useStore(box);
+  S.save(threeMonths());
+  let app = S.load();
+  ok(!S.inIndexedDB() && 'logs' in JSON.parse(LS.getItem(S.KEY)).baby, '还没搬：日常记录在 localStorage 里');
+  const moving = S.migrate(() => app);
+  Bb.addLog(app.baby, Bb.readLog('diaper', { date: '2026-10-12', time: '10:00', poo: true }, tAt('2026-10-12', '12:00')));
+  S.save(app);
+  box.done();
+  ok(settle(moving) && S.inIndexedDB(), '搬好了');
+  ok(!('logs' in moved(LS).baby) && JSON.parse(LS.getItem(S.KEY)).movedTo === S.KEY2, '其余的记录换到 v2，不再带日常记录；v1 只留个记号');
+  eq(M.normalize(JSON.parse(LS.getItem(S.KEY))), null, '老版本的蜜罐读 v1：当成没有记录，不会把日常记录当成空的存回去');
+  eq([keysOf(LS.getItem(MONTHS)), keysOf(LS.getItem(PENDING)), Object.keys(box.data).sort()],
+    [['2026-08', '2026-09', '2026-10'], ['2026-10'], ['2026-08', '2026-09', '2026-10']], '三个月都进了 IndexedDB；搬的时候新记的十月先在暂存里');
+  S.useStore(box);
+  const reopened = S.load();
+  ok(S.isPartial(reopened), '重新打开：八月、九月要去 IndexedDB 取');
+  app = settle(S.complete(reopened));
+  eq([app.baby.logs.length, box.reads, S.isPartial(app)], [4, 1, false], '补齐了，搬的时候新记的那条也在');
+  box.done();
+  eq([LS.getItem(PENDING), keysOf(LS.getItem(MONTHS))], [null, ['2026-08', '2026-09', '2026-10']], '十月写进去以后暂存删掉');
+  eq(JSON.stringify(settle(S.complete(S.load())).baby.logs), JSON.stringify(app.baby.logs), '再打开一次，记录一样');
+});
+
+test('本机存储：只写改了的月份；写不进去就留在暂存里，打开时以暂存为准；删光的月份也删掉', () => {
+  const LS = globalThis.localStorage;
+  const box = fakeStore();
+  S.useStore(box);
+  const app = threeMonths();
+  ok(moveIn(box, app) && box.jobs.length === 0, '搬好了，没有要补写的');
+  Bb.addLog(app.baby, Bb.readLog('diaper', { date: '2026-09-16', time: '09:00', pee: true }, tAt('2026-10-12', '12:00')));
+  S.save(app);
+  eq([box.jobs.length, Object.keys(box.jobs[0].changes)], [1, ['2026-09']], '加了一条九月的：只写九月');
+  box.fail();
+  eq(keysOf(LS.getItem(PENDING)), ['2026-09'], '写不进去：留在暂存里');
+  S.useStore(box);
+  const back = settle(S.complete(S.load()));
+  eq(back.baby.logs.filter((l) => Bb.dayOf(l.start).startsWith('2026-09')).length, 2, '打开时用暂存里的九月');
+  S.resume();
+  eq(Object.keys(box.jobs[0].changes), ['2026-09'], '打开时把没写完的九月再写一次');
+  box.fail();
+  S.save(back);
+  eq(box.jobs.length, 0, '没改就不写');
+  const aug = back.baby.logs.find((l) => Bb.dayOf(l.start).startsWith('2026-08'));
+  Bb.removeLog(back.baby, aug.id);
+  S.save(back);
+  eq(box.jobs[0].changes, { '2026-08': '[]' }, '八月删光了');
+  box.done();
+  ok(!('2026-08' in box.data) && !keysOf(LS.getItem(MONTHS)).includes('2026-08') && keysOf(LS.getItem(PENDING)).join() === '2026-09', '八月从 IndexedDB 和目录里去掉；九月还在暂存里');
+});
+
+test('本机存储：IndexedDB 读不出来时只存其余的记录、不碰月份；找不到的月份记下来提示', () => {
+  const LS = globalThis.localStorage;
+  const box = fakeStore();
+  S.useStore(box);
+  moveIn(box, threeMonths());
+  const before = [LS.getItem(MONTHS), LS.getItem(PENDING), JSON.stringify(box.data)];
+  S.useStore(box);
+  box.failRead = true;
+  const st = S.load();
+  let failed = false;
+  try {
+    settle(S.complete(st));
+  } catch (e) {
+    failed = true;
+  }
+  ok(failed && S.isBroken(), '读不出来：报错，进「坏了」状态');
+  M.upsertWeight(st, '2026-10-12', 57);
+  ok(S.save(st) && moved(LS).weights.some((w) => w.kg === 57), '其余的记录照样存');
+  eq([LS.getItem(MONTHS), LS.getItem(PENDING), JSON.stringify(box.data), box.jobs.length], [...before, 0], '月份一点没动');
+  box.failRead = false;
+  delete box.data['2026-09'];
+  S.useStore(box);
+  const got = settle(S.complete(S.load()));
+  eq([S.isBroken(), S.lostMonths(), got.baby.logs.length], [false, ['2026-09'], 2], '九月在 IndexedDB 里找不到了：记下来，用剩下的');
+});
+
+test('本机存储：别的标签页改了才算变了；清除宝宝、清空全部时月份一起删；没有 IndexedDB 就一直用老办法', () => {
+  const LS = globalThis.localStorage;
+  const box = fakeStore();
+  S.useStore(box);
+  const s = threeMonths();
+  moveIn(box, s);
+  Bb.addLog(s.baby, Bb.readLog('diaper', { date: '2026-10-12', time: '11:00', pee: true }, tAt('2026-10-12', '12:00')));
+  S.save(s);
+  ok(!S.changedElsewhere() && LS.getItem(PENDING), '自己存的不算');
+  box.done();
+  ok(!S.changedElsewhere() && LS.getItem(PENDING) === null, '暂存挪进 IndexedDB 了，内容没变，不算');
+  const other = moved(LS);
+  other.weights = [];
+  LS.setItem(S.KEY2, JSON.stringify(other));
+  ok(S.changedElsewhere(), '别的标签页改了其余的记录');
+  const fresh = S.load();
+  ok(!S.changedElsewhere() && !S.isPartial(fresh) && box.reads === 0, '读过就不算了；月份都认得，不用再去 IndexedDB 取');
+  const cleared = M.clearBaby(fresh, Date.now());
+  S.save(fresh);
+  ok(cleared && LS.getItem(S.KEY2) === null && LS.getItem(MONTHS) === null && LS.getItem(PENDING) === null && !Object.keys(box.data).length && !S.inIndexedDB()
+    && JSON.parse(LS.getItem(S.KEY)).baby === null, '清除宝宝信息：回到 v1，月份目录、暂存、IndexedDB 都清掉');
+  M.restoreBaby(fresh, cleared, Date.now());
+  S.save(fresh);
+  ok('logs' in JSON.parse(LS.getItem(S.KEY)).baby, '撤销了：先按老办法存回 localStorage');
+  moveIn(box, fresh);
+  S.clear();
+  ok(LS.getItem(S.KEY) === null && LS.getItem(S.KEY2) === null && LS.getItem(MONTHS) === null && !Object.keys(box.data).length, '清空全部：都删掉');
+  S.useStore(null);
+  const plain = threeMonths();
+  S.save(plain);
+  ok(settle(S.migrate(() => plain)) === false && 'logs' in JSON.parse(LS.getItem(S.KEY)).baby, '没有 IndexedDB：不搬');
+  S.useStore(undefined);
+  delete globalThis.localStorage;
+});
+
+test('本机存储：别的标签页改了的月份还没取回来时存一次，不会把它写回旧的；清空以后之前的写入写完也不再动目录', () => {
+  globalThis.localStorage = fakeLocalStorage();
+  const LS = globalThis.localStorage;
+  const box = fakeStore();
+  S.useStore(box);
+  const mine = threeMonths();
+  moveIn(box, mine);
+  const sep = JSON.parse(box.data['2026-09']);
+  sep.push({ ...sep[0], id: 'dp-other', start: sep[0].start + 3600000 });
+  box.data['2026-09'] = JSON.stringify(sep);
+  const index = JSON.parse(LS.getItem(MONTHS));
+  index['2026-09'] = `${box.data['2026-09'].length}:other`;
+  LS.setItem(MONTHS, JSON.stringify(index));
+  const reloading = S.load();
+  ok(S.isPartial(reloading), '别的标签页把九月写进了 IndexedDB：要去取');
+  M.upsertWeight(mine, '2026-10-12', 57.5);
+  S.save(mine);
+  eq([box.jobs.length, LS.getItem(PENDING)], [0, null], '取回来之前存一次：九月不动');
+  eq(settle(S.complete(reloading)).baby.logs.some((l) => l.id === 'dp-other'), true, '取回来就有别的标签页记的那条');
+  Bb.addLog(mine.baby, Bb.readLog('diaper', { date: '2026-10-12', time: '12:00', pee: true }, tAt('2026-10-12', '13:00')));
+  S.save(mine);
+  S.clear();
+  box.done();
+  eq([LS.getItem(MONTHS), LS.getItem(PENDING)], [null, null], '清空以后，之前发出去的写入写完了也不会把目录写回来');
+  S.useStore(undefined);
+  delete globalThis.localStorage;
+});
+
 print(`\n${passed} 通过，${failures.length} 失败`);
 if (failures.length) {
   print(failures.join('\n'));

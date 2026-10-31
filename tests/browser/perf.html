@@ -75,7 +75,7 @@ const open = async (raw, today) => {
   await new Promise((r) => { iframe.onload = r; iframe.src = 'about:blank'; });
   localStorage.clear();
   localStorage.setItem(S.KEY, raw);
-  await new Promise((r) => { iframe.onload = r; iframe.src = `../../index.html?today=${today}&n=${Math.random()}`; });
+  await new Promise((r) => { iframe.onload = r; iframe.src = `../../index.html?noidb&today=${today}&n=${Math.random()}`; });
   return iframe.contentWindow;
 };
 

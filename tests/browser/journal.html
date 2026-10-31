@@ -6,7 +6,7 @@ const out = [];
 const log = (ok, name, extra = '') => out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
 const iframe = document.createElement('iframe');
 iframe.style.cssText = 'width:390px;height:844px';
-iframe.src = '../../index.html?today=2026-10-12';
+iframe.src = '../../index.html?noidb&today=2026-10-12';
 document.body.appendChild(iframe);
 
 let w, d;

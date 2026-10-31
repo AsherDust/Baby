@@ -8,7 +8,7 @@ cd "$(dirname "$0")/../.." || exit 1
 CHROME="${CHROME:-/Applications/Google Chrome.app/Contents/MacOS/Google Chrome}"
 PORT="${PORT:-18765}"
 [ -x "$CHROME" ] || { echo "找不到 Chrome：$CHROME（可以用 CHROME=路径 指定）"; exit 1; }
-[ $# -eq 0 ] && set -- core bag meds tools records safety story journal recipes baby sync contrast contrast:dark perf
+[ $# -eq 0 ] && set -- core bag meds tools records safety story journal recipes baby sync storage contrast contrast:dark perf
 for name in "$@"; do
   [ -f "tests/browser/${name%:dark}.html" ] || { echo "没有这组测试：$name"; exit 1; }
 done

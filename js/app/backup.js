@@ -45,8 +45,16 @@
     openMergeSheet(Mg.merge(app.state, other), exportedAt(text));
   }
 
+  // 宝宝的日常记录这次没读全：备份会缺月份，导入、合并的也存不全，先别做
+  function notNow() {
+    if (!S.isBroken()) return false;
+    oops('宝宝的日常记录这次没读出来，先关掉蜜罐再打开');
+    return true;
+  }
+
   const backupActions = {
     async 'export-backup'(el) {
+      if (notNow()) return;
       const backedUp = { ...app.state, prefs: { ...app.state.prefs, lastBackup: ui.today, backupNudged: null } };
       const how = await saveFile(S.backupText(backedUp, new Date()), `蜜罐备份-${ui.today}.json`, 'application/json');
       if (how === 'cancelled') return;
@@ -61,6 +69,7 @@
     },
 
     'import-backup'() {
+      if (notNow()) return;
       const form = settingsDialog.open ? settingsDialog.querySelector('form') : document.querySelector('form[data-form="onboard"]');
       pickJson((text) => {
         try {
@@ -80,6 +89,7 @@
     },
 
     async 'share-family'(el) {
+      if (notNow()) return;
       const how = await saveFile(S.backupText(app.state, new Date()), `蜜罐-发给家人-${ui.today}.json`, 'application/json');
       if (how === 'cancelled') return;
       cheer(el);
@@ -92,6 +102,7 @@
     },
 
     'merge-family'() {
+      if (notNow()) return;
       pickJson(previewMerge);
     },
 

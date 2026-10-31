@@ -29,7 +29,7 @@ const open = async (scene, route, extra = {}) => {
   Object.entries(extra).forEach(([k, v]) => localStorage.setItem(k, JSON.stringify(v)));
   return new Promise((r) => {
     iframe.onload = r;
-    iframe.src = `../../index.html?today=${TODAY}&n=${Math.random()}#/${route}`;
+    iframe.src = `../../index.html?noidb&today=${TODAY}&n=${Math.random()}#/${route}`;
   }).then(() => { w = iframe.contentWindow; d = iframe.contentDocument; });
 };
 

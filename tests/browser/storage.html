@@ -1,0 +1,144 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script src="guard.js"></script>
+<script src="load-core.js"></script>
+<script src="scenes.js"></script>
+<script>
+// 宝宝的日常记录按月存进 IndexedDB：老数据搬过去，重新打开读回来，记一笔先进暂存、写好了再删，
+// 写不进去也不丢，两个标签页，清空。
+// 无头 Chrome 的虚拟时间里 IndexedDB 不会自己做完：等的时候不停发小请求，有请求没回来时虚拟时间不走
+const out = [];
+const show = (head) => { document.getElementById('out').textContent = `${head}\n${out.join('\n')}`; };
+const log = (ok, name, extra = '') => { out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`); show('RUNNING'); };
+const TODAY = '2026-10-12';
+const KEY = 'honey-pot:v1';
+const KEY2 = 'honey-pot:v2';
+const MONTHS = `${KEY2}:months`;
+const PENDING = `${KEY2}:pending`;
+const errors = [];
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const pump = async (cond, tries = 400) => {
+  for (let i = 0; i < tries && !cond(); i += 1) await fetch(`guard.js?pump=${i}-${Math.random()}`).catch(() => {});
+  return Boolean(cond());
+};
+const frame = () => {
+  const f = document.createElement('iframe');
+  f.style.cssText = 'width:390px;height:844px';
+  document.body.appendChild(f);
+  return f;
+};
+const tabA = frame();
+const tabB = frame();
+// 打开 App；要去 IndexedDB 取的月份取齐了、画好了才算打开
+async function open(f) {
+  await new Promise((r) => { f.onload = r; f.src = `../../index.html?today=${TODAY}&n=${Math.random()}#/baby`; });
+  const w = f.contentWindow;
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
+  w.confirm = () => true;
+  await pump(() => w.Baby.app.started);
+  return w;
+}
+const close = (f) => new Promise((r) => { f.onload = r; f.src = 'about:blank'; });
+const mainOf = () => JSON.parse(localStorage.getItem(KEY2) || localStorage.getItem(KEY));
+const keys = (k) => Object.keys(JSON.parse(localStorage.getItem(k) || '{}')).sort();
+const logs = (w) => w.Baby.app.state.baby.logs.length;
+const monthOf = (ms) => new Date(ms).toISOString().slice(0, 7);
+const idbKeys = async () => {
+  let found = null;
+  const q = indexedDB.open('honey-pot', 1);
+  q.onupgradeneeded = () => q.result.createObjectStore('months');
+  q.onsuccess = () => {
+    const r = q.result.transaction('months').objectStore('months').getAllKeys();
+    r.onsuccess = () => {
+      found = r.result.slice().sort();
+      q.result.close();
+    };
+  };
+  await pump(() => found !== null);
+  return found || [];
+};
+
+// 宝宝 7 个月，八月、九月、十月都有日常记录
+function seed() {
+  const s = seedScene('baby-7m');
+  const B = Baby.baby;
+  for (const day of ['2026-08-10', '2026-09-10', '2026-10-10']) {
+    B.addLog(s.baby, B.readLog('diaper', { date: day, time: '09:00', pee: true }, B.msAt(TODAY, '12:00')));
+  }
+  return s;
+}
+
+(async () => {
+  try {
+    localStorage.clear();
+    const s = seed();
+    localStorage.setItem(KEY, JSON.stringify(s));
+    const total = s.baby.logs.length;
+    const months = [...new Set(s.baby.logs.map((l) => monthOf(l.start)))].sort();
+
+    // ---- 老数据搬进 IndexedDB ----
+    let a = await open(tabA);
+    log(logs(a) === total && 'logs' in mainOf().baby, '刚打开：日常记录还在 localStorage 里', `${logs(a)} / ${total}`);
+    await wait(1600);
+    await pump(() => a.Baby.storage.inIndexedDB() && a.Baby.storage.writing() === 0);
+    log(!('logs' in mainOf().baby) && keys(MONTHS).join() === months.join() && !localStorage.getItem(PENDING),
+      '打开一会儿后搬进 IndexedDB：localStorage 里只剩月份目录', `${keys(MONTHS).join()} / ${months.join()}`);
+    log((await idbKeys()).join() === months.join() && logs(a) === total, 'IndexedDB 里每个月一份，页面上一条没少');
+    log(Baby.model.normalize(JSON.parse(localStorage.getItem(KEY))) === null, '老版本的蜜罐读不懂留下的记号：当成没有记录，不会把日常记录当成空的存回去');
+
+    // ---- 重新打开：从 IndexedDB 读回来 ----
+    await close(tabA);
+    a = await open(tabA);
+    log(a.Baby.app.started && logs(a) === total && !a.Baby.storage.isBroken() && a.document.getElementById('diaper-pee'),
+      '重新打开：从 IndexedDB 读齐了才画宝宝页', `${logs(a)} / ${total}`);
+
+    // ---- 记一笔：先进暂存，写进 IndexedDB 以后删掉 ----
+    const month = monthOf(a.Date.now());
+    a.document.getElementById('diaper-pee').click();
+    log(keys(PENDING).includes(month), '记了一笔：这个月先写进暂存', keys(PENDING).join());
+    await pump(() => a.Baby.storage.writing() === 0 && !localStorage.getItem(PENDING));
+    log(!localStorage.getItem(PENDING) && keys(MONTHS).includes(month), '写进 IndexedDB 以后暂存删掉');
+    await close(tabA);
+    a = await open(tabA);
+    log(logs(a) === total + 1, '重新打开还在');
+
+    // ---- IndexedDB 写不进去：留在暂存里，下次打开再写 ----
+    a.IDBObjectStore.prototype.put = function () { throw new a.DOMException('写不进去', 'QuotaExceededError'); };
+    a.document.getElementById('diaper-pee').click();
+    await pump(() => a.Baby.storage.writing() === 0);
+    log(keys(PENDING).includes(month) && logs(a) === total + 2, 'IndexedDB 写不进去：留在暂存里，页面上照样记着');
+    await close(tabA);
+    a = await open(tabA);
+    log(logs(a) === total + 2, '关掉再打开：暂存里的那条在');
+    await pump(() => a.Baby.storage.writing() === 0 && !localStorage.getItem(PENDING));
+    log(!localStorage.getItem(PENDING), '打开以后把没写完的再写一次');
+
+    // ---- 两个标签页 ----
+    const b = await open(tabB);
+    log(logs(b) === total + 2, '另一个标签页也读齐了');
+    a.document.getElementById('diaper-pee').click();
+    await pump(() => logs(b) === total + 3);
+    log(logs(b) === total + 3, '这个标签页记的，那个标签页跟着有了');
+    b.Baby.app.ui.undo = () => {};
+    await pump(() => a.Baby.storage.writing() === 0 && !localStorage.getItem(PENDING));
+    await wait(50);
+    log(typeof b.Baby.app.ui.undo === 'function', '暂存挪进 IndexedDB 时，那个标签页不用重读，撤销还能点');
+    await close(tabB);
+
+    // ---- 清空全部 ----
+    a.document.querySelector('[data-action="open-settings"]').click();
+    a.document.querySelector('#settings-dialog [data-action="clear-all"]').click();
+    await pump(() => a.Baby.storage.writing() === 0);
+    log(!localStorage.getItem(KEY) && !localStorage.getItem(KEY2) && !localStorage.getItem(MONTHS) && !localStorage.getItem(PENDING) && !a.Baby.app.state, '清空全部：localStorage 里的都删掉');
+    let left = await idbKeys();
+    for (let i = 0; i < 50 && left.length; i += 1) left = await idbKeys();
+    log(!left.length, 'IndexedDB 里的也清掉', left.join());
+
+    log(errors.length === 0, '页面没有报错', errors.join(' | '));
+  } catch (e) {
+    log(false, '脚本异常', e && e.stack || String(e));
+  }
+  show('DONE');
+})();
+</script>
+</body>

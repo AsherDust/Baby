@@ -480,7 +480,8 @@
 
   /** 立刻同步；正在同步时等这次结束再来一次。同一台设备的几个标签页轮流来。返回 { ok, result, error, waiting } */
   function syncNow(reason = 'manual') {
-    if (!config) return Promise.resolve({ ok: false, error: null });
+    // 日常记录没读全的时候不同步，免得拿缺了月份的记录去合并
+    if (!config || S.isBroken() || S.isPartial(app.state)) return Promise.resolve({ ok: false, error: null });
     if (reason !== 'manual' && (paused || Date.now() < pausedUntil)) return Promise.resolve({ ok: false, error: null });
     if (busy) {
       again = true;
@@ -561,7 +562,7 @@
     if (!document.hidden) syncNow('poll');
   }, settings.poll);
   // 页面加载完再拉，先让人看到这台手机上的记录
-  window.addEventListener('load', () => setTimeout(() => syncNow('open'), 0));
+  window.addEventListener('load', () => app.whenReady.then(() => setTimeout(() => syncNow('open'), 0)));
 
   // ---------- 连接、断开 ----------
 

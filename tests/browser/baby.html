@@ -33,7 +33,7 @@ const open = (scene, route = '') => {
   if (s) localStorage.setItem(KEY, JSON.stringify(s));
   return new Promise((r) => {
     iframe.onload = r;
-    iframe.src = `../../index.html?today=${TODAY}&n=${Math.random()}#/${route}`;
+    iframe.src = `../../index.html?noidb&today=${TODAY}&n=${Math.random()}#/${route}`;
   }).then(() => { bind(); w.Baby.app.render(); });
 };
 const $ = (s) => d.querySelector(s);

@@ -76,7 +76,9 @@
   // iPhone 上在浏览器里（不是从主屏幕图标）打开时，长时间没用的网站数据可能被系统清掉
   const atRisk = () => isIOS() && !isStandalone();
 
+  // 日常记录搬进 IndexedDB 以后，有的月份要异步取回来，取齐了 main.js 才画第一次
   app.state = S.load();
+  app.whenReady = new Promise((resolve) => { app.markReady = resolve; });
   const ui = {
     today: D.today(),
     showAllWeights: false,

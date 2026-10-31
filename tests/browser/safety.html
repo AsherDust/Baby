@@ -10,7 +10,7 @@ const log = (ok, name, extra = '') => {
   document.getElementById('out').textContent = `RUNNING\n${out.join('\n')}`;
 };
 const TODAY = '2026-10-12';
-const APP = `../../index.html?today=${TODAY}`;
+const APP = `../../index.html?noidb&today=${TODAY}`;
 const KEY = 'honey-pot:v1';
 const iframe = document.createElement('iframe');
 iframe.style.cssText = 'width:390px;height:844px';
@@ -38,7 +38,11 @@ const save = (s) => localStorage.setItem(KEY, JSON.stringify(s));
 const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
 const open = (src) => new Promise((r) => { iframe.onload = r; iframe.src = `${src}&n=${Math.random()}`; }).then(bind);
 // app 每次渲染都现查设备类型；改完数据或设备再让它重新读一遍、重画
-const rerender = () => w.dispatchEvent(new w.StorageEvent('storage', { key: KEY }));
+// 存储改过的按别的标签页改了读一遍；只是换了环境（假装成 iPhone 之类）的直接重画
+const rerender = () => {
+  w.dispatchEvent(new w.StorageEvent('storage', { key: KEY }));
+  w.Baby.app.render();
+};
 const pretend = (props) => { for (const [k, v] of Object.entries(props)) Object.defineProperty(w.navigator, k, { value: v, configurable: true }); };
 const settings = () => d.getElementById('settings-dialog');
 // 关面板后 app 会 history.back()，等它真的退回去再继续
