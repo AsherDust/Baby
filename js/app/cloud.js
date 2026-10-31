@@ -15,7 +15,7 @@
   const TOKEN_URL = `https://github.com/settings/personal-access-tokens/new?${new URLSearchParams({
     name: '蜜罐云同步', description: '蜜罐 App 的云同步：读写存数据的那个仓库', expires_in: '366', contents: 'write',
   })}`;
-  // 密码只有 6 位数字，钥匙算得慢一点，猜起来就慢（每台手机设置时算一次，大约一秒）；测试里会改小
+  // 钥匙算得慢一点，猜密码就慢（每台手机设置时算一次，大约一秒）；测试里会改小
   const settings = { iter: 1000000, debounce: 4000, maxWait: 30000, poll: 3 * 60 * 1000, showAfter: 30 * 1000 };
 
   class CloudError extends Error {
@@ -408,10 +408,9 @@
     const same = Boolean(config && config.repo === repo && config.folder === folder);
     const token = String(f.token || '').trim() || (config && config.repo === repo ? config.token : '');
     if (!token) return { error: '填一下 GitHub Token' };
-    const password = String(f.password || '').trim();
-    if (!password && !same) return { error: '设一个 6 位数字的加密密码' };
-    if (password && !/^\d{6}$/.test(password)) return { error: '加密密码是 6 位数字' };
-    if (password !== String(f.confirm || '').trim()) return { error: '两次输的密码不一样' };
+    const password = String(f.password || '');
+    if (!password && !same) return { error: '设一个加密密码' };
+    if (password !== String(f.confirm || '')) return { error: '两次输的密码不一样' };
     return { repo, folder, branch: String(f.branch || '').trim(), token, password, same };
   }
 
@@ -550,15 +549,15 @@
         </details>
         <div class="field-row">
           <label class="field">
-            <span>加密密码 <small>6 位数字</small></span>
-            <input name="password" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="${c ? '不改就空着' : '6 位数字'}">
+            <span>加密密码</span>
+            <input name="password" type="password" autocomplete="new-password" placeholder="${c ? '不改就空着' : '自己记得住的'}">
           </label>
           <label class="field">
             <span>再输一遍</span>
-            <input name="confirm" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password">
+            <input name="confirm" type="password" autocomplete="new-password">
           </label>
         </div>
-        <p class="hint">云端的数据用这 6 位数字加密。每台手机填同一个；忘了就打不开云端的数据，手机上的记录不受影响。这台手机只记下由密码算出来的钥匙，不存密码本身。Token 要保管好，别发给别人。</p>
+        <p class="hint">云端的数据用这个密码加密，什么字都可以，越长越难猜。每台手机填同一个；忘了就打不开云端的数据，手机上的记录不受影响。这台手机只记下由密码算出来的钥匙，不存密码本身。Token 要保管好，别发给别人。</p>
         <p class="form-error" hidden></p>
         <div class="dialog-actions">
           <span class="spacer"></span>
