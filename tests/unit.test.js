@@ -2860,6 +2860,19 @@ test('多语言：代码里用到的键词典里都有，词典里的都用得�
   ok(!unused.length, `词典里没用上的：${unused.join('、')}`);
 });
 
+// 已经搬完的文件：给人看的话都在 lang/zh.js，代码里（注释除外）不再写中文。搬完一个加一个；
+// 解析用户输入、B 超报告的正则本来就要认中文（斤、厘米、胎盘……），这样的文件不放进来
+const NO_CHINESE = ['js/core/i18n.js', 'js/core/merge.js', 'js/core/storage.js', 'js/core/sync.js'];
+
+test('多语言：搬完的文件里不再写中文，注释除外', () => {
+  const CJK = /[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef]/;
+  for (const file of NO_CHINESE) {
+    const code = readFile(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+    const hits = code.split('\n').filter((line) => CJK.test(line)).map((line) => line.trim());
+    ok(!hits.length, `${file} 里还有中文，挪进 lang/zh.js：${hits.join(' | ')}`);
+  }
+});
+
 test('校验：填错时的提示（核心逻辑里的）', () => {
   const T = '2026-10-12';
   const now = tAt(T, '20:00');
