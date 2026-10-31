@@ -1,0 +1,6 @@
+# GitHub Pages 用 Jekyll 发布这个仓库：只放 App 本身，测试页和生成数据的脚本不发布。
+# 测试页一打开就会清空浏览器存储，和线上的 App 在同一个网站下，发布出去会把真实记录清掉
+exclude:
+  - tests
+  - scripts
+  - work
