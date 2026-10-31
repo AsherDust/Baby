@@ -140,6 +140,15 @@
     cap(store, KEEP_EDITS, (v) => v);
   }
 
+  // 删过的标记只留真的不在了的：撤销删除以后这条又在了，标记就去掉。云同步不下载没变的文件，靠的就是这一点
+  function clearStale(removed, shape) {
+    for (const k of Object.keys(removed)) {
+      const cut = k.indexOf(':');
+      const group = shape[k.slice(0, cut)];
+      if (group && group.each.has(k.slice(cut + 1))) delete removed[k];
+    }
+  }
+
   /** 读出来时先记一份底；之后每次保存，新记的、改过的、删掉的都记下这会儿的时间 */
   function track(state, now = Date.now()) {
     if (!state) return;
@@ -148,6 +157,8 @@
     const b = state.baby;
     const baby = b ? babyShape(b) : null;
     seen.set(state, { top, baby, b });
+    clearStale(state.removed, top);
+    if (b) clearStale(b.removed, baby);
     if (!prev) return;
     stamp(state.edits, prev.top, top, now);
     if (b) stamp(b.edits, prev.b === b ? prev.baby : {}, baby, now);

@@ -6,7 +6,7 @@
     settingsDialog, checkupDialog, medDialog, sheetDialog, notifyPermission, JOURNAL_SHOWN, ui, render, go, closeDialog,
     openGlucoseSheet, openUltrasoundSheet, openJournalSheet, openSettings, openCheckupDialog, openMedDialog, openMergeSheet, formError,
     toast, oops, say, cheer, persist, saveFile, downloadCalendar, readProfile, saveWeight, saveGlucose,
-    checkNotifications, storyActions, recipeActions, babyForms, babyActions, noiseActions, startPelvic, stopPelvic
+    checkNotifications, storyActions, recipeActions, babyForms, babyActions, noiseActions, cloudForms, cloudActions, startPelvic, stopPelvic
   } = app;
 
   const submitButton = (form) => form.querySelector('button:not([type="button"])');
@@ -220,6 +220,7 @@
     },
 
     ...babyForms,
+    ...cloudForms,
   };
 
   const actions = {
@@ -227,6 +228,7 @@
     ...recipeActions,
     ...babyActions,
     ...noiseActions,
+    ...cloudActions,
 
     'open-settings': openSettings,
 
@@ -651,7 +653,9 @@
     },
 
     'clear-all'() {
-      if (!window.confirm('确定清空全部数据吗？清空后找不回来，建议先导出备份。')) return;
+      const cloud = app.cloudOn() ? '这台手机的云同步也会断开，云端的数据不会删。' : '';
+      if (!window.confirm(`确定清空全部数据吗？清空后找不回来，建议先导出备份。${cloud}`)) return;
+      app.cloudOff();
       S.clear();
       app.state = null;
       ui.bagAdding = null;

@@ -100,6 +100,7 @@
   function persist() {
     if (!S.save(app.state)) return oops('没保存成功：浏览器存储可能满了或被禁用了');
     askToKeep();
+    app.cloudChanged();
   }
 
   let keepAsked = false;

@@ -1,0 +1,343 @@
+<!doctype html><meta charset="utf-8"><body><pre id="out">RUNNING</pre>
+<script src="load-core.js"></script>
+<script src="scenes.js"></script>
+<script>
+// 云同步：用内存里假的 GitHub（实现用到的那几个接口），妈妈、爸爸两台手机轮流打开同步
+localStorage.clear();
+const out = [];
+const log = (ok, name, extra = '') => {
+  out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`);
+  document.getElementById('out').textContent = `RUNNING\n${out.join('\n')}`;
+};
+const TODAY = '2026-10-12';
+const KEY = 'pregnancy-desk:v1';
+const CLOUD = `${KEY}:cloud`;
+const TOKEN = 'github_pat_good';
+const PASSWORD = 'honeypot1';
+const iframe = document.createElement('iframe');
+iframe.style.cssText = 'width:390px;height:844px';
+document.body.appendChild(iframe);
+
+// ---------- 假的 GitHub ----------
+
+const enc = new TextEncoder();
+const hex = (buf) => [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
+const b64 = (text) => { const b = enc.encode(text); let s = ''; b.forEach((x) => { s += String.fromCharCode(x); }); return btoa(s); };
+const unb64 = (s) => new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)));
+
+async function fakeGitHub({ empty = false } = {}) {
+  const blobs = new Map();
+  const trees = new Map();
+  const commits = new Map();
+  let head = null;
+  let n = 0;
+  const id = () => (n += 1).toString(16).padStart(40, '0');
+  const repo = { calls: [], offline: false, push: true, beforePatch: null, blobs };
+  const putBlob = async (text) => {
+    const body = enc.encode(text);
+    const sha = hex(await crypto.subtle.digest('SHA-1', enc.encode(`blob ${body.length}\0${text}`)));
+    blobs.set(sha, text);
+    return sha;
+  };
+  const filesAt = (sha) => (sha ? trees.get(commits.get(sha).tree) : {});
+  repo.files = () => filesAt(head);
+  repo.head = () => head;
+  // 别的手机直接推了一个提交（比如改了仓库里别的文件）
+  repo.commitOther = async (path, text) => {
+    const tree = { ...filesAt(head), [path]: await putBlob(text) };
+    const t = id();
+    trees.set(t, tree);
+    const c = id();
+    commits.set(c, { tree: t, parents: head ? [head] : [], message: 'other' });
+    head = c;
+  };
+  if (!empty) await repo.commitOther('README.md', '# BabySync\n');
+
+  async function handle(method, url, body, auth) {
+    const u = new URL(url);
+    const path = decodeURIComponent(u.pathname.replace('/repos/AsherDust/BabySync', ''));
+    repo.calls.push({ method, path, body });
+    if (repo.offline) throw new TypeError('Failed to fetch');
+    if (auth !== `Bearer ${TOKEN}`) return [401, { message: 'Bad credentials' }];
+    if (!u.pathname.startsWith('/repos/AsherDust/BabySync')) return [404, { message: 'Not Found' }];
+    if (method === 'GET' && path === '') return [200, { default_branch: 'main', private: true, permissions: { pull: true, push: repo.push } }];
+    if (method === 'GET' && path === '/git/ref/heads/main') return head ? [200, { object: { sha: head, type: 'commit' } }] : [409, { message: 'Git Repository is empty.' }];
+    if (method === 'GET' && path.startsWith('/git/commits/')) {
+      const sha = path.slice(13);
+      return commits.has(sha) ? [200, { sha, tree: { sha: commits.get(sha).tree } }] : [404, { message: 'Not Found' }];
+    }
+    if (method === 'GET' && path.startsWith('/git/blobs/')) {
+      const text = blobs.get(path.slice(11));
+      // GitHub 的 base64 每 60 个字符换一行
+      return text == null ? [404, { message: 'Not Found' }] : [200, { content: b64(text).replace(/(.{60})/g, '$1\n'), encoding: 'base64' }];
+    }
+    if (method === 'GET' && path.startsWith('/contents/')) {
+      const folder = path.slice(10).replace(/\/$/, '');
+      const ref = u.searchParams.get('ref');
+      const files = filesAt(ref === 'main' ? head : ref);
+      const prefix = folder ? `${folder}/` : '';
+      const items = Object.entries(files).filter(([p]) => p.startsWith(prefix) && !p.slice(prefix.length).includes('/'))
+        .map(([p, sha]) => ({ name: p.slice(prefix.length), path: p, sha, type: 'file' }));
+      return items.length ? [200, items] : [404, { message: 'Not Found' }];
+    }
+    if (method === 'POST' && path === '/git/trees') {
+      const tree = { ...(trees.get(body.base_tree) || {}) };
+      for (const e of body.tree) {
+        if (e.sha === null) delete tree[e.path];
+        else tree[e.path] = e.content != null ? await putBlob(e.content) : e.sha;
+      }
+      const sha = id();
+      trees.set(sha, tree);
+      return [201, { sha }];
+    }
+    if (method === 'POST' && path === '/git/commits') {
+      const sha = id();
+      commits.set(sha, { tree: body.tree, parents: body.parents, message: body.message });
+      return [201, { sha }];
+    }
+    if (method === 'PATCH' && path === '/git/refs/heads/main') {
+      if (repo.beforePatch) {
+        const f = repo.beforePatch;
+        repo.beforePatch = null;
+        await f();
+      }
+      const c = commits.get(body.sha);
+      if (!c || c.parents[0] !== head) return [422, { message: 'Update is not a fast forward' }];
+      head = body.sha;
+      return [200, { object: { sha: head } }];
+    }
+    if (method === 'PUT' && path.startsWith('/contents/')) {
+      if (head) return [422, { message: '"sha" wasn\'t supplied.' }];
+      const p = path.slice(10);
+      const blob = await putBlob(unb64(body.content));
+      const t = id();
+      trees.set(t, { [p]: blob });
+      const c = id();
+      commits.set(c, { tree: t, parents: [], message: body.message });
+      head = c;
+      return [201, { content: { path: p, sha: blob }, commit: { sha: c } }];
+    }
+    return [404, { message: 'Not Found' }];
+  }
+
+  repo.fetch = async (url, opts = {}) => {
+    const [status, json] = await handle(opts.method || 'GET', String(url), opts.body ? JSON.parse(opts.body) : null, opts.headers && opts.headers.Authorization);
+    return new Response(JSON.stringify(json), { status, headers: { 'Content-Type': 'application/json' } });
+  };
+  return repo;
+}
+
+// ---------- 页面 ----------
+
+let w;
+let d;
+let repo;
+const errors = [];
+function bind() {
+  w = iframe.contentWindow;
+  d = iframe.contentDocument;
+  w.addEventListener('error', (e) => errors.push(e.message));
+  w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
+  w.confirm = () => true;
+  w.fetch = (...args) => repo.fetch(...args);
+  Object.assign(w.Baby.app.cloud.settings, { iter: 1000, debounce: 200, maxWait: 1000 });
+}
+// 换手机：先把页面关掉再动本地存储，免得旧页面收到 storage 事件；snap 是那台手机存着的东西
+const open = async (scene, snap = null) => {
+  await new Promise((r) => { iframe.onload = r; iframe.src = 'about:blank'; });
+  localStorage.clear();
+  if (snap) Object.entries(snap).forEach(([k, v]) => { if (v != null) localStorage.setItem(k, v); });
+  const s = scene && scene !== 'none' ? seedScene(scene) : null;
+  if (s) localStorage.setItem(KEY, JSON.stringify(s));
+  return new Promise((r) => {
+    iframe.onload = () => {
+      try {
+        bind();
+      } catch (e) {
+        log(false, '打开页面出错', `${e.message}\n${e.stack}`);
+      }
+      r();
+    };
+    iframe.src = `../../index.html?today=${TODAY}&n=${Math.random()}`;
+  });
+};
+const $ = (s) => d.querySelector(s);
+const text = (s) => ($(s) ? $(s).textContent.replace(/\s+/g, ' ').trim() : '');
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// 加密、压缩是真的异步，等的时候虚拟时间也在走，步子小一点，免得用完测试的时间
+const until = async (cond) => {
+  for (let i = 0; i < 1000 && !cond(); i += 1) await wait(5);
+  return Boolean(cond());
+};
+const state = () => JSON.parse(localStorage.getItem(KEY));
+const cloud = () => JSON.parse(localStorage.getItem(CLOUD));
+const status = () => w.Baby.app.cloud.status.state;
+const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
+const settled = () => until(() => !['syncing', 'pending'].includes(status()));
+const remote = (name) => repo.blobs.get(repo.files()[`pregnancy-desk/${name}`]);
+const names = () => Object.keys(repo.files()).sort();
+const snapshot = () => ({ [KEY]: localStorage.getItem(KEY), [CLOUD]: localStorage.getItem(CLOUD) });
+const fill = (values) => {
+  const form = $('form[data-form="cloud-setup"]');
+  Object.entries(values).forEach(([k, v]) => { form.elements[k].value = v; });
+  form.requestSubmit();
+  return form;
+};
+const formError = () => text('form[data-form="cloud-setup"] .form-error');
+const setupOpen = () => d.getElementById('sheet-dialog').open && $('form[data-form="cloud-setup"]');
+const openSettings = async () => {
+  $('[data-action="open-settings"]').click();
+  await wait(0);
+};
+// 关面板后 app 会 history.back()，等它真的退回去再继续
+const closeSettings = async () => {
+  d.querySelector('#settings-dialog [data-action="close-dialog"]').click();
+  await wait(0);
+  if (w.history.state && w.history.state.sheet) await new Promise((r) => w.addEventListener('popstate', () => setTimeout(r, 0), { once: true }));
+};
+const sinceCalls = () => {
+  const start = repo.calls.length;
+  return () => repo.calls.slice(start);
+};
+
+(async () => {
+  try {
+    repo = await fakeGitHub();
+
+    // ---- 妈妈的手机：设置云同步，第一次上传 ----
+    await open('main');
+    log(!$('.cloud-badge'), '没设置云同步时页头没有小云朵');
+    await openSettings();
+    log(/云同步/.test(text('.settings-cloud')) && $('.settings-cloud [data-action="cloud-setup"]'), '设置里有「云同步」');
+    $('.settings-cloud [data-action="cloud-setup"]').click();
+    await until(setupOpen);
+    log(setupOpen() && $('form[data-form="cloud-setup"] [name="folder"]').value === 'pregnancy-desk', '打开云同步的设置面板，文件夹默认 pregnancy-desk');
+    fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: PASSWORD, confirm: 'honeypot2' });
+    log(/两次输的密码不一样/.test(formError()), '两次密码不一样时提示', formError());
+    fill({ repo: 'https://github.com/AsherDust/BabySync', token: 'github_pat_bad', password: PASSWORD, confirm: PASSWORD });
+    await until(() => /Token/.test(formError()));
+    log(/Token 不对/.test(formError()) && setupOpen(), 'Token 不对时在面板里提示', formError());
+    repo.push = false;
+    fill({ token: TOKEN });
+    await until(() => /只能读/.test(formError()));
+    log(/只能读/.test(formError()), 'Token 没有写入权限时提示', formError());
+    repo.push = true;
+    let calls = sinceCalls();
+    fill({ token: TOKEN });
+    await until(() => !setupOpen());
+    await settled();
+    log(status() === 'idle' && names().join() === 'README.md,pregnancy-desk/main.json', '连上以后传上去：仓库里多了 pregnancy-desk/main.json', `${status()} ${names()}`);
+    log(calls().some((c) => c.method === 'PATCH') && !calls().some((c) => c.method === 'PUT'), '仓库不是空的：用一次提交传上去');
+    const env = JSON.parse(remote('main.json'));
+    log(env.cipher === 'AES-GCM' && env.kdf.name === 'PBKDF2' && env.zip === 'gzip' && !/叶酸|dueDate|豆豆/.test(remote('main.json')), '云端是加密过的乱码，看不到记录', remote('main.json').slice(0, 80));
+    log(cloud().key && !JSON.stringify(cloud()).includes(PASSWORD), '这台手机记下钥匙，不存密码');
+    log(/记录已经传上去/.test(toastText()) && $('.cloud-badge.cloud-idle'), '提示传好了，页头出现小云朵', toastText());
+    await openSettings();
+    log(/AsherDust\/BabySync/.test(text('.settings-cloud')) && /已同步 · (今天|\d+月\d+日) \d\d:\d\d/.test(text('.settings-cloud .cloud-state')) && /云端也有一份/.test(text('#settings-dialog')),
+      '设置里写着仓库和上次同步的时间', text('.settings-cloud'));
+    await closeSettings();
+
+    // ---- 改了以后防抖上传 ----
+    calls = sinceCalls();
+    const before = repo.head();
+    w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.3);
+    w.Baby.app.persist();
+    log(status() === 'pending' && $('.cloud-badge.cloud-pending'), '改了以后先等一会儿，小云朵上有个点');
+    w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.4);
+    w.Baby.app.persist();
+    await settled();
+    await until(() => repo.head() !== before);
+    const trees = calls().filter((c) => c.path === '/git/trees');
+    log(repo.head() !== before && trees.length === 1 && trees[0].body.tree.map((e) => e.path).join() === 'pregnancy-desk/main.json', '连着改两次只传一次', JSON.stringify(trees.map((t) => t.body.tree.map((e) => e.path))));
+    calls = sinceCalls();
+    const r = await w.Baby.app.cloud.syncNow('manual');
+    log(r.ok && calls().length === 1 && calls()[0].path === '/git/ref/heads/main', '没有改动时同步只问一下分支到哪了', JSON.stringify(calls().map((c) => c.path)));
+    const mom = snapshot();
+
+    // ---- 爸爸的新手机：从云端恢复 ----
+    await open('none');
+    log($('.onboard-import [data-action="cloud-setup"]'), '开始页有「从云端恢复」');
+    $('.onboard-import [data-action="cloud-setup"]').click();
+    await until(setupOpen);
+    fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: 'wrongpass', confirm: 'wrongpass' });
+    await until(() => /密码/.test(formError()));
+    log(/密码不对/.test(formError()), '密码不对解不开云端的数据', formError());
+    fill({ password: PASSWORD, confirm: PASSWORD });
+    await until(() => $('.hero'));
+    await settled();
+    log($('.hero') && state() && state().weights.some((x) => x.date === TODAY && x.kg === 56.4) && /拿下来了/.test(toastText()), '新手机从云端恢复，直接进首页', toastText());
+
+    // ---- 爸爸记一条，推的时候妈妈刚好也推了 ----
+    calls = sinceCalls();
+    repo.beforePatch = () => repo.commitOther('README.md', '# BabySync\n\n妈妈的手机刚推过\n');
+    w.Baby.journal.add(w.Baby.app.state, { mood: 'happy', text: '爸爸今天哄睡成功', date: TODAY }, TODAY, Date.now());
+    w.Baby.app.persist();
+    await settled();
+    await until(() => remote('main.json') && status() === 'idle');
+    const patches = calls().filter((c) => c.method === 'PATCH');
+    log(status() === 'idle' && patches.length === 2 && names().includes('README.md'), '分支被抢先推了：重新拉、再推一次，别人的文件不动', `${status()} ${patches.length}`);
+    const dad = snapshot();
+
+    // ---- 妈妈的手机重新打开：自动拉到爸爸记的 ----
+    await open(null, mom);
+    await until(() => /合进来了/.test(toastText()));
+    await settled();
+    log(state().journal.some((e) => e.text === '爸爸今天哄睡成功') && /加了 1 条/.test(toastText()), '打开时自动拉云端的，爸爸记的合进来了', toastText());
+
+    // ---- 妈妈删掉那条，爸爸那边也没了 ----
+    const entry = w.Baby.app.state.journal.find((e) => e.text === '爸爸今天哄睡成功');
+    w.Baby.journal.remove(w.Baby.app.state, entry.id);
+    w.Baby.app.persist();
+    await settled();
+    await until(() => status() === 'idle');
+    await open(null, dad);
+    await until(() => /删了 1 条/.test(toastText()));
+    log(!state().journal.some((e) => e.text === '爸爸今天哄睡成功'), '妈妈删掉的，爸爸那边同步后也删了', toastText());
+
+    // ---- 断网 ----
+    repo.offline = true;
+    await openSettings();
+    d.querySelector('.settings-cloud [data-action="cloud-sync"]').click();
+    await until(() => status() === 'offline');
+    log(/没联网/.test(text('.settings-cloud .cloud-state')) && $('.cloud-badge.cloud-offline'), '没联网时写着联网后自动同步', text('.settings-cloud .cloud-state'));
+    repo.offline = false;
+    w.dispatchEvent(new w.Event('online'));
+    await until(() => status() === 'idle');
+    log(status() === 'idle' && /已同步/.test(text('.settings-cloud .cloud-state')), '联网以后自动同步');
+
+    // ---- 断开 ----
+    d.querySelector('.settings-cloud [data-action="cloud-off"]').click();
+    log(!cloud() && !$('.cloud-badge') && names().includes('pregnancy-desk/main.json') && /断开了/.test(toastText()), '断开：这台手机不再同步，云端的不动');
+
+    // ---- 空仓库、宝宝的记录按月分文件 ----
+    repo = await fakeGitHub({ empty: true });
+    await open('baby');
+    await openSettings();
+    $('.settings-cloud [data-action="cloud-setup"]').click();
+    await until(setupOpen);
+    calls = sinceCalls();
+    fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: PASSWORD, confirm: PASSWORD });
+    await until(() => !setupOpen());
+    await settled();
+    const months = names().filter((x) => /logs-/.test(x));
+    log(calls().some((c) => c.method === 'PUT') && names().includes('pregnancy-desk/main.json') && months.join() === `pregnancy-desk/logs-${TODAY.slice(0, 7)}.json`, '空仓库也能用，宝宝的日常记录按月单独放', names().join());
+    calls = sinceCalls();
+    w.Baby.baby.addLog(w.Baby.app.state.baby, w.Baby.baby.readLog('diaper', { date: TODAY, time: '10:00', pee: true }, w.Baby.baby.msAt(TODAY, '12:00')));
+    w.Baby.app.persist();
+    await settled();
+    await until(() => calls().some((c) => c.method === 'PATCH'));
+    const t = calls().find((c) => c.path === '/git/trees');
+    log(t && t.body.tree.map((e) => e.path).join() === `pregnancy-desk/logs-${TODAY.slice(0, 7)}.json`, '记了一次尿布，只传当月的文件', t && JSON.stringify(t.body.tree.map((e) => e.path)));
+
+    // ---- 清空全部数据时断开 ----
+    await openSettings();
+    d.querySelector('[data-action="clear-all"]').click();
+    log(!cloud() && !state() && names().includes('pregnancy-desk/main.json'), '清空全部数据：这台手机的云同步也断开，云端的不删');
+  } catch (e) {
+    log(false, '脚本异常', `${e.message}\n${e.stack}`);
+  }
+  log(errors.length === 0, '页面没有报错', errors.join(' | '));
+  document.getElementById('out').textContent = `DONE\n${out.join('\n')}`;
+})();
+</script>
+</body>

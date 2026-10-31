@@ -27,6 +27,14 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
 .settings-data h3 { margin: 0 0 4px; font-size: 14px; }
 .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .family-state { color: var(--ink-2); }
+.cloud-state { color: var(--ink-2); }
+.cloud-state-error { color: var(--red); }
+
+/* 云同步的设置面板 */
+.cloud-help { font-size: 13.5px; color: var(--ink-2); }
+.cloud-help summary { cursor: pointer; color: var(--honey-deep); font-weight: 600; }
+.cloud-help ol { margin: 8px 0 0; padding-left: 20px; line-height: 1.7; }
+.cloud-help a { color: var(--honey-deep); }
 
 /* 合并家人的记录：合之前看一眼 */
 .merge-list { margin: 0; padding: 0; list-style: none; }

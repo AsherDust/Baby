@@ -267,9 +267,10 @@
           <button class="btn">保存</button>
         </div>
         ${viewBabySettings()}
+        ${app.viewCloudSettings()}
         <section class="settings-data">
           <h3>数据</h3>
-          <p class="hint">记录只存在这台设备的这个浏览器里。换浏览器、清理浏览器数据之前，先导出一份备份。</p>
+          <p class="hint">${app.cloudOn() ? '记录存在这台设备的浏览器里，云端也有一份。想自己再留一份，可以导出备份文件。' : '记录只存在这台设备的这个浏览器里。换浏览器、清理浏览器数据之前，先导出一份备份。'}</p>
           <p class="hint backup-state">${app.state.prefs.lastBackup ? `上次备份：${D.formatDate(app.state.prefs.lastBackup)}。` : '还没备份过。'}</p>
           <p class="hint storage-state" hidden></p>
           <div class="btn-row">

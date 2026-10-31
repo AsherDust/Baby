@@ -18,10 +18,14 @@ iframe.style.cssText = 'width:390px;height:844px';
 document.body.appendChild(iframe);
 let w, d;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-const open = (scene, route) => {
+// extra：再往本地存储里放几项，例如云同步的设置。
+// 先把页面关掉再动本地存储：旧页面收到 storage 事件会关弹窗、退历史，可能把新页面的加载顶掉
+const open = async (scene, route, extra = {}) => {
+  await new Promise((r) => { iframe.onload = r; iframe.src = 'about:blank'; });
   localStorage.clear();
   const s = seedScene(scene);
   if (s) localStorage.setItem(KEY, JSON.stringify(s));
+  Object.entries(extra).forEach(([k, v]) => localStorage.setItem(k, JSON.stringify(v)));
   return new Promise((r) => {
     iframe.onload = r;
     iframe.src = `../../index.html?today=${TODAY}&n=${Math.random()}#/${route}`;
@@ -156,6 +160,23 @@ const SHEETS = [
     await wait(600);
     log(Boolean(d.querySelector('dialog[open] .merge-note')), '合并面板打开了');
     bad = bad.concat(audit(d.querySelector('dialog[open]'), 'baby 合并家人的记录'));
+    // 云同步：设置面板（展开怎么创建 Token），设置好了以后出错时的红字和页头的小云朵
+    await open('main', 'today');
+    d.querySelector('[data-action="open-settings"]').click();
+    d.querySelector('.settings-cloud [data-action="cloud-setup"]').click();
+    await wait(600);
+    d.querySelector('dialog[open] .cloud-help').open = true;
+    bad = bad.concat(audit(d.querySelector('dialog[open]'), 'main 云同步设置'));
+    const cloud = { repo: 'AsherDust/BabySync', branch: 'main', folder: 'pregnancy-desk', token: 'x', key: 'AAAA', salt: 'AAAA', iter: 1000, files: {}, head: null, last: Date.now() };
+    await open('main', 'today', { [`${KEY}:cloud`]: cloud });
+    w.fetch = async () => new w.Response('{"message":"Bad credentials"}', { status: 401 });
+    await wait(600);
+    log(Boolean(d.querySelector('.cloud-badge.cloud-error')), '云同步出错时页头的小云朵有红点');
+    bad = bad.concat(audit(d.querySelector('.topbar'), 'main 页头的云同步'));
+    d.querySelector('[data-action="open-settings"]').click();
+    await wait(300);
+    log(/同步出错/.test(d.querySelector('.cloud-state').textContent), '设置里写着同步出错');
+    bad = bad.concat(audit(d.querySelector('.settings-cloud'), 'main 云同步出错'));
     await open('main', 'records/bp');
     d.getElementById('bp-sys').value = '30';
     d.getElementById('bp-sys').form.requestSubmit();

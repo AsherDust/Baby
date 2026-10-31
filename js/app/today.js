@@ -25,7 +25,7 @@
         </section>`;
     }
     const due = M.backupReminder(app.state, today);
-    if (!due) return '';
+    if (!due || app.cloudSynced()) return '';
     return `
       <section class="safety" aria-label="数据安全">
         <h2 class="safety-title">${A.icon.download}${due.last ? `上次备份是 ${due.days} 天前` : '还没备份过'}，存一份吧</h2>

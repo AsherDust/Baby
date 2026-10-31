@@ -90,6 +90,7 @@
         </a>
         <div class="topbar-side">
           <p class="topbar-date"><span class="topbar-greet">${greeting(new Date().getHours())}</span>${D.formatDate(today)} 星期${D.weekday(today)}</p>
+          ${app.viewCloudBadge()}
           <button type="button" class="icon-btn" data-action="open-settings" aria-label="设置" title="设置">${A.icon.sliders}</button>
         </div>
       </header>`;
@@ -230,8 +231,9 @@
           <p class="onboard-import">
             <span>${isIOS() && isStandalone() ? '之前在浏览器里记过？先在浏览器里打开蜜罐，到「设置 → 导出备份」，再回这里导入。' : '换了手机，或者有之前导出的备份？'}</span>
             <button type="button" class="btn btn-ghost btn-sm" data-action="import-backup">导入备份</button>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="cloud-setup">${A.icon.cloud}从云端恢复</button>
           </p>
-          <p class="fineprint">所有记录只保存在这台设备的浏览器里，不会上传到任何地方。</p>
+          <p class="fineprint">记录保存在这台设备的浏览器里；只有自己设置了云同步，才会加密存到你自己的 GitHub 仓库。</p>
         </div>
       </main>`;
   }

@@ -17,6 +17,7 @@
 //   profile 改几项资料（JSON），例如 {"preWeight":48} 看体重长得偏快的样子
 //   then   打开弹窗以后再滚到哪里，例如 .settings-family
 //   merge  假装收到家人发来的文件，打开「合并家人的记录」：1 只打开，apply 再点「合并」
+//   cloud  云同步：setup 打开设置面板（help=1 展开怎么创建 Token）；ok / error / offline 是设置好了以后同步成功、出错、没联网
 const p = new URLSearchParams(location.search);
 const scenario = p.get('s') || 'empty';
 const today = p.get('today') || '2026-10-12';
@@ -24,6 +25,12 @@ localStorage.clear();
 const seeded = seedScene(scenario);
 if (seeded && p.get('profile')) Object.assign(seeded.profile, JSON.parse(p.get('profile')));
 if (seeded) localStorage.setItem('pregnancy-desk:v1', JSON.stringify(seeded));
+const cloudMode = p.get('cloud');
+if (['ok', 'error', 'offline'].includes(cloudMode)) {
+  localStorage.setItem('pregnancy-desk:v1:cloud', JSON.stringify({
+    repo: 'AsherDust/BabySync', branch: 'main', folder: 'pregnancy-desk', token: 'x', key: btoa('k'.repeat(32)), salt: 'AAAA', iter: 1000, files: {}, head: 'h1', last: Date.now() - 3600e3,
+  }));
+}
 const w = p.get('w');
 document.write(`<iframe src="../../index.html?today=${today}#/${p.get('r') || ''}" style="width:${w ? `${w}px` : '100%'}"></iframe>`);
 document.querySelector('iframe').addEventListener('load', (e) => {
@@ -37,6 +44,17 @@ document.querySelector('iframe').addEventListener('load', (e) => {
   }
   // mute=1：假装声音放得出来（无头浏览器不让自动放声音），截哄睡声音正在放的样子
   if (p.get('mute')) fw.HTMLMediaElement.prototype.play = () => Promise.resolve();
+  // 假的 GitHub：ok 什么都答应，error 说 Token 不对，offline 连不上
+  if (cloudMode === 'ok') {
+    fw.fetch = async (url, opts = {}) => {
+      const path = new URL(url).pathname;
+      const body = /\/git\/ref\/heads\//.test(path) && !opts.method ? { object: { sha: 'h1' } }
+        : /\/git\/commits\//.test(path) ? { tree: { sha: 't1' } } : { sha: 'c2', object: { sha: 'c2' } };
+      return new fw.Response(JSON.stringify(body), { status: 200 });
+    };
+  }
+  if (cloudMode === 'error') fw.fetch = async () => new fw.Response('{"message":"Bad credentials"}', { status: 401 });
+  if (cloudMode === 'offline') fw.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
   if (p.get('hour')) {
     const [y, m, day] = today.split('-').map(Number);
     const at = new Date(y, m - 1, day, Number(p.get('hour'))).getTime();
@@ -48,6 +66,11 @@ document.querySelector('iframe').addEventListener('load', (e) => {
   if (p.get('scroll')) d.querySelector(p.get('scroll')).scrollIntoView();
   if (p.get('click')) d.querySelector(p.get('click')).click();
   if (p.get('open')) d.querySelector(`[data-action="open-${p.get('open')}"]`).click();
+  if (cloudMode === 'setup') {
+    fw.Baby.app.actions['cloud-setup']();
+    if (p.get('help')) d.querySelector('.cloud-help').open = true;
+    d.activeElement.blur();
+  }
   if (p.get('then')) d.querySelector(p.get('then')).scrollIntoView({ block: 'center' });
   if (p.get('merge')) {
     // 爸爸那台：昨晚多记了两顿奶、两次尿布，删了一条重复的，改了一条备注，还量了体重、记了第一次笑

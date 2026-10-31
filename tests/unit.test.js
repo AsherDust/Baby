@@ -2326,6 +2326,87 @@ test('合并：旧备份没有删过的标记照样能合；标记半年后清�
   eq([Object.keys(store).length, 'k:0' in store, 'k:504' in store], [500, false, true]);
 });
 
+// ---------- 云同步：分文件 ----------
+
+const Sy = globalThis.Baby.sync;
+
+test('云同步：宝宝的日常记录按月分文件，其它在 main.json，拼回来和原来一样', () => {
+  const s = viaFile(fullState());
+  Bb.addLog(s.baby, Bb.readLog('diaper', { date: '2026-09-30', time: '23:30', pee: true }, tAt('2026-10-12', '12:00')));
+  const parts = Sy.split(s);
+  const monthOfLog = (l) => new Date(l.start).toISOString().slice(0, 7);
+  const months = [...new Set(s.baby.logs.map(monthOfLog))].sort();
+  eq(Object.keys(parts), ['main.json', ...months.map((m) => `logs-${m}.json`)]);
+  eq(JSON.parse(parts['main.json']).baby.logs, [], 'main.json 里不放日常记录');
+  ok(!/"pee"/.test(parts['main.json']), '日常记录都在按月的文件里');
+  eq(Sy.join(parts), s);
+  const preg = viaFile(M.createState({ dueDate: DUE }));
+  eq(Object.keys(Sy.split(preg)), ['main.json'], '还没出生只有一个文件');
+  eq(Sy.join(Sy.split(preg)), preg);
+  eq(Sy.join({ 'logs-2026-10.json': '[]' }), null, '没有 main.json 拼不出来');
+  const legacy = JSON.parse(parts['main.json']);
+  legacy.baby.logs = [s.baby.logs[0]];
+  eq(Sy.join({ ...parts, 'main.json': JSON.stringify(legacy) }).baby.logs.length, s.baby.logs.length, 'main.json 里也有记录时合在一起、不重复');
+});
+
+test('云同步：只传变了的文件，某个月的记录全删了就删掉那个文件', () => {
+  const s = viaFile(fullState());
+  const files = {};
+  const sync = () => {
+    const parts = Sy.split(s);
+    const c = Sy.changes(parts, files);
+    c.upload.forEach((n) => { files[n] = { sha: 'x', hash: Sy.hash(parts[n]) }; });
+    c.remove.forEach((n) => { delete files[n]; });
+    return c;
+  };
+  const month = `logs-${new Date(s.baby.logs[0].start).toISOString().slice(0, 7)}.json`;
+  eq(sync(), { upload: ['main.json', month], remove: [] }, '第一次全传');
+  eq(sync(), { upload: [], remove: [] }, '没变就不传');
+  s.baby.logs[0].note = '改一下';
+  eq(sync(), { upload: [month], remove: [] }, '改了一条日常记录只传那个月');
+  M.upsertWeight(s, '2026-10-11', 56);
+  eq(sync(), { upload: ['main.json'], remove: [] }, '记了体重只传 main.json');
+  Bb.removeLog(s.baby, s.baby.logs[0].id);
+  eq(sync(), { upload: ['main.json'], remove: [month] }, '那个月没有记录了：删掉文件，删过的标记在 main.json');
+  files['README.md'] = { sha: 'y', hash: 'z' };
+  eq(Sy.changes(Sy.split(s), files).remove, [], '别的文件不碰');
+  ok(Sy.hash('a') !== Sy.hash('b') && Sy.hash('蜜罐') === Sy.hash('蜜罐'), '指纹');
+});
+
+test('合并：撤销删除再保存，删过的标记就去掉了', () => {
+  const s = viaFile(fullState());
+  Mg.track(s);
+  const w = M.removeWeight(s, '2026-10-10');
+  const log = Bb.removeLog(s.baby, s.baby.logs[0].id);
+  Mg.track(s);
+  ok(s.removed['weight:2026-10-10'] && s.baby.removed[`log:${log.entry.id}`], '删了有标记');
+  s.weights.push(w);
+  Bb.restoreLog(s.baby, log);
+  Mg.track(s);
+  eq([s.removed, s.baby.removed], [{}, {}], '撤销后保存，标记去掉');
+});
+
+test('云同步：没变的月份不下载也合得对', () => {
+  const t0 = Date.now() - 60e3;
+  const base = viaFile(fullState());
+  const t = tAt('2026-09-01', '08:00');
+  for (let i = 0; i < 5; i += 1) Bb.addLog(base.baby, Bb.readLog('diaper', { date: '2026-09-01', time: `0${i + 1}:00`, pee: true }, t + 86400e3));
+  const mine = viaFile(base);
+  const dad = viaFile(base);
+  Mg.track(mine, t0);
+  Mg.track(dad, t0);
+  const before = Sy.split(dad);
+  Bb.addLog(dad.baby, Bb.readLog('bottle', { date: '2026-10-12', time: '09:30', ml: '90', milk: 'formula' }, tAt('2026-10-12', '12:00')));
+  Mg.track(dad, t0 + 1000);
+  const after = Sy.split(dad);
+  const changed = Object.keys(after).filter((n) => after[n] !== before[n]);
+  eq(changed, ['logs-2026-10.json'], '爸爸记了一瓶奶只动了十月的文件');
+  const texts = { 'main.json': Sy.split(mine)['main.json'] };
+  changed.forEach((n) => { texts[n] = after[n]; });
+  const r = Mg.merge(mine, Sy.join(texts));
+  eq([r.added, r.dropped, r.state.baby.logs.length], [1, 0, mine.baby.logs.length + 1], '九月的没下载，也没被当成删掉');
+});
+
 print(`\n${passed} 通过，${failures.length} 失败`);
 if (failures.length) {
   print(failures.join('\n'));

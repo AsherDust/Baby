@@ -45,6 +45,15 @@
 .topbar-side { display: flex; align-items: center; gap: 12px; }
 .topbar-date { margin: 0; font-size: 14px; color: var(--ink-2); }
 .topbar-greet { margin-right: 10px; color: var(--honey-deep); font-weight: 600; }
+/* 云同步的小云朵：同步好了是绿的；有改动等着传是蜂蜜色的点，出错是红点，没联网是灰的 */
+.cloud-badge { position: relative; margin-right: -8px; border-color: transparent; background: transparent; color: var(--leaf-deep); }
+.cloud-badge::after { content: ''; display: none; position: absolute; right: 7px; bottom: 9px; width: 9px; height: 9px; border: 2px solid var(--paper); border-radius: 50%; }
+.cloud-pending::after { display: block; background: var(--honey); }
+.cloud-error::after { display: block; background: var(--red); }
+.cloud-offline { color: var(--ink-3); }
+.cloud-syncing svg { animation: cloud-pulse 1.2s ease-in-out infinite; }
+@keyframes cloud-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .cloud-syncing svg { animation: none; } }
 
 /* ---------- 面板 ---------- */
 
@@ -101,6 +110,7 @@
 .onboard-form { display: grid; gap: 14px; text-align: left; }
 .onboard-form .btn-lg { width: 100%; margin-top: 6px; }
 .onboard-import { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; margin: 18px 0 0; font-size: 13px; color: var(--ink-2); }
+.onboard-import span { flex-basis: 100%; text-align: center; }
 
 @media (max-width: 720px) {
   .topbar-date { font-size: 13px; text-align: right; }
