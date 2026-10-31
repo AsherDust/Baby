@@ -168,6 +168,40 @@ save(seed);
     bind();
     log($('.hero') && !/新版本/.test(toastText()), '点「刷新页面」重新加载');
 
+    // ---- 手机存储满了：提示没保存成功，也告诉调用的地方 ----
+    const realSet = w.Storage.prototype.setItem;
+    w.Storage.prototype.setItem = function (k, v) {
+      if (k === KEY) throw new w.DOMException('full', 'QuotaExceededError');
+      return realSet.call(this, k, v);
+    };
+    const saved = w.Baby.app.persist();
+    w.Storage.prototype.setItem = realSet;
+    log(saved === false && /没保存成功/.test(toastText()), '手机存储满了：提示没保存成功', toastText());
+
+    // ---- 别的标签页改了记录：之前的撤销不能再点 ----
+    let undone = false;
+    w.Baby.app.toast('删掉了一条', () => { undone = true; });
+    save({ ...state(), prefs: { ...state().prefs, glucoseAfter: 1 } });
+    for (let i = 0; i < 100 && w.Baby.app.ui.undo; i += 1) await wait(10);
+    if ($('#toast [data-action="undo"]')) $('#toast [data-action="undo"]').click();
+    log(!undone && w.Baby.app.ui.undo === null, '别的标签页改了记录：之前的撤销不能再点');
+
+    // ---- 清空全部数据以后点撤销，不会把存储写坏 ----
+    w.Baby.app.toast('删掉了一条', () => { w.Baby.app.state.weights = []; });
+    $('[data-action="open-settings"]').click();
+    settings().querySelector('[data-action="clear-all"]').click();
+    if ($('#toast [data-action="undo"]')) $('#toast [data-action="undo"]').click();
+    log(localStorage.getItem(KEY) === null && $('form[data-form="onboard"]'), '清空全部数据以后点撤销：存储不会被写成 null');
+    await wait(60);
+
+    // ---- 读不出来的记录：只另存一份 ----
+    localStorage.setItem(KEY, '{坏的');
+    await open(APP);
+    await open(APP);
+    const copies = Object.keys(localStorage).filter((k) => k.startsWith(`${KEY}:unreadable`));
+    log(copies.join() === `${KEY}:unreadable` && localStorage.getItem(`${KEY}:unreadable`) === '{坏的' && $('form[data-form="onboard"]'),
+      '读不出来的记录另存一份，打开几次也只有一份', copies.join());
+
     // ---- 开始页导入备份 ----
     localStorage.clear();
     await open(APP);

@@ -33,7 +33,8 @@ async function fakeGitHub({ empty = false } = {}) {
   let head = null;
   let n = 0;
   const id = () => (n += 1).toString(16).padStart(40, '0');
-  const repo = { calls: [], offline: false, push: true, beforePatch: null, blobs };
+  // authOk：Token 还有效；hang：请求一直不回；public：仓库是公开的；protect：分支受保护
+  const repo = { calls: [], offline: false, push: true, beforePatch: null, blobs, authOk: true, hang: false, public: false, protect: false };
   const putBlob = async (text) => {
     const body = enc.encode(text);
     const sha = hex(await crypto.subtle.digest('SHA-1', enc.encode(`blob ${body.length}\0${text}`)));
@@ -59,9 +60,9 @@ async function fakeGitHub({ empty = false } = {}) {
     const path = decodeURIComponent(u.pathname.replace('/repos/AsherDust/BabySync', ''));
     repo.calls.push({ method, path, body });
     if (repo.offline) throw new TypeError('Failed to fetch');
-    if (auth !== `Bearer ${TOKEN}`) return [401, { message: 'Bad credentials' }];
+    if (auth !== `Bearer ${TOKEN}` || !repo.authOk) return [401, { message: 'Bad credentials' }];
     if (!u.pathname.startsWith('/repos/AsherDust/BabySync')) return [404, { message: 'Not Found' }];
-    if (method === 'GET' && path === '') return [200, { default_branch: 'main', private: true, permissions: { pull: true, push: repo.push } }];
+    if (method === 'GET' && path === '') return [200, { default_branch: 'main', private: !repo.public, permissions: { pull: true, push: repo.push } }];
     if (method === 'GET' && path === '/git/ref/heads/main') return head ? [200, { object: { sha: head, type: 'commit' } }] : [409, { message: 'Git Repository is empty.' }];
     if (method === 'GET' && path.startsWith('/git/commits/')) {
       const sha = path.slice(13);
@@ -102,6 +103,7 @@ async function fakeGitHub({ empty = false } = {}) {
         repo.beforePatch = null;
         await f();
       }
+      if (repo.protect) return [422, { message: 'Cannot update this protected ref.' }];
       const c = commits.get(body.sha);
       if (!c || c.parents[0] !== head) return [422, { message: 'Update is not a fast forward' }];
       head = body.sha;
@@ -122,6 +124,10 @@ async function fakeGitHub({ empty = false } = {}) {
   }
 
   repo.fetch = async (url, opts = {}) => {
+    // 一直不回：只有超时或取消才结束
+    if (repo.hang) {
+      return new Promise((_, reject) => opts.signal && opts.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+    }
     const [status, json] = await handle(opts.method || 'GET', String(url), opts.body ? JSON.parse(opts.body) : null, opts.headers && opts.headers.Authorization);
     return new Response(JSON.stringify(json), { status, headers: { 'Content-Type': 'application/json' } });
   };
@@ -141,7 +147,7 @@ function bind() {
   w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
   w.confirm = () => true;
   w.fetch = (...args) => repo.fetch(...args);
-  Object.assign(w.Baby.app.cloud.settings, { iter: 1000, debounce: 200, maxWait: 1000 });
+  Object.assign(w.Baby.app.cloud.settings, { iter: 1000, debounce: 200, maxWait: 1000, timeout: 300 });
 }
 // 换手机：先把页面关掉再动本地存储，免得旧页面收到 storage 事件；snap 是那台手机存着的东西
 const open = async (scene, snap = null) => {
@@ -341,6 +347,69 @@ const sinceCalls = () => {
     await until(() => status() === 'idle');
     log(status() === 'idle' && /已同步/.test(text('.settings-cloud .cloud-state')), '联网以后自动同步');
 
+    // ---- Token 失效：自动同步先停下，手动同步才再试 ----
+    const syncBtn = () => d.querySelector('.settings-cloud [data-action="cloud-sync"]');
+    repo.authOk = false;
+    w.Baby.app.cloud.syncNow('poll');
+    await until(() => status() === 'error');
+    log(/Token 不对/.test(text('.settings-cloud .cloud-state')), 'Token 失效时写明原因', text('.settings-cloud .cloud-state'));
+    calls = sinceCalls();
+    w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.6);
+    w.Baby.app.persist();
+    await wait(500);
+    log(!calls().length && status() === 'error', 'Token 失效以后先不自动同步，出错的原因还在', JSON.stringify(calls().map((c) => c.path)));
+    repo.authOk = true;
+    syncBtn().click();
+    await until(() => status() === 'idle');
+    log(status() === 'idle' && calls().some((c) => c.method === 'PATCH'), 'Token 好了以后手动同步，又能同步了');
+
+    // ---- 请求一直不回：过一会儿算超时 ----
+    repo.hang = true;
+    syncBtn().click();
+    await until(() => status() === 'error');
+    log(/太久没回应/.test(text('.settings-cloud .cloud-state')), '请求一直不回，过一会儿算超时', text('.settings-cloud .cloud-state'));
+    repo.hang = false;
+    syncBtn().click();
+    await until(() => status() === 'idle');
+
+    // ---- 分支受保护：照实报出来，不当成被别的手机抢先推了 ----
+    repo.protect = true;
+    calls = sinceCalls();
+    w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.7);
+    w.Baby.app.persist();
+    await until(() => status() === 'error');
+    log(/protected/.test(text('.settings-cloud .cloud-state')) && calls().filter((c) => c.method === 'PATCH').length === 1, '分支受保护：照实报错，不重试四次',
+      `${text('.settings-cloud .cloud-state')} ${calls().filter((c) => c.method === 'PATCH').length}`);
+    repo.protect = false;
+    syncBtn().click();
+    await until(() => status() === 'idle');
+
+    // ---- 别的标签页正在同步：这个标签页等一会儿再来 ----
+    const TURN = `${CLOUD}:turn`;
+    localStorage.setItem(TURN, JSON.stringify({ tab: 'other-tab', until: Date.now() + 60000 }));
+    calls = sinceCalls();
+    syncBtn().click();
+    await wait(50);
+    log(!calls().length && /另一个标签页正在同步/.test(toastText()), '别的标签页正在同步：先不同步，说一声', toastText());
+    localStorage.removeItem(TURN);
+    syncBtn().click();
+    await until(() => status() === 'idle' && !localStorage.getItem(TURN));
+    log(status() === 'idle' && !localStorage.getItem(TURN), '轮到了就同步，同步完把位子让出来');
+
+    // ---- 别的标签页断开了、又连上了 ----
+    const savedCloud = localStorage.getItem(CLOUD);
+    localStorage.removeItem(CLOUD);
+    await until(() => !w.Baby.app.cloudOn());
+    log(!w.Baby.app.cloudOn() && !$('.cloud-badge'), '别的标签页断开了，这个标签页也停下');
+    calls = sinceCalls();
+    w.Baby.model.upsertWeight(w.Baby.app.state, TODAY, 56.8);
+    w.Baby.app.persist();
+    await wait(500);
+    log(!calls().length && !localStorage.getItem(CLOUD), '这个标签页不同步，也不会把设置写回去');
+    localStorage.setItem(CLOUD, savedCloud);
+    await until(() => w.Baby.app.cloudOn());
+    log(w.Baby.app.cloudOn(), '别的标签页又连上了，这个标签页跟着用');
+
     // ---- 断开 ----
     d.querySelector('.settings-cloud [data-action="cloud-off"]').click();
     log(!cloud() && !$('.cloud-badge') && names().includes('honey-pot/main.json') && /断开了/.test(toastText()), '断开：这台手机不再同步，云端的不动');
@@ -351,6 +420,11 @@ const sinceCalls = () => {
     await openSettings();
     $('.settings-cloud [data-action="cloud-setup"]').click();
     await until(setupOpen);
+    repo.public = true;
+    fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: PASSWORD, confirm: PASSWORD });
+    await until(() => /公开/.test(formError()));
+    log(/公开的/.test(formError()) && setupOpen(), '仓库是公开的：不让连', formError());
+    repo.public = false;
     calls = sinceCalls();
     fill({ repo: 'AsherDust/BabySync', token: TOKEN, password: PASSWORD, confirm: PASSWORD });
     await until(() => !setupOpen());

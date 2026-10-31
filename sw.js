@@ -76,11 +76,11 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// 医院里常有「有信号但几乎不通」的时候，等网络超过这么久就先用缓存打开；
-// 慢过一次后，接下来一阵子的请求（页面里的脚本、样式）直接用缓存，不再每个都等
+// 医院里常有「有信号但几乎不通」的时候：打开页面等网络超过这么久，就整页都用缓存。
+// 按整页定，不按一个个文件定：一部分文件新、一部分旧混在一起，可能根本跑不起来
 const SLOW_MS = 3000;
-const SLOW_SPELL_MS = 30000;
-let slowUntil = 0;
+// 从缓存打开的页面：它要的脚本、样式也都从缓存拿，是完整的一套旧版本
+const fromCache = new Set();
 
 /**
  * 每次都找服务器确认有没有新版（没变时只回一个很小的 304），推送后马上能用上新版，
@@ -123,22 +123,31 @@ self.addEventListener('fetch', (e) => {
   });
   // 先用了缓存时，网络晚到的新版照样存起来，下次打开就是新的
   e.waitUntil(network.catch(() => {}).finally(settled));
-  const fromCache = async () => {
+  const fromCacheCopy = async () => {
     const hit = await cached(req);
     if (hit) stale = hit.clone();
     return hit;
   };
   e.respondWith((async () => {
-    if (Date.now() < slowUntil) {
-      const hit = await fromCache();
+    if (req.mode === 'navigate') {
+      const slow = new Promise((resolve) => setTimeout(resolve, SLOW_MS, 'slow'));
+      try {
+        const first = await Promise.race([network, slow]);
+        if (first !== 'slow') return first;
+      } catch (err) {
+        // 没网：下面用缓存
+      }
+      const hit = await fromCacheCopy();
+      if (!hit) return network;
+      if (e.resultingClientId) fromCache.add(e.resultingClientId);
+      return hit;
+    }
+    if (fromCache.has(e.clientId)) {
+      const hit = await fromCacheCopy();
       if (hit) return hit;
     }
-    const slow = new Promise((resolve) => setTimeout(resolve, SLOW_MS, 'slow'));
     try {
-      const first = await Promise.race([network, slow]);
-      if (first !== 'slow') return first;
-      slowUntil = Date.now() + SLOW_SPELL_MS;
-      return (await fromCache()) || network;
+      return await network;
     } catch (err) {
       const hit = await cached(req);
       if (hit) return hit;

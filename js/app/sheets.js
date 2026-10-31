@@ -9,6 +9,8 @@
 
   // 弹窗打开时往历史里压一条，手机上按返回键（或侧滑返回）就是关弹窗，而不是退出页面
   let backPending = false;
+  // 关完弹窗要去的页面：等退回去以后再跳，不然会被关弹窗时的 history.back() 顶掉
+  let afterBack = '';
 
   function showDialog(dialog) {
     if (!dialog.open) dialog.showModal();
@@ -27,10 +29,14 @@
     history.back();
   }
 
-  function closeDialog(dialog) {
+  /** 关弹窗；go 是关完要去的页面（例如 '#/'） */
+  function closeDialog(dialog, go = '') {
     if (!dialog) return;
     if (dialog.open) dialog.close();
     onDialogClose();
+    if (!go) return;
+    if (backPending) afterBack = go;
+    else if (location.hash !== go) location.hash = go;
   }
 
   window.addEventListener('popstate', () => {
@@ -38,6 +44,9 @@
       // 自己关弹窗触发的返回；这期间又打开了别的弹窗的话，把历史补回去
       backPending = false;
       if (DIALOGS.some((d) => d.open)) showDialog(DIALOGS.find((d) => d.open));
+      const go = afterBack;
+      afterBack = '';
+      if (go && location.hash !== go) location.hash = go;
       return;
     }
     DIALOGS.forEach((d) => { if (d.open) d.close(); });

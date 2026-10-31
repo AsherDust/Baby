@@ -1058,8 +1058,10 @@
   const BACKUP_SNOOZE = 7; // 点了「过几天再说」，一周内不再提
 
   function hasRecords(state) {
-    return ['weights', 'bp', 'glucose', 'ultrasounds', 'meds', 'kicks', 'contractions'].some((k) => state[k].length > 0)
-      || state.checkups.some((c) => c.done || c.date);
+    const b = state.baby;
+    return ['weights', 'bp', 'glucose', 'ultrasounds', 'meds', 'kicks', 'contractions', 'journal'].some((k) => state[k].length > 0)
+      || state.checkups.some((c) => c.done || c.date)
+      || Boolean(b && (b.logs.length || b.growth.length > 1 || b.moments.length || Object.keys(b.vaccines).length || Object.keys(b.milestones).length));
   }
 
   /** 该提醒备份时返回 { last: 上次备份的日期或 null, days: 过去几天 }，不用提醒时返回 null */

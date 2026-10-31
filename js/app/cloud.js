@@ -16,7 +16,7 @@
     name: '蜜罐云同步', description: '蜜罐 App 的云同步：读写存数据的那个仓库', expires_in: '366', contents: 'write',
   })}`;
   // 钥匙算得慢一点，猜密码就慢（每台手机设置时算一次，大约一秒）；测试里会改小
-  const settings = { iter: 1000000, debounce: 4000, maxWait: 30000, poll: 3 * 60 * 1000, showAfter: 30 * 1000 };
+  const settings = { iter: 1000000, debounce: 4000, maxWait: 30000, poll: 3 * 60 * 1000, showAfter: 30 * 1000, timeout: 20000 };
 
   class CloudError extends Error {
     constructor(message, code) {
@@ -76,9 +76,7 @@
 
   const device = loadDevice();
 
-  // 同步途中断开或者改了设置，旧的那份不能再写回去
-  function keep(c) {
-    if (config !== c) return;
+  function save(c) {
     try {
       localStorage.setItem(KEY, JSON.stringify(c));
     } catch (e) {
@@ -86,41 +84,96 @@
     }
   }
 
+  const stored = () => {
+    try {
+      return JSON.parse(localStorage.getItem(KEY));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // 同步途中断开、改了设置，或者别的标签页断开、换了设置：旧的那份不能再写回去
+  function keep(c) {
+    if (config !== c) return;
+    const now = stored();
+    if (!now || now.gen !== c.gen) return reloadConfig();
+    save(c);
+  }
+
+  /** 别的标签页改了云同步的设置：断开了跟着断开，换了设置用新的，同步到哪了也跟上 */
+  function reloadConfig() {
+    const fresh = loadConfig();
+    if (!fresh) {
+      if (!config) return;
+      stopSync();
+      render();
+      return;
+    }
+    if (!config || fresh.gen !== config.gen) {
+      stopSync();
+      config = fresh;
+      status.state = 'idle';
+      render();
+    } else {
+      Object.assign(config, { head: fresh.head, files: fresh.files, last: fresh.last });
+      paint();
+    }
+  }
+
   // ---------- GitHub ----------
 
   function explain(status, detail) {
     if (status === 401) return 'Token 不对或者过期了，到「设置 → 云同步」换一个';
-    if (status === 403) return /rate limit/i.test(detail) ? 'GitHub 那边请求太多了，过一会儿再试' : 'Token 没有这个仓库的写入权限';
+    if (status === 429) return 'GitHub 那边请求太多了，过一会儿再试';
+    if (status === 403) return 'Token 没有这个仓库的写入权限';
     if (status === 404) return '找不到这个仓库，检查一下仓库名，以及 Token 能不能访问它';
     if (status >= 500) return 'GitHub 暂时出了问题，过一会儿再试';
     return `GitHub 返回了错误（${status}${detail ? `：${detail}` : ''}）`;
   }
 
+  // 正在进行的这次同步：断开时取消
+  let current = null;
+
+  /** 每个请求最多等 settings.timeout；断开时跟着取消 */
   async function gh(c, method, path, body) {
-    let res;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), settings.timeout);
+    const outer = current;
+    const cancel = () => ctl.abort();
+    if (outer) outer.signal.addEventListener('abort', cancel);
     try {
-      res = await fetch(`${API}/repos/${c.repo}${path}`, {
-        method,
-        cache: 'no-store',
-        headers: {
-          Accept: 'application/vnd.github+json',
-          Authorization: `Bearer ${c.token}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-          ...(body ? { 'Content-Type': 'application/json' } : {}),
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-    } catch (e) {
-      throw new CloudError('连不上 GitHub，可能没联网', 'offline');
+      let res;
+      try {
+        res = await fetch(`${API}/repos/${c.repo}${path}`, {
+          method,
+          cache: 'no-store',
+          signal: ctl.signal,
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${c.token}`,
+            'X-GitHub-Api-Version': '2022-11-28',
+            ...(body ? { 'Content-Type': 'application/json' } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        });
+      } catch (e) {
+        if (outer && outer.signal.aborted) throw new CloudError('同步取消了', 'cancelled');
+        if (ctl.signal.aborted) throw new CloudError('GitHub 太久没回应，过一会儿再试', 'timeout');
+        throw new CloudError('连不上 GitHub，可能没联网', 'offline');
+      }
+      if (res.ok) return res.status === 204 ? null : await res.json();
+      let detail = '';
+      try {
+        detail = (await res.json()).message || '';
+      } catch (e) {
+        // 没有说明就只报状态码
+      }
+      const rate = res.status === 429 || (res.status === 403 && /rate limit/i.test(detail));
+      throw new CloudError(explain(rate ? 429 : res.status, detail), rate ? 'rate' : res.status);
+    } finally {
+      clearTimeout(timer);
+      if (outer) outer.signal.removeEventListener('abort', cancel);
     }
-    if (res.ok) return res.status === 204 ? null : res.json();
-    let detail = '';
-    try {
-      detail = (await res.json()).message || '';
-    } catch (e) {
-      // 没有说明就只报状态码
-    }
-    throw new CloudError(explain(res.status, detail), res.status);
   }
 
   const encPath = (p) => p.split('/').map(encodeURIComponent).join('/');
@@ -164,7 +217,8 @@
     try {
       await gh(c, 'PATCH', `/git/refs/heads/${encPath(c.branch)}`, { sha: made.sha, force: false });
     } catch (e) {
-      if (e.code === 422) return null;
+      // 只有「不是快进」才是被别的手机抢先推了；别的 422（比如分支受保护）照实报出来
+      if (e.code === 422 && /fast.forward/i.test(e.message)) return null;
       throw e;
     }
     return made.sha;
@@ -262,21 +316,30 @@
   // 合并云端的记录时会保存，别因为这次保存又排一次同步
   let applying = false;
 
-  function apply(remote) {
+  // 正在打字（包括中文输入法拼到一半）时先不重画，离开输入框再画
+  function renderSoon() {
+    const el = document.activeElement;
+    const typing = el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !['button', 'checkbox', 'radio', 'range', 'submit'].includes(el.type)));
+    if (!typing) return render();
+    el.addEventListener('blur', () => setTimeout(render, 0), { once: true });
+  }
+
+  function apply(remote, c) {
+    if (config !== c) throw new CloudError('同步取消了', 'cancelled');
     applying = true;
     try {
       if (!app.state) {
         app.state = Sy.forThisDevice(remote, ui.today);
-        persist();
+        if (!persist()) throw new CloudError('手机存储满了，云端的记录没存上', 'storage');
         render();
         return { restored: true };
       }
       const r = Mg.merge(app.state, remote, { converge: true });
       if (JSON.stringify(r.state) === JSON.stringify(M.normalize(JSON.parse(JSON.stringify(app.state))))) return null;
       app.state = r.state;
-      ui.undo = null;
-      persist();
-      render();
+      app.resetTransient();
+      if (!persist()) throw new CloudError('手机存储满了，云端的新记录没存上', 'storage');
+      renderSoon();
       return r;
     } finally {
       applying = false;
@@ -288,13 +351,20 @@
     const listing = await listOf(c, head);
     const files = {};
     const texts = {};
+    // 这台还没有记录（从云端恢复）：没变的文件也要下载，不然只拿到一部分
+    const knownFiles = app.state ? c.files : {};
     await Promise.all(listing.map(async (f) => {
-      const known = c.files[f.name];
+      const known = knownFiles[f.name];
       if (known && known.sha === f.sha) {
         files[f.name] = known;
         return;
       }
-      const plain = await unseal(c, f.name, await blobText(c, f.sha));
+      let plain;
+      try {
+        plain = await unseal(c, f.name, await blobText(c, f.sha));
+      } catch (e) {
+        throw new CloudError(`${f.name}：${e.message}`, e.code);
+      }
       texts[f.name] = plain;
       files[f.name] = { sha: f.sha, hash: Sy.fingerprint(f.name, plain) };
     }));
@@ -303,7 +373,7 @@
       // 只有某个月的记录变了：其它部分跟这台的一样（云端改过、删过都会动到 main.json）
       if (!texts[Sy.MAIN] && app.state) texts[Sy.MAIN] = Sy.split(app.state)[Sy.MAIN];
       const remote = Sy.join(texts);
-      if (remote) result = apply(remote);
+      if (remote) result = apply(remote, c);
     }
     c.files = files;
     c.head = head;
@@ -365,6 +435,10 @@
   let firstDirty = 0;
   let lastTry = 0;
   const shown = new Set();
+  // Token 失效、没有权限：先不自动同步，等手动同步或者改了设置；GitHub 嫌请求太多：歇一会儿
+  let paused = false;
+  let pausedUntil = 0;
+  const QUIET = ['offline', 'timeout'];
 
   function setStatus(state, message = '') {
     status.state = state;
@@ -372,40 +446,93 @@
     paint();
   }
 
-  /** 立刻同步；正在同步时等这次结束再来一次。返回 { ok, result, error } */
+  // 同一台设备的几个标签页别同时同步：同步时在存储里占个位，别的标签页看到了就过一会儿再来
+  const TURN = `${KEY}:turn`;
+  const TAB = [...crypto.getRandomValues(new Uint8Array(4))].map((x) => x.toString(16).padStart(2, '0')).join('');
+  const TURN_MS = 30 * 1000;
+
+  function takeTurn() {
+    try {
+      const held = JSON.parse(localStorage.getItem(TURN));
+      if (held && held.tab !== TAB && held.until > Date.now()) return false;
+      localStorage.setItem(TURN, JSON.stringify({ tab: TAB, until: Date.now() + TURN_MS }));
+    } catch (e) {
+      // 存储用不了就不排队，GitHub 那边只接受快进，同时推也不会丢
+    }
+    return true;
+  }
+
+  function giveTurn() {
+    try {
+      const held = JSON.parse(localStorage.getItem(TURN));
+      if (held && held.tab === TAB) localStorage.removeItem(TURN);
+    } catch (e) {
+      // 没占上就不用还
+    }
+  }
+
+  /** 别的标签页可能已经把同步往前推了：开始前读一遍进度；设置被换掉了就不同步 */
+  function refresh(c) {
+    const now = stored();
+    if (!now || now.gen !== c.gen) throw new CloudError('云同步的设置在别的标签页里改过了', 'cancelled');
+    Object.assign(c, { head: now.head, files: now.files || {}, last: now.last });
+  }
+
+  /** 立刻同步；正在同步时等这次结束再来一次。同一台设备的几个标签页轮流来。返回 { ok, result, error, waiting } */
   function syncNow(reason = 'manual') {
     if (!config) return Promise.resolve({ ok: false, error: null });
+    if (reason !== 'manual' && (paused || Date.now() < pausedUntil)) return Promise.resolve({ ok: false, error: null });
     if (busy) {
       again = true;
       return busy;
+    }
+    if (!takeTurn()) {
+      clearTimeout(timer);
+      timer = setTimeout(() => syncNow('again'), 3000);
+      return Promise.resolve({ ok: false, error: null, waiting: true });
     }
     clearTimeout(timer);
     timer = 0;
     firstDirty = 0;
     lastTry = Date.now();
     const c = config;
+    const ctl = new AbortController();
+    current = ctl;
     setStatus('syncing');
-    busy = syncOnce(c).then((result) => {
-      if (config === c) setStatus('idle');
+    busy = new Promise((resolve) => {
+      refresh(c);
+      resolve(syncOnce(c));
+    }).then((result) => {
+      if (config !== c) return { ok: false, error: null };
+      paused = false;
+      pausedUntil = 0;
+      setStatus('idle');
+      const notes = result && result.notes && result.notes.length ? result.notes.join('；') : '';
       if (result && result.restored) toast('云端的记录拿下来了');
       else if (result && (result.added || result.updated || result.dropped)) {
         const what = [result.added ? `加了 ${result.added} 条` : '', result.updated ? `改了 ${result.updated} 条` : '', result.dropped ? `删了 ${result.dropped} 条` : ''];
-        toast(`云端有新的记录，合进来了：${what.filter(Boolean).join('、')}`);
+        toast(`云端有新的记录，合进来了：${what.filter(Boolean).join('、')}${notes ? `。${notes}` : ''}`);
+      } else if (notes) {
+        toast(notes);
       }
       return { ok: true, result };
     }, (error) => {
-      if (config === c) setStatus(error.code === 'offline' ? 'offline' : 'error', error.message);
-      if (reason !== 'manual' && error.code !== 'offline' && !shown.has(error.message)) {
+      if (error.code === 'cancelled' || config !== c) return { ok: false, error: null };
+      if (error.code === 401 || error.code === 403) paused = true;
+      if (error.code === 'rate') pausedUntil = Date.now() + 10 * 60 * 1000;
+      setStatus(error.code === 'offline' ? 'offline' : 'error', error.message);
+      if (reason !== 'manual' && !QUIET.includes(error.code) && !shown.has(error.message)) {
         shown.add(error.message);
         oops(`云同步：${error.message}`);
       }
       return { ok: false, error };
     }).finally(() => {
       busy = null;
-      if (again) {
-        again = false;
-        timer = setTimeout(() => syncNow('again'), 500);
-      }
+      giveTurn();
+      if (current === ctl) current = null;
+      const next = again && config;
+      again = false;
+      if (next) timer = setTimeout(() => syncNow('again'), 500);
     });
     return busy;
   }
@@ -417,7 +544,8 @@
     if (!firstDirty) firstDirty = now;
     clearTimeout(timer);
     timer = setTimeout(() => syncNow('change'), Math.max(0, Math.min(settings.debounce, firstDirty + settings.maxWait - now)));
-    if (status.state !== 'syncing') setStatus('pending');
+    // 暂停自动同步的时候，别把出错的原因盖掉
+    if (status.state !== 'syncing' && !paused && Date.now() >= pausedUntil) setStatus('pending');
   }
 
   document.addEventListener('visibilitychange', () => {
@@ -457,14 +585,20 @@
   /** 检查仓库和 Token；云端已经有数据时用它的盐算钥匙、试着解开，密码不对在这里就报出来 */
   async function connect(f) {
     if (!window.crypto || !crypto.subtle) throw new CloudError('云同步要在 https 的网址下用', 'insecure');
-    const c = { repo: f.repo, folder: f.folder, branch: f.branch, token: f.token, iter: settings.iter, salt: null, key: null, head: null, files: {}, last: 0 };
+    // gen：这一份设置的编号，别的标签页换了设置时认得出来
+    const gen = [...crypto.getRandomValues(new Uint8Array(6))].map((x) => x.toString(16).padStart(2, '0')).join('');
+    const c = { repo: f.repo, folder: f.folder, branch: f.branch, token: f.token, gen, iter: settings.iter, salt: null, key: null, head: null, files: {}, last: 0 };
     const info = await gh(c, 'GET', '');
+    if (info.private !== true) throw new CloudError('这个仓库是公开的，谁都能下载云端的文件。到 GitHub 把它改成 Private 再连', 'public');
     if (!info.permissions || !info.permissions.push) throw new CloudError('这个 Token 只能读、不能写：创建时「Contents」要选「Read and write」', 'perm');
     c.branch = c.branch || info.default_branch || 'main';
     const head = await headOf(c);
     const main = head ? (await listOf(c, head)).find((x) => x.name === Sy.MAIN) : null;
     const raw = main ? await blobText(c, main.sha) : null;
     const env = raw ? envelopeOf(raw) : null;
+    // 云端文件里的参数先看看合不合理：迭代次数太大会把手机卡住
+    if (env && !(Number.isInteger(env.kdf.iter) && env.kdf.iter >= Math.min(100000, settings.iter) && env.kdf.iter <= 10000000
+      && fromB64(env.kdf.salt).length === 16)) throw new CloudError('云端的文件不是蜜罐存的，或者坏了', 'format');
     if (!f.password && f.same && (!env || (env.kdf.salt === config.salt && env.kdf.iter === config.iter))) {
       const sameBranch = config.branch === c.branch;
       return { ...c, salt: config.salt, iter: config.iter, key: config.key, head: sameBranch ? config.head : null, files: sameBranch ? config.files : {} };
@@ -477,17 +611,26 @@
     return c;
   }
 
-  function disconnect() {
+  /** 这个标签页停止同步（不动存储）：取消进行中的，清掉排着的 */
+  function stopSync() {
+    if (current) current.abort();
+    current = null;
     config = null;
     clearTimeout(timer);
     timer = 0;
     firstDirty = 0;
+    paused = false;
+    pausedUntil = 0;
+    setStatus('off');
+  }
+
+  function disconnect() {
+    stopSync();
     try {
       localStorage.removeItem(KEY);
     } catch (e) {
       // 存储被禁用时本来也没存上
     }
-    setStatus('off');
   }
 
   // ---------- 界面 ----------
@@ -631,8 +774,11 @@
         button.textContent = '连接并同步';
         return formError(form, e.message);
       }
+      if (current) current.abort();
       config = c;
-      keep(c);
+      save(c);
+      paused = false;
+      pausedUntil = 0;
       status.state = 'idle';
       closeDialog(sheetDialog);
       render();
@@ -656,6 +802,7 @@
       const r = await syncNow('manual');
       el.disabled = false;
       if (r.ok && !(r.result && (r.result.restored || r.result.added || r.result.updated || r.result.dropped))) toast('同步好了');
+      else if (r.waiting) toast('另一个标签页正在同步，等一下就好');
       else if (!r.ok && r.error) oops(`云同步：${r.error.message}`);
     },
 
@@ -678,6 +825,7 @@
     cloudSynced: () => Boolean(config && config.last && Date.now() - config.last < 7 * 24 * 3600 * 1000 && status.state !== 'error'),
     cloudChanged: changed,
     cloudOff: disconnect,
+    cloudReload: reloadConfig,
     cloud: { settings, status, syncNow, config: () => config, device },
   });
 })();

@@ -577,6 +577,7 @@
         try {
           const next = S.parseBackup(text);
           if (app.state && !window.confirm('导入会覆盖现在的全部记录，确定吗？')) return;
+          app.resetTransient();
           app.state = next;
           persist();
           if (settingsDialog.open) closeDialog(settingsDialog);
@@ -655,6 +656,7 @@
       const cloud = app.cloudOn() ? '这台手机的云同步也会断开，云端的数据不会删。' : '';
       if (!window.confirm(`确定清空全部数据吗？清空后找不回来，建议先导出备份。${cloud}`)) return;
       app.cloudOff();
+      app.resetTransient();
       S.clear();
       app.state = null;
       ui.bagAdding = null;
@@ -663,7 +665,7 @@
     },
 
     undo() {
-      if (!ui.undo) return;
+      if (!ui.undo || !app.state) return;
       ui.undo();
       ui.undo = null;
       persist();

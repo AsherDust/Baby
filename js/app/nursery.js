@@ -313,11 +313,8 @@
       }
       if (f.name) app.state.profile.nickname = f.name.trim().slice(0, 12);
       persist();
-      closeDialog(sheetDialog);
-      if (first) {
-        ui.babyDay = 0;
-        if (location.hash && location.hash !== '#/') location.hash = '#/';
-      }
+      if (first) ui.babyDay = 0;
+      closeDialog(sheetDialog, first && location.hash && location.hash !== '#/' ? '#/' : '');
       render();
       toast(first ? say('born') : say('saved'));
     },
@@ -504,8 +501,7 @@
       if (!window.confirm('清除宝宝信息会删掉宝宝的全部记录，回到孕期的样子，确定吗？建议先导出备份。')) return;
       const before = M.clearBaby(app.state);
       persist();
-      closeDialog(sheetDialog);
-      location.hash = '#/';
+      closeDialog(sheetDialog, '#/');
       render();
       toast('宝宝的信息清掉了', () => M.restoreBaby(app.state, before));
     },

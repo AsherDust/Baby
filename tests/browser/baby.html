@@ -363,6 +363,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await click('#sheet-dialog [data-action="baby-clear"]');
     await wait(40);
     log(!state().baby && tabs() === '今天,记录,心情,产检,工具' && /宝宝的信息清掉了/.test(toastText()), '清除宝宝信息，回到孕期');
+    log(['#/', ''].includes(w.location.hash), '清除后回到首页（关面板时的后退不会把跳转顶掉）', w.location.hash);
     await click('#toast [data-action="undo"]');
     log(state().baby && state().baby.name === '小米', '清除也能撤销');
 

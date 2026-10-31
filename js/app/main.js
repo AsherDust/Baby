@@ -124,10 +124,13 @@
     checkForUpdate();
   });
 
+  // 同一台设备上别的标签页改了记录、云同步的设置
   window.addEventListener('storage', (e) => {
-    if (e.key !== S.KEY) return;
+    if (e.key === `${S.KEY}:cloud` || e.key === null) app.cloudReload();
+    if (e.key !== S.KEY && e.key !== null) return;
+    app.resetTransient();
     app.state = S.load();
-    if (!app.state) DIALOGS.forEach(closeDialog);
+    if (!app.state) DIALOGS.forEach((d) => closeDialog(d));
     render();
   });
 

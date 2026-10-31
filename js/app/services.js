@@ -97,10 +97,22 @@
     return true;
   }
 
+  /** 保存；存不进去时提示，但照样排同步，云端能多留一份最新的。返回存上了没有 */
   function persist() {
-    if (!S.save(app.state)) return oops('没保存成功：浏览器存储可能满了或被禁用了');
-    askToKeep();
+    const ok = S.save(app.state);
+    if (ok) askToKeep();
+    else oops('没保存成功：手机存储可能满了，或者浏览器不让存。先到「设置」导出一份备份');
     app.cloudChanged();
+    return ok;
+  }
+
+  /** 记录整份换掉了（别的标签页改了、清空了）：撤销不能再点，计时和声音都停下 */
+  function resetTransient() {
+    ui.undo = null;
+    toastBox.classList.remove('show');
+    app.stopPelvic();
+    app.stopNoise();
+    app.stopReading();
   }
 
   let keepAsked = false;
@@ -220,7 +232,7 @@
   }
 
   Object.assign(app, {
-    toast, oops, say, cheer, checkForUpdate, persist, saveFile, download, downloadCalendar, readProfile, saveWeight, saveGlucose,
+    toast, oops, say, cheer, checkForUpdate, persist, resetTransient, saveFile, download, downloadCalendar, readProfile, saveWeight, saveGlucose,
     checkNotifications
   });
 })();

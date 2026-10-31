@@ -2535,6 +2535,17 @@ test('合并：清空宫缩、清除宝宝信息，同步后不会被带回来�
   ok(Mg.merge(viaFile(d.state), viaFile(r2.state), { converge: true }).state.baby, '爸爸那台也拿回来');
 });
 
+test('备份提醒：只记宝宝的、只记心情日记的也会提醒', () => {
+  const s = M.createState({ dueDate: DUE }, '2026-08-01');
+  s.baby = newborn();
+  Bb.addLog(s.baby, Bb.readLog('diaper', { date: '2026-10-12', time: '09:00', pee: true }, tAt('2026-10-12', '12:00')));
+  ok(M.backupReminder(s, '2026-10-12'), '宝宝的日常记录');
+  const t = M.createState({ dueDate: DUE }, '2026-08-01');
+  J.add(t, { mood: 'calm', text: '', date: '2026-10-10' }, '2026-10-12', Date.UTC(2026, 9, 10, 1));
+  ok(M.backupReminder(t, '2026-10-12'), '心情日记');
+  eq(M.backupReminder(M.createState({ dueDate: DUE }, '2026-08-01'), '2026-10-12'), null, '什么都没记就不提醒');
+});
+
 test('存奶：超过 200 袋时留最新的', () => {
   const b = newborn();
   for (let i = 0; i < 230; i += 1) b.stash.push({ id: `st-${i.toString(36)}x`, ml: 100, at: Date.UTC(2026, 6, 1) + i * 3600e3, place: 'freezer', thawedAt: null });

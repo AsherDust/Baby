@@ -22,8 +22,9 @@
     } catch (e) {
       // 读不出来的数据在下面另存一份，避免被新数据覆盖后彻底丢失
     }
+    // 只留一份：每次打开都存一份的话，会把存储占满
     try {
-      localStorage.setItem(`${KEY}:unreadable:${Date.now()}`, raw);
+      if (localStorage.getItem(`${KEY}:unreadable`) !== raw) localStorage.setItem(`${KEY}:unreadable`, raw);
     } catch (e) {
       // 存储已满时只能放弃这份副本
     }
