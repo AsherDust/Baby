@@ -10,14 +10,19 @@ const out = [];
 const show = (head = 'RUNNING') => { document.getElementById('out').textContent = `${head}\n${out.join('\n')}`; };
 const log = (ok, name, extra = '') => { out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${extra && !ok ? ` — ${extra}` : ''}`); show(); };
 const note = (text) => { out.push(`NOTE ${text}`); show(); };
+// 每次单独计时取中位数：写 localStorage、垃圾回收偶尔会卡一下，平均数会被这一次拉高
 const time = (fn, runs = 5) => {
   fn();
-  const t0 = performance.now();
-  for (let i = 0; i < runs; i += 1) fn();
-  return (performance.now() - t0) / runs;
+  const each = [];
+  for (let i = 0; i < runs; i += 1) {
+    const t0 = performance.now();
+    fn();
+    each.push(performance.now() - t0);
+  }
+  return each.sort((a, b) => a - b)[runs >> 1];
 };
 // 上限按 GitHub 的 macOS 机器定：它比开发用的电脑慢 2～5 倍，在它上面也留 4 倍以上的余量，
-// 只抓慢了好几倍的（比如不小心写成了每条记录都整份重算）
+// 只抓慢了好几倍的（比如不小心写成了每条记录都整份重算）。保存要真写磁盘，波动最大，留得更宽
 const measure = (slow, label, limit, fn, runs) => {
   const ms = time(fn, runs);
   note(`${label}：${ms.toFixed(1)} ms`);
@@ -91,7 +96,7 @@ async function run(label, { s, today, routes }, extra) {
     w.history.replaceState(null, '', route);
     measure(slow, `${label}·${route} 重画一次`, 60, () => { w.Baby.app.render(); void w.document.body.offsetHeight; });
   }
-  measure(slow, `${label}·保存一次（含记下改过的）`, 60, () => w.Baby.app.persist());
+  measure(slow, `${label}·保存一次（含记下改过的）`, 120, () => w.Baby.app.persist());
   if (extra) extra(w, slow);
   log(!slow.length, `${label}：每项都在上限以内`, slow.join('；'));
 }
