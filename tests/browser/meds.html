@@ -150,7 +150,7 @@ iframe.onload = async () => {
 
     $('[data-action="open-settings"]').click();
     d.getElementById('settings-dialog').querySelector('[data-action="export-backup"]').click();
-    const backup = JSON.parse(await blobs[blobs.length - 1].text());
+    const backup = JSON.parse(textOf(blobs[blobs.length - 1]));
     log(Array.isArray(backup.meds) && backup.meds.length === 2, '备份里包含用药记录');
     d.getElementById('settings-dialog').querySelector('[data-action="close-dialog"]').click();
 

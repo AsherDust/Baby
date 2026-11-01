@@ -16,3 +16,13 @@ jobs:
         run: sh tests/run.sh
       - name: 页面测试
         run: sh tests/browser/run.sh
+        env:
+          KEEP: ${{ runner.temp }}/page-tests
+      # 没通过的那几组：Chrome 吐出来的页面和日志，下载下来看现场
+      - name: 留下没通过的页面
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: page-tests
+          path: ${{ runner.temp }}/page-tests
+          if-no-files-found: ignore

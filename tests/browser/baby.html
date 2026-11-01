@@ -300,7 +300,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     log(baby().vaccines.bcg.booked === '2026-10-13' && /约在 10月13日/.test(text($('.remind-strip'))), '约好卡介苗明天打');
     blobs.length = 0;
     await click('[data-action="vaccine-ics"]');
-    const ics = blobs.length ? await blobs[0].text() : '';
+    const ics = blobs.length ? textOf(blobs[0]) : '';
     log(/X-WR-CALNAME:疫苗接种/.test(ics) && (ics.match(/BEGIN:VEVENT/g) || []).length >= 10 && /DTSTART;VALUE=DATE:20261013/.test(ics), '导出疫苗日历，约好的按约的日子', ics.slice(0, 80));
     d.getElementById('xv-name').value = '乙肝免疫球蛋白';
     $('form[data-form="extra-vaccine"]').requestSubmit();
@@ -333,7 +333,7 @@ const click = async (sel) => { const el = $(sel); if (!el) throw new Error(`找�
     await click('#sheet-dialog [data-action="close-dialog"]');
     blobs.length = 0;
     await click('[data-action="exam-ics"]');
-    const eics = blobs.length ? await blobs[0].text() : '';
+    const eics = blobs.length ? textOf(blobs[0]) : '';
     log(/X-WR-CALNAME:儿保体检/.test(eics) && (eics.match(/BEGIN:VEVENT/g) || []).length === 10 && /DTSTART;VALUE=DATE:20261013/.test(eics) && /导出了 10 次体检/.test(toastText()), '导出体检日历，约好的按约的日子', eics.slice(0, 80));
     await nav('#/');
     log(/明天体检：产后访视/.test(text($('.banner'))), '首页横幅提醒明天体检');

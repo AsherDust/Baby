@@ -253,7 +253,7 @@ iframe.onload = async () => {
     // ---- 备份和刷新 ----
     $('[data-action="open-settings"]').click();
     d.getElementById('settings-dialog').querySelector('[data-action="export-backup"]').click();
-    const backup = JSON.parse(await blobs[blobs.length - 1].text());
+    const backup = JSON.parse(textOf(blobs[blobs.length - 1]));
     log(backup.bp.length === 3 && backup.glucose.length === 3 && backup.ultrasounds.length === 2 && backup.prefs.glucoseAfter === 1, '备份里有血压、血糖、B 超和餐后设置', `${backup.bp.length}/${backup.glucose.length}/${backup.ultrasounds.length}`);
     d.getElementById('settings-dialog').querySelector('[data-action="close-dialog"]').click();
     await settle();

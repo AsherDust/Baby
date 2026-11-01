@@ -109,7 +109,7 @@ iframe.onload = async () => {
 
     $('[data-action="open-settings"]').click();
     d.getElementById('settings-dialog').querySelector('[data-action="export-backup"]').click();
-    const backup = JSON.parse(await blobs[blobs.length - 1].text());
+    const backup = JSON.parse(textOf(blobs[blobs.length - 1]));
     log(Array.isArray(backup.bag) && backup.bag.length === 36, '备份里包含待产包');
     d.getElementById('settings-dialog').querySelector('[data-action="close-dialog"]').click();
 

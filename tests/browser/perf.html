@@ -16,6 +16,8 @@ const time = (fn, runs = 5) => {
   for (let i = 0; i < runs; i += 1) fn();
   return (performance.now() - t0) / runs;
 };
+// 上限按 GitHub 的 macOS 机器定：它比开发用的电脑慢 2～5 倍，在它上面也留 4 倍以上的余量，
+// 只抓慢了好几倍的（比如不小心写成了每条记录都整份重算）
 const measure = (slow, label, limit, fn, runs) => {
   const ms = time(fn, runs);
   note(`${label}：${ms.toFixed(1)} ms`);
@@ -87,7 +89,7 @@ async function run(label, { s, today, routes }, extra) {
   measure(slow, `${label}·读出并整理一次`, 50, () => M.normalize(JSON.parse(w.localStorage.getItem(S.KEY))));
   for (const route of routes) {
     w.history.replaceState(null, '', route);
-    measure(slow, `${label}·${route} 重画一次`, 30, () => { w.Baby.app.render(); void w.document.body.offsetHeight; });
+    measure(slow, `${label}·${route} 重画一次`, 60, () => { w.Baby.app.render(); void w.document.body.offsetHeight; });
   }
   measure(slow, `${label}·保存一次（含记下改过的）`, 60, () => w.Baby.app.persist());
   if (extra) extra(w, slow);
@@ -104,10 +106,10 @@ async function run(label, { s, today, routes }, extra) {
       measure(slow, '宝宝·判断要传哪些（算指纹）', 100, () => Sy.changes(Sy.split(state), {}));
       const other = M.normalize(JSON.parse(JSON.stringify(kid.s)));
       Bb.addLog(other.baby, Bb.readLog('diaper', { date: kid.today, time: '10:00', pee: true }, Bb.msAt(kid.today, '10:05')));
-      measure(slow, '宝宝·合并一次', 160, () => Mg.merge(state, other), 3);
+      measure(slow, '宝宝·合并一次', 320, () => Mg.merge(state, other), 3);
       w.history.replaceState(null, '', '#/');
       w.Baby.app.render();
-      measure(slow, '宝宝·点一下记尿布（保存 + 重画）', 100, () => { w.document.getElementById('diaper-pee').click(); void w.document.body.offsetHeight; }, 3);
+      measure(slow, '宝宝·点一下记尿布（保存 + 重画）', 250, () => { w.document.getElementById('diaper-pee').click(); void w.document.body.offsetHeight; }, 3);
     });
   } catch (e) {
     log(false, '出错了', e && e.stack || String(e));

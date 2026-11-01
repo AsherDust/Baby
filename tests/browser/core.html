@@ -143,7 +143,7 @@ iframe.onload = async () => {
 
     $('[data-action="export-ics"]').click();
     log(downloads.includes('产检日程.ics'), '导出整个日程到日历', downloads.join());
-    const ics = await blobs[blobs.length - 1].text();
+    const ics = textOf(blobs[blobs.length - 1]);
     log(/BEGIN:VCALENDAR/.test(ics) && /DTSTART:20261013T083000/.test(ics) && /TRIGGER:-PT12H30M/.test(ics), '日历文件包含预约时间和提醒');
     log(!/早孕检查/.test(ics) && /复查血常规/.test(ics.replace(/\r\n /g, '')), '已完成的不导出，自定义的会导出');
     $('[data-action="export-ics-one"][data-id="ogtt"]').click();
@@ -174,7 +174,7 @@ iframe.onload = async () => {
     $('[data-action="open-settings"]').click();
     sd.querySelector('[data-action="export-backup"]').click();
     log(downloads.some((n) => /备份-2026-10-12\.json$/.test(n)), '导出备份', downloads.join());
-    const backup = JSON.parse(await blobs[blobs.length - 1].text());
+    const backup = JSON.parse(textOf(blobs[blobs.length - 1]));
     log(backup.app === 'honey-pot' && backup.weights.length === 2 && backup.checkups.length === 17, '备份内容完整');
     sd.querySelector('[data-action="close-dialog"]').click();
 

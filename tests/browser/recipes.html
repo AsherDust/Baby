@@ -20,6 +20,9 @@ function bind() {
   d = iframe.contentDocument;
   w.addEventListener('error', (e) => errors.push(e.message));
   w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
+  // 买齐了冒不冒爱心看系统的「减弱动态效果」，测试里按没开算，不跟着跑测试的机器走
+  const realMatch = w.matchMedia.bind(w);
+  w.matchMedia = (q) => (q.includes('reduced-motion') ? { matches: false, media: q } : realMatch(q));
 }
 const open = (scene, route) => {
   localStorage.clear();

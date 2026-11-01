@@ -12,11 +12,15 @@ document.body.appendChild(iframe);
 let w, d;
 const errors = [];
 const blobs = [];
+// 冒不冒爱心看系统的「减弱动态效果」，测试里自己定，不跟着跑测试的机器走
+let reduceMotion = false;
 function bind() {
   w = iframe.contentWindow;
   d = iframe.contentDocument;
   w.addEventListener('error', (e) => errors.push(e.message));
   w.addEventListener('unhandledrejection', (e) => errors.push(String(e.reason)));
+  const realMatch = w.matchMedia.bind(w);
+  w.matchMedia = (q) => (q.includes('reduced-motion') ? { matches: reduceMotion, media: q } : realMatch(q));
   w.confirm = () => true;
   w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
   w.URL.revokeObjectURL = () => {};
@@ -152,7 +156,7 @@ iframe.onload = async () => {
     $('[data-action="open-settings"]').click();
     d.getElementById('settings-dialog').querySelector('[data-action="export-backup"]').click();
     await wait(10);
-    const backup = JSON.parse(await blobs[blobs.length - 1].text());
+    const backup = JSON.parse(textOf(blobs[blobs.length - 1]));
     log(Array.isArray(backup.journal) && backup.journal.length === 47, '备份里包含心情日记');
     d.getElementById('settings-dialog').querySelector('[data-action="close-dialog"]').click();
 
@@ -160,15 +164,14 @@ iframe.onload = async () => {
     $('.quick-form .btn').click();
     log($('#toast .toast-oops') && /先填一下体重/.test(toastText()), '出错时换成担心的小蜜蜂');
 
-    const realMatch = w.matchMedia.bind(w);
-    w.matchMedia = (q) => (q.includes('reduced-motion') ? { matches: true } : realMatch(q));
+    reduceMotion = true;
     d.querySelectorAll('.burst').forEach((b) => b.remove());
     await nav('#/journal');
     pick(composer(), 'calm');
     composer().requestSubmit();
     await wait(10);
     log(state().journal.length === 48 && bursts() === 0, '系统设置了减弱动态效果时不冒爱心');
-    w.matchMedia = realMatch;
+    reduceMotion = false;
 
     // ---- 最近心情不太好时，关心一下 ----
     const J = w.Baby.journal;

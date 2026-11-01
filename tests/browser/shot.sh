@@ -21,7 +21,7 @@ mkdir -p /tmp/baby-shots
 png="/tmp/baby-shots/$1.png"
 rm -f "$png"
 "$CHROME" --headless=new --use-mock-keychain --hide-scrollbars --no-first-run --user-data-dir="$work/profile" \
-  --virtual-time-budget=3000 --window-size="$2" --force-device-scale-factor="${4:-1}" ${DARK:+--force-dark-mode} \
+  --virtual-time-budget=3000 --force-prefers-no-reduced-motion --window-size="$2" --force-device-scale-factor="${4:-1}" ${DARK:+--force-dark-mode} \
   --screenshot="$png" "http://127.0.0.1:$PORT/tests/browser/preview.html?$3" >/dev/null 2>&1 &
 chrome=$!
 for _ in $(seq 1 30); do
