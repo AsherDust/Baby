@@ -948,6 +948,8 @@ test('B 超识别：括号缩写、换行、四象限羊水、毫米写的羊水
   eq(M.parseUltrasoundText('AFI 126mm', '2026-10-12').values, { afi: 12.6 });
   eq(M.parseUltrasoundText('头臀长 CRL 12mm，NT 1.4mm', '2026-10-12').values, { crl: 12 });
   eq(M.parseUltrasoundText('头臀长 CRL 12mm，NT 1.4mm', '2026-10-12').note, 'NT 1.4 mm');
+  eq(M.parseUltrasoundText('头臀长度: 45mm\n股骨长度: 9mm', '2026-10-12').values, { crl: 45, fl: 9 }, '写成「长度」');
+  eq(M.parseUltrasoundText('股骨长度\n头臀长度\n9mm\n45mm', '2026-10-12').values, { crl: 45, fl: 9 }, '一列一列拷出来的「长度」');
 });
 
 test('B 超识别：表格被一列一列拷出来时，名字和数按顺序配对', () => {

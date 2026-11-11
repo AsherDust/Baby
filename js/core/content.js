@@ -228,11 +228,11 @@
 
   // B 超单上常见的指标；min/max 只用来挡住明显填错的数；alias 是报告上可能出现的写法，长的放前面
   const US_FIELDS = [
-    { id: 'crl', name: '头臀长', abbr: 'CRL', unit: 'mm', min: 1, max: 120, step: 0.1, about: '从头顶到屁股的长度，孕早期用来核对孕周。', alias: ['头臀长', '顶臀长', '头臀径', '胎芽长', 'CRL'] },
+    { id: 'crl', name: '头臀长', abbr: 'CRL', unit: 'mm', min: 1, max: 120, step: 0.1, about: '从头顶到屁股的长度，孕早期用来核对孕周。', alias: ['头臀长度', '顶臀长度', '胎芽长度', '头臀长', '顶臀长', '头臀径', '胎芽长', 'CRL'] },
     { id: 'bpd', name: '双顶径', abbr: 'BPD', unit: 'mm', min: 5, max: 120, step: 0.1, about: '头部左右两侧最宽处的距离。', alias: ['双顶径', 'BPD'] },
     { id: 'hc', name: '头围', abbr: 'HC', unit: 'mm', min: 20, max: 420, step: 0.1, about: '头部一圈的长度。', alias: ['头围', 'HC'] },
     { id: 'ac', name: '腹围', abbr: 'AC', unit: 'mm', min: 20, max: 450, step: 0.1, about: '肚子一圈的长度，和估计体重关系最大。', alias: ['腹围', 'AC'] },
-    { id: 'fl', name: '股骨长', abbr: 'FL', unit: 'mm', min: 3, max: 95, step: 0.1, about: '大腿骨的长度。', alias: ['股骨长', '股骨', 'FL'] },
+    { id: 'fl', name: '股骨长', abbr: 'FL', unit: 'mm', min: 3, max: 95, step: 0.1, about: '大腿骨的长度。', alias: ['股骨长度', '股骨长', '股骨', 'FL'] },
     { id: 'fhr', name: '胎心率', abbr: 'FHR', unit: '次/分', min: 60, max: 240, step: 1, about: '一般在 110–160 次/分。', alias: ['胎心率', '胎心', '心率', 'FHR'] },
     { id: 'afi', name: '羊水指数', abbr: 'AFI', unit: 'cm', min: 0, max: 50, step: 0.1, about: '四个象限羊水深度加起来，一般在 5–25 cm 之间。', alias: ['羊水指数', 'AFI'] },
     { id: 'dvp', name: '最大羊水深度', abbr: 'AFV', unit: 'cm', min: 0, max: 20, step: 0.1, about: '最深的一处羊水，一般在 2–8 cm 之间。', alias: ['最大羊水深度', '羊水最大深度', '最大羊水池深度', '羊水深度', '最大深度', '最大暗区', 'AFV', 'DVP', 'MVP'] },
