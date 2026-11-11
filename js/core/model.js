@@ -266,14 +266,33 @@
     return values;
   }
 
-  function usFields(f) {
-    return { date: f.date, values: usValues(f.values), placenta: text(f.placenta, 40), note: text(f.note, 200) };
+  function placentaMm(raw) {
+    if (isBlank(raw)) return null;
+    const n = toNumber(raw);
+    const r = C.PLACENTA_MM;
+    return Number.isFinite(n) && n >= r.min && n <= r.max ? Math.round(n * 10) / 10 : null;
   }
+
+  /** 胎盘厚度、成熟度只在填了的时候才有这个字段，以前的记录签名不变，删过的标记照样对得上 */
+  function usFields(f) {
+    const mm = placentaMm(f.placentaMm);
+    const grade = C.PLACENTA_GRADES.includes(f.placentaGrade) ? f.placentaGrade : '';
+    return {
+      date: f.date,
+      values: usValues(f.values),
+      placenta: text(f.placenta, 40),
+      ...(mm != null ? { placentaMm: mm } : {}),
+      ...(grade ? { placentaGrade: grade } : {}),
+      note: text(f.note, 200),
+    };
+  }
+
+  const usEmpty = (f) => !Object.keys(f.values).length && !f.placenta && f.placentaMm == null && !f.placentaGrade && !f.note;
 
   function normalizeUltrasound(u) {
     if (!u || typeof u !== 'object' || typeof u.id !== 'string' || !u.id) return null;
     const fields = usFields(u);
-    if (!D.isISODate(fields.date) || (!Object.keys(fields.values).length && !fields.placenta && !fields.note)) return null;
+    if (!D.isISODate(fields.date) || usEmpty(fields)) return null;
     return { id: u.id.slice(0, 40), ...fields };
   }
 
@@ -1025,8 +1044,9 @@
         return msg('us.range', { name: field.name, min: field.min, max: field.max, unit: field.unit });
       }
     }
-    const fields = usFields(f);
-    if (!Object.keys(fields.values).length && !fields.placenta && !fields.note) return msg('us.empty');
+    const pm = C.PLACENTA_MM;
+    if (!isBlank(f.placentaMm) && placentaMm(f.placentaMm) == null) return msg('us.range', { name: pm.name, min: pm.min, max: pm.max, unit: pm.unit });
+    if (usEmpty(usFields(f))) return msg('us.empty');
     return null;
   }
 
@@ -1038,9 +1058,11 @@
   }
 
   function updateUltrasound(state, id, f) {
-    const record = state.ultrasounds.find((u) => u.id === id);
-    if (!record) return null;
-    Object.assign(record, usFields(f));
+    const index = state.ultrasounds.findIndex((u) => u.id === id);
+    if (index < 0) return null;
+    // 整条换掉：清空了的厚度、成熟度不能留着旧值
+    const record = { id, ...usFields(f) };
+    state.ultrasounds[index] = record;
     state.ultrasounds.sort(byDate);
     return record;
   }
@@ -1205,13 +1227,40 @@
     return found.length ? found.map((x) => x.iso).sort().pop() : null;
   }
 
+  /**
+   * 胎盘的方位、厚度、成熟度：在写着「胎盘」的那句话里找，
+   * 下面紧跟着的「厚度」「成熟度」这样开头的行也算；别处的「厚度」（比如 NT 颈项透明层厚度）不管
+   */
   function usPlacentaIn(text) {
-    const at = text.indexOf('胎盘');
-    if (at < 0) return '';
-    const seg = text.slice(at, at + 40);
+    const lines = text.split('\n');
+    const segs = [];
+    lines.forEach((line, i) => {
+      const at = line.indexOf('胎盘');
+      if (at < 0) return;
+      let seg = line.slice(at).split('。')[0];
+      for (let k = i + 1; k < lines.length && /^\s*(厚|成熟度|分级|位置|附着)/.test(lines[k]); k += 1) seg += `，${lines[k]}`;
+      segs.push(seg);
+    });
+    const seg = segs.join('，');
     const place = (seg.match(/(左前壁|右前壁|左后壁|右后壁|左侧壁|右侧壁|前壁|后壁|侧壁|宫底)/) || [])[1] || '';
-    const grade = (seg.match(/(III|II|I|Ⅲ|Ⅱ|Ⅰ|[0０123])\s*[级度]/) || [])[1];
-    return [place, grade ? `${GRADES[grade]} 级` : ''].filter(Boolean).join(' ');
+    const g = seg.match(/(?:成熟度|分级)\s*[:：为是]?\s*(III|II|I|Ⅲ|Ⅱ|Ⅰ|[0123])(?![\d.])|(III|II|I|Ⅲ|Ⅱ|Ⅰ|[0123])\s*级/);
+    let mm = null;
+    for (const m of seg.matchAll(/厚度?\s*[:：为约]*\s*(\d{1,3}(?:\.\d{1,2})?)\s*(mm|cm|毫米|厘米)?/gi)) {
+      if (seg[m.index - 1] === '层') continue;
+      const n = Number(m[1]);
+      const u = (m[2] || '').toLowerCase();
+      mm = placentaMm(u === 'cm' || u === '厘米' || (!u && m[1].includes('.') && n < 10) ? n * 10 : n);
+      if (mm != null) break;
+    }
+    return { placenta: place, placentaMm: mm, placentaGrade: g ? GRADES[g[1] || g[2]] : '' };
+  }
+
+  /** 以前方位和成熟度写在一格里（「后壁 I 级」）：显示、编辑时拆开 */
+  function splitPlacenta(r) {
+    const text = r.placenta || '';
+    if (r.placentaGrade) return { placenta: text, placentaGrade: r.placentaGrade };
+    const m = text.match(/^(.*?)[\s，,]*(?:成熟度|分级)?\s*(III|II|I|Ⅲ|Ⅱ|Ⅰ|[0123])\s*级$/);
+    return m ? { placenta: m[1], placentaGrade: GRADES[m[2]] } : { placenta: text, placentaGrade: '' };
   }
 
   function usNoteIn(text) {
@@ -1227,7 +1276,7 @@
 
   /**
    * 从拷贝出来的 B 超单文字里认出数值，给表单预填用，保存前要人看一遍。
-   * 返回 { values: { bpd: 62.4, ... }, date, placenta, note }，认不出的不出现
+   * 返回 { values: { bpd: 62.4, ... }, date, placenta, placentaMm, placentaGrade, note }，认不出的数值不出现
    */
   function parseUltrasoundText(text, today) {
     const s = String(text || '')
@@ -1245,7 +1294,7 @@
     // 保持和 US_FIELDS 一样的顺序，表单和提示里好对照
     const ordered = {};
     for (const field of C.US_FIELDS) if (values[field.id] != null) ordered[field.id] = values[field.id];
-    return { values: ordered, date: usDateIn(s, today), placenta: usPlacentaIn(s), note: usNoteIn(s) };
+    return { values: ordered, date: usDateIn(s, today), ...usPlacentaIn(s), note: usNoteIn(s) };
   }
 
   /** 新的在前，附上孕龄和上一次（更早一次）的记录，方便看长了多少 */
@@ -1346,6 +1395,7 @@
     usFlag,
     ultrasoundRows,
     parseUltrasoundText,
+    splitPlacenta,
     backupReminder,
     markBackedUp,
     snoozeBackup,

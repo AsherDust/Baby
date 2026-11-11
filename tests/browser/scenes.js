@@ -31,7 +31,7 @@ function seedScene(scene) {
     .forEach(([date, slot, value]) => M.setGlucose(s, { date, slot, value }));
   M.addUltrasound(s, { date: '2026-07-06', values: { crl: '62.5', fhr: '158' }, placenta: '', note: 'NT 1.4 mm' });
   M.addUltrasound(s, { date: '2026-09-25', values: { bpd: '58.2', hc: '212', ac: '186', fl: '41.3', fhr: '146', dvp: '5.1', efw: '520' }, placenta: '后壁 0 级', note: '大排畸未见异常' });
-  M.addUltrasound(s, { date: '2026-10-09', values: { bpd: '62.4', hc: '226', ac: '203', fl: '45.0', fhr: '142', afi: '4.6', efw: '640' }, placenta: '后壁 0 级', note: '' });
+  M.addUltrasound(s, { date: '2026-10-09', values: { bpd: '62.4', hc: '226', ac: '203', fl: '45.0', fhr: '142', afi: '4.6', efw: '640' }, placenta: '后壁', placentaMm: '24', placentaGrade: '0', note: '' });
   s.journal = Baby.journal.normalize([
     { id: 'j1', date: '2026-10-12', time: '21:40', mood: 'excited', text: '今天豆豆踢得特别有劲，像在肚子里翻跟头。\n爸爸贴着肚子讲了半天故事，不知道听没听见。' },
     { id: 'j2', date: '2026-10-12', time: '09:15', mood: 'tired', text: '昨晚起夜三次，早上有点没精神。' },

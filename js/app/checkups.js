@@ -8,6 +8,11 @@
 
   const US_GROWTH = new Set(['crl', 'bpd', 'hc', 'ac', 'fl', 'efw']);
   const usText = (v) => String(Math.round(v * 10) / 10);
+  // 胎盘：前壁，厚 15 mm，0 级
+  const placentaText = (r) => {
+    const { placenta, placentaGrade } = M.splitPlacenta(r);
+    return [placenta, r.placentaMm != null ? `厚 ${usText(r.placentaMm)} mm` : '', placentaGrade ? `${placentaGrade} 级` : ''].filter(Boolean).join('，');
+  };
 
   function viewUltrasounds(today) {
     const rows = M.ultrasoundRows(app.state);
@@ -55,7 +60,7 @@
             <button type="button" class="chip" data-action="edit-us" data-id="${esc(r.id)}">编辑</button>
           </div>
           ${cells ? `<dl class="us-grid">${cells}</dl>` : ''}
-          ${r.placenta ? `<p class="us-extra"><b>胎盘</b>${esc(r.placenta)}</p>` : ''}
+          ${placentaText(r) ? `<p class="us-extra"><b>胎盘</b>${esc(placentaText(r))}</p>` : ''}
           ${r.note ? `<p class="us-extra"><b>备注</b>${esc(r.note)}</p>` : ''}
         </li>`;
     };
@@ -173,5 +178,5 @@
       </li>`;
   }
 
-  Object.assign(app, { usText, viewUltrasounds, viewCheckups });
+  Object.assign(app, { usText, placentaText, viewUltrasounds, viewCheckups });
 })();

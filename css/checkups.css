@@ -171,7 +171,7 @@
 .us-paste-result:empty { display: none; }
 .us-paste-result.is-ok { color: var(--leaf-deep); }
 .us-paste-result.is-empty { color: var(--red); }
-.field input.is-filled, .field textarea.is-filled { border-color: var(--honey); background: var(--filled); }
+.field input.is-filled, .field textarea.is-filled, .field .seg.is-filled { border-color: var(--honey); background: var(--filled); }
 
 @media (max-width: 720px) {
   .remind-strip { flex-direction: column; align-items: flex-start; gap: 10px; }

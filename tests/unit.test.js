@@ -633,6 +633,21 @@ test('B 超：校验、取整、标出超出一般范围的', () => {
   eq(M.removeUltrasound(s, a.id).index, 0);
 });
 
+test('B 超：胎盘方位、厚度、成熟度', () => {
+  const today = '2026-10-12';
+  const f = (over) => ({ date: '2026-09-25', values: {}, placenta: '', note: '', ...over });
+  eq(M.usError(f({ placentaMm: '15' }), today), null, '只填胎盘厚度也行');
+  eq(M.usError(f({ placentaGrade: '0' }), today), null, '只选成熟度也行');
+  eq(zh(M.usError(f({ placentaMm: '1.5' }), today)), '胎盘厚度填 5–80 mm 之间的数，看看单位对不对');
+  const s = M.createState({ dueDate: DUE });
+  const a = M.addUltrasound(s, f({ placenta: '前壁', placentaMm: ' 15 ', placentaGrade: '0', values: { bpd: '48' } }));
+  eq([a.placenta, a.placentaMm, a.placentaGrade], ['前壁', 15, '0']);
+  eq(Object.keys(M.addUltrasound(s, f({ placenta: '后壁', placentaGrade: 'IV' }))), ['id', 'date', 'values', 'placenta', 'note'], '没填的不留字段，以前的记录签名不变');
+  const b = M.updateUltrasound(s, a.id, f({ placenta: '前壁', values: { bpd: '48' } }));
+  ok(!('placentaMm' in b) && !('placentaGrade' in b) && s.ultrasounds.includes(b), '清空了就不留旧值');
+  eq(M.normalize(JSON.parse(JSON.stringify(s))).ultrasounds, s.ultrasounds, '存取一圈不变');
+});
+
 // ---------- content：妈妈这周 ----------
 
 test('妈妈这周：每个孕周都有内容', () => {
@@ -908,11 +923,11 @@ test('B 超识别：叙述式报告，厘米换成毫米，胎盘和胎位也认
   const r = M.parseUltrasoundText(text, '2026-10-12');
   eq(r.values, { bpd: 62, hc: 226, ac: 203, fl: 45, fhr: 142, afi: 12.3, dvp: 5.1, efw: 640 });
   eq(r.date, '2026-10-09');
-  eq(r.placenta, '后壁 0 级');
+  eq([r.placenta, r.placentaMm, r.placentaGrade], ['后壁', null, '0']);
   eq(r.note, '头位，脐带绕颈一周');
 });
 
-test('B 超识别：医院常见格式，不把肱骨长、胎盘厚度、S/D、打印时间认进来', () => {
+test('B 超识别：医院常见格式，不把肱骨长、胎盘厚度当成测量值，不认 S/D、打印时间', () => {
   const text = `检查部位：产科（中晚孕） 检查日期：2026-10-09
 打印时间：2026-10-10 08:12
 胎心搏动可见，胎心率：148次/分，心律齐。
@@ -922,7 +937,7 @@ test('B 超识别：医院常见格式，不把肱骨长、胎盘厚度、S/D、
 脐动脉S/D：2.8 PI 1.0 RI 0.6`;
   const r = M.parseUltrasoundText(text, '2026-10-12');
   eq(r.values, { bpd: 62, hc: 226, ac: 203, fl: 45, fhr: 148, afi: 12.5, dvp: 5.2 });
-  eq([r.date, r.placenta], ['2026-10-09', '前壁 I 级']);
+  eq([r.date, r.placenta, r.placentaMm, r.placentaGrade], ['2026-10-09', '前壁', 25, 'I']);
   eq(M.parseUltrasoundText('卵黄囊直径约4mm，胎芽长约12mm，心率约160次/分', '2026-10-12').values, { crl: 12, fhr: 160 }, '孕早期');
   eq(M.parseUltrasoundText('ＢＰＤ：６２．４ｍｍ', '2026-10-12').values, { bpd: 62.4 }, '全角');
 });
@@ -938,7 +953,25 @@ FHR 142bpm AFI 4.6cm EFW 640g
   const r = M.parseUltrasoundText(text, '2026-10-12');
   eq(r.values, { bpd: 62.4, hc: 226, ac: 203, fl: 45, fhr: 142, afi: 4.6, efw: 640 });
   eq(r.date, '2026-10-09', '优先用写着「检查时间」的日期');
-  eq(r.placenta, '前壁 I 级');
+  eq([r.placenta, r.placentaGrade], ['前壁', 'I']);
+});
+
+test('B 超识别：胎盘方位、厚度、成熟度', () => {
+  const p = (text) => {
+    const r = M.parseUltrasoundText(text, '2026-10-12');
+    return [r.placenta, r.placentaMm, r.placentaGrade];
+  };
+  eq(p('胎盘方位：前壁，胎盘厚度：15mm，胎盘成熟度：0；'), ['前壁', 15, '0'], '一行写完，成熟度后面没写「级」');
+  eq(p('胎盘方位：后壁\n胎盘厚度：2.8cm\n胎盘成熟度：Ⅱ级'), ['后壁', 28, 'II'], '一项一行，厘米换成毫米');
+  eq(p('胎盘：位于后壁\n厚度：31mm\n成熟度：I级'), ['后壁', 31, 'I'], '下面几行没写「胎盘」');
+  eq(p('颈项透明层厚度1.4mm\n胎盘位于前壁。NT 1.4mm'), ['前壁', null, ''], 'NT 的厚度不是胎盘的');
+  eq(p('胎盘位于前壁，颈项透明层厚度6mm'), ['前壁', null, ''], '同一行也不算');
+  eq(p('胎盘位于前壁。子宫壁厚约8mm'), ['前壁', null, ''], '句号后面的不算');
+  eq(p('胎盘厚度：120mm'), ['', null, ''], '超出范围的不要');
+  eq(M.splitPlacenta({ placenta: '后壁 I 级' }), { placenta: '后壁', placentaGrade: 'I' }, '以前写在一格里的拆开');
+  eq(M.splitPlacenta({ placenta: '前壁，成熟度Ⅱ级' }), { placenta: '前壁', placentaGrade: 'II' });
+  eq(M.splitPlacenta({ placenta: '前壁下缘' }), { placenta: '前壁下缘', placentaGrade: '' });
+  eq(M.splitPlacenta({ placenta: '后壁 I 级', placentaGrade: 'II' }), { placenta: '后壁 I 级', placentaGrade: 'II' }, '分开记过的不再拆');
 });
 
 test('B 超识别：括号缩写、换行、四象限羊水、毫米写的羊水', () => {
@@ -963,7 +996,7 @@ test('B 超识别：比值、超出范围、单词里的缩写都不会被误认
   const r = M.parseUltrasoundText('HC/AC 1.11 FL/BPD 0.72 头围/腹围比值 0.98 FLOW 12 BPD 620mm 头围 HC 2.1cm', '2026-10-12');
   eq(r.values, { hc: 21 }, '比值和 620mm 都要跳过');
   eq(M.parseUltrasoundText('胎心率142次/分', '2026-10-12').values, { fhr: 142 }, '次/分 不能当成比值去掉');
-  eq(M.parseUltrasoundText('随便一段文字，没有数值', '2026-10-12'), { values: {}, date: null, placenta: '', note: '' });
+  eq(M.parseUltrasoundText('随便一段文字，没有数值', '2026-10-12'), { values: {}, date: null, placenta: '', placentaMm: null, placentaGrade: '', note: '' });
 });
 
 test('B 超识别：日期不晚于今天，没有关键词时取最近的一个', () => {

@@ -106,6 +106,9 @@
           <input name="v-${f.id}" inputmode="${f.step >= 1 ? 'numeric' : 'decimal'}" autocomplete="off" value="${v != null ? usText(v) : ''}">
         </label>`;
     }).join('');
+    const placenta = r ? M.splitPlacenta(r) : { placenta: '', placentaGrade: '' };
+    const grades = [['', '没写'], ...C.PLACENTA_GRADES.map((g) => [g, g])].map(([g, name]) => `
+      <label><input type="radio" name="placentaGrade" value="${g}"${placenta.placentaGrade === g ? ' checked' : ''}><span>${name}</span></label>`).join('');
     sheetDialog.innerHTML = `
       <form class="dialog-body" data-form="ultrasound" data-id="${r ? esc(r.id) : ''}" novalidate>
         ${dialogHead(r ? '编辑 B 超' : '记一次 B 超', '照着 B 超单填，没有的空着就行')}
@@ -124,10 +127,20 @@
           <input type="date" name="date" max="${ui.today}" value="${r ? r.date : ui.today}">
         </label>
         <div class="us-fields">${fields}</div>
-        <label class="field">
-          <span>胎盘 <small>可选，例如 后壁 I 级</small></span>
-          <input name="placenta" maxlength="40" autocomplete="off" value="${esc(r ? r.placenta : '')}">
-        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>胎盘方位 <small>可选</small></span>
+            <input name="placenta" maxlength="40" autocomplete="off" placeholder="例如 后壁" value="${esc(placenta.placenta)}">
+          </label>
+          <label class="field">
+            <span>胎盘厚度 <small>mm</small></span>
+            <input name="placentaMm" inputmode="decimal" autocomplete="off" value="${r && r.placentaMm != null ? usText(r.placentaMm) : ''}">
+          </label>
+        </div>
+        <div class="field">
+          <span>胎盘成熟度 <small>级</small></span>
+          <div class="seg" role="radiogroup" aria-label="胎盘成熟度" data-name="placentaGrade">${grades}</div>
+        </div>
         <label class="field">
           <span>备注 <small>可选</small></span>
           <textarea name="note" rows="2" maxlength="200" placeholder="例如 头位、脐带绕颈一周">${esc(r ? r.note : '')}</textarea>
@@ -193,6 +206,13 @@
     showDialog(sheetDialog);
   }
 
+  // 成熟度是一组单选，和文字格子一样填、一样还原
+  const valueOf = (el) => (el.matches('.seg') ? (el.querySelector('input:checked') || { value: '' }).value : el.value);
+  const setValue = (el, v) => {
+    if (el.matches('.seg')) el.querySelectorAll('input').forEach((radio) => { radio.checked = radio.value === v; });
+    else el.value = v;
+  };
+
   /**
    * 把粘贴进来的 B 超单文字认一遍，认出来的填进表单并标黄，等人核对。
    * 自己改过的格子不动；粘贴的内容变了（换了张单子、删了几行），上次自动填、没人改过的格子先还原
@@ -209,7 +229,9 @@
       .filter((f) => found.values[f.id] != null)
       .map((f) => [form.elements[`v-${f.id}`], usText(found.values[f.id]), f.name]);
     if (found.date) wanted.push([form.elements.date, found.date, '检查日期']);
-    if (found.placenta) wanted.push([form.elements.placenta, found.placenta, '胎盘']);
+    if (found.placenta) wanted.push([form.elements.placenta, found.placenta, '胎盘方位']);
+    if (found.placentaMm != null) wanted.push([form.elements.placentaMm, usText(found.placentaMm), '胎盘厚度']);
+    if (found.placentaGrade) wanted.push([form.querySelector('.seg[data-name="placentaGrade"]'), found.placentaGrade, '胎盘成熟度']);
     // 认不出时什么都不动，免得粘错一段文字就把填好的冲掉
     if (!wanted.length) {
       result.className = 'us-paste-result is-empty';
@@ -217,7 +239,7 @@
       return;
     }
     form.querySelectorAll('.is-filled').forEach((el) => {
-      el.value = el.dataset.before;
+      setValue(el, el.dataset.before);
       el.classList.remove('is-filled');
     });
     const note = form.elements.note;
@@ -229,8 +251,8 @@
         if (name) kept.push(name);
         continue;
       }
-      if (!('before' in input.dataset)) input.dataset.before = input.value;
-      input.value = value;
+      if (!('before' in input.dataset)) input.dataset.before = valueOf(input);
+      setValue(input, value);
       input.classList.add('is-filled');
       if (name) filled.push(name);
     }

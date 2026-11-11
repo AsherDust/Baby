@@ -179,11 +179,17 @@ iframe.onload = async () => {
     sheetForm().elements['v-bpd'].value = '58.2';
     sheetForm().elements['v-fl'].value = '41.3';
     sheetForm().elements['v-afi'].value = '12';
-    sheetForm().elements.placenta.value = '后壁 0 级';
+    sheetForm().elements.placenta.value = '后壁';
+    sheetForm().elements.placentaMm.value = '300';
+    sheetForm().requestSubmit();
+    log(/胎盘厚度填 5–80 mm/.test(formErr(sheetForm())), '胎盘厚度超出范围会提示', formErr(sheetForm()));
+    sheetForm().elements.placentaMm.value = '24';
+    log(sheetForm().elements.placentaGrade.value === '', '成熟度默认「没写」');
+    sheetForm().querySelector('[name="placentaGrade"][value="0"]').click();
     sheetForm().requestSubmit();
     await settle();
     log(!sheet().open && state().ultrasounds.length === 1 && $$('.us-item').length === 3, '保存一次 B 超，显示 3 项');
-    log(/孕 22 周/.test(text('.us-date')) && /后壁 0 级/.test(text('.us-extra')), '标出孕周和胎盘');
+    log(/孕 22 周/.test(text('.us-date')) && /胎盘后壁，厚 24 mm，0 级/.test(text('.us-extra')), '标出孕周，胎盘方位、厚度、成熟度写在一起', text('.us-extra'));
 
     $('[data-action="add-us"]').click();
     sheetForm().elements.date.value = '2026-10-09';
@@ -210,6 +216,23 @@ iframe.onload = async () => {
     $('[data-action="undo"]').click();
     log(state().ultrasounds.length === 2, '撤销删除 B 超');
 
+    $$('.us [data-action="edit-us"]')[1].click();
+    let uf = sheetForm().elements;
+    log(uf.placenta.value === '后壁' && uf.placentaMm.value === '24' && uf.placentaGrade.value === '0', '编辑时带出胎盘方位、厚度、成熟度', `${uf.placenta.value}/${uf.placentaMm.value}/${uf.placentaGrade.value}`);
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await settle();
+    const legacy = w.Baby.app.state.ultrasounds[0];
+    legacy.placenta = '后壁 I 级';
+    delete legacy.placentaMm;
+    delete legacy.placentaGrade;
+    w.Baby.app.render();
+    log(/胎盘后壁，I 级/.test(text('.us:last-child .us-extra')), '以前写在一格里的「后壁 I 级」拆开显示', text('.us:last-child .us-extra'));
+    $$('.us [data-action="edit-us"]')[1].click();
+    uf = sheetForm().elements;
+    log(uf.placenta.value === '后壁' && uf.placentaGrade.value === 'I', '编辑以前的记录：方位和成熟度拆开填好', `${uf.placenta.value}/${uf.placentaGrade.value}`);
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await settle();
+
     // ---- 粘贴 B 超单文字自动填 ----
     $('.us [data-action="edit-us"]').click();
     log(!sheet().querySelector('.us-paste').open, '编辑旧记录时粘贴区默认收起');
@@ -220,11 +243,11 @@ iframe.onload = async () => {
     log(sheet().querySelector('.us-paste').open && paste, '新记一次时粘贴区默认展开');
     const type = (el, v) => { el.value = v; el.dispatchEvent(new w.InputEvent('input', { bubbles: true })); };
     type(paste, '检查日期：2026-10-09\n双顶径约6.2cm，头围约22.6cm，股骨长约4.5cm\n胎心率约142次/分 AFI 12.3cm\n胎盘位于后壁，成熟度Ⅰ级。头位');
-    const uf = sheetForm().elements;
+    uf = sheetForm().elements;
     log(uf['v-bpd'].value === '62' && uf['v-hc'].value === '226' && uf['v-fl'].value === '45' && uf['v-fhr'].value === '142' && uf['v-afi'].value === '12.3' && uf['v-ac'].value === '',
       '认出来的数填进对应格子，厘米换成毫米', ['bpd', 'hc', 'fl', 'fhr', 'afi', 'ac'].map((k) => uf[`v-${k}`].value).join('/'));
-    log(uf.date.value === '2026-10-09' && uf.placenta.value === '后壁 I 级' && uf.note.value === '头位', '日期、胎盘、胎位也填好', `${uf.date.value}/${uf.placenta.value}/${uf.note.value}`);
-    log(sheet().querySelectorAll('.is-filled').length === 8 && /认出了 双顶径、头围、股骨长、胎心率、羊水指数、检查日期、胎盘/.test(text('#us-paste-result')), '填好的标黄，并说明认出了哪些', text('#us-paste-result'));
+    log(uf.date.value === '2026-10-09' && uf.placenta.value === '后壁' && uf.placentaGrade.value === 'I' && uf.note.value === '头位', '日期、胎盘、胎位也填好', `${uf.date.value}/${uf.placenta.value}/${uf.placentaGrade.value}/${uf.note.value}`);
+    log(sheet().querySelectorAll('.is-filled').length === 9 && sheet().querySelector('.seg.is-filled') && /认出了 双顶径、头围、股骨长、胎心率、羊水指数、检查日期、胎盘方位、胎盘成熟度/.test(text('#us-paste-result')), '填好的标黄（成熟度那组也标），并说明认出了哪些', text('#us-paste-result'));
     type(uf['v-bpd'], '62.4');
     log(!uf['v-bpd'].classList.contains('is-filled') && uf['v-hc'].classList.contains('is-filled'), '自己改过的格子不再标黄');
     type(paste, '检查日期：2026-10-09\n双顶径约6.2cm，股骨长约4.5cm\n胎心率约142次/分 AFI 12.3cm\n胎盘位于后壁，成熟度Ⅰ级。头位');
@@ -234,6 +257,13 @@ iframe.onload = async () => {
     type(paste, 'FL 50mm 头围 HC 230mm');
     log(uf['v-fl'].value === '50' && uf['v-hc'].value === '230' && uf['v-fhr'].value === '' && uf['v-afi'].value === '' && uf.date.value === '2026-10-12' && uf.placenta.value === '' && uf.note.value === '' && uf['v-bpd'].value === '62.4',
       '换一张单子再粘贴：上一张自动填的都还原，只留这张的', ['fl', 'hc', 'fhr', 'afi', 'bpd'].map((k) => uf[`v-${k}`].value).join('/') + ` ${uf.date.value} ${uf.placenta.value} ${uf.note.value}`);
+    log(uf.placentaGrade.value === '' && !sheet().querySelector('.seg.is-filled'), '成熟度也还原成「没写」', uf.placentaGrade.value);
+    type(paste, '胎盘方位：前壁，胎盘厚度：15mm，胎盘成熟度：0；');
+    log(uf.placenta.value === '前壁' && uf.placentaMm.value === '15' && uf.placentaGrade.value === '0' && /认出了 胎盘方位、胎盘厚度、胎盘成熟度/.test(text('#us-paste-result')), '胎盘方位、厚度、成熟度都认出来', `${uf.placenta.value}/${uf.placentaMm.value}/${uf.placentaGrade.value} ${text('#us-paste-result')}`);
+    sheetForm().querySelector('[name="placentaGrade"][value="I"]').click();
+    type(paste, '胎盘方位：前壁，胎盘成熟度：Ⅱ级');
+    log(uf.placentaGrade.value === 'I' && !sheet().querySelector('.seg.is-filled') && /胎盘成熟度你改过，没动/.test(text('#us-paste-result')), '自己点过的成熟度，再粘贴也不动', `${uf.placentaGrade.value} ${text('#us-paste-result')}`);
+    type(paste, 'FL 50mm 头围 HC 230mm');
     type(uf.date, '2026-10-10');
     type(paste, '检查日期：2026-10-09 FL 51mm');
     log(uf.date.value === '2026-10-10' && uf['v-fl'].value === '51', '日期自己改过，再粘贴也不动');

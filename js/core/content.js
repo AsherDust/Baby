@@ -238,6 +238,9 @@
     { id: 'dvp', name: '最大羊水深度', abbr: 'AFV', unit: 'cm', min: 0, max: 20, step: 0.1, about: '最深的一处羊水，一般在 2–8 cm 之间。', alias: ['最大羊水深度', '羊水最大深度', '最大羊水池深度', '羊水深度', '最大深度', '最大暗区', 'AFV', 'DVP', 'MVP'] },
     { id: 'efw', name: '估计体重', abbr: 'EFW', unit: 'g', min: 50, max: 6500, step: 1, about: '按 B 超测量值估算，误差可能有 10–15%。', alias: ['估计体重', '估测体重', '胎儿体重', '预估体重', '估重', 'EFW'] },
   ];
+  // 胎盘和方位记在一起：厚度一般 20–40 mm，随孕周变厚；成熟度分 0–III 级
+  const PLACENTA_MM = { name: '胎盘厚度', unit: 'mm', min: 5, max: 80 };
+  const PLACENTA_GRADES = ['0', 'I', 'II', 'III'];
 
   // 血糖按一天里测的时间点记；目标值参考《妊娠期高血糖诊治指南（2022）》，以医生给的为准
   const GLUCOSE_SLOTS = [
@@ -467,6 +470,8 @@
     FOOD_GROUPS,
     FOODS,
     US_FIELDS,
+    PLACENTA_MM,
+    PLACENTA_GRADES,
     GLUCOSE_SLOTS,
     MOM,
     CHEERS,

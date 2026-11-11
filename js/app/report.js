@@ -5,7 +5,7 @@
   const {
     dates: D, content: C, model: M, chart: Chart, baby: Bb, babyBook: BB, babyFood: FOOD, growthStandard: STD, journal: J, art: A, app,
   } = globalThis.Baby;
-  const { esc, ui, kg, kgDiff } = app;
+  const { esc, ui, kg, kgDiff, placentaText } = app;
 
   const W = 640;
   const row = (label, value) => (value ? `<tr><th>${label}</th><td>${value}</td></tr>` : '');
@@ -111,7 +111,7 @@
       const fields = C.US_FIELDS.filter((f) => us.values[f.id] != null);
       usBody = `
         <p>${D.formatDate(us.date, { year: true })}（孕 ${D.formatGA(D.gestation(p.dueDate, us.date).days)} 周）</p>
-        <table class="rp-kv">${fields.map((f) => row(`${f.name} ${f.abbr}`, `${us.values[f.id]} ${f.unit}`)).join('')}${row('胎盘', esc(us.placenta || ''))}${row('备注', esc(us.note || ''))}</table>`;
+        <table class="rp-kv">${fields.map((f) => row(`${f.name} ${f.abbr}`, `${us.values[f.id]} ${f.unit}`)).join('')}${row('胎盘', esc(placentaText(us)))}${row('备注', esc(us.note || ''))}</table>`;
     }
 
     const next = M.nextCheckup(M.scheduleRows(s, today));

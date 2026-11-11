@@ -64,8 +64,9 @@
     }
     // B 超表单里自己改过的格子：不再标成「自动填的」，之后再粘贴也不动它
     if (e.target.closest('form[data-form="ultrasound"]')) {
-      e.target.dataset.manual = '1';
-      e.target.classList.remove('is-filled');
+      const box = e.target.closest('.seg') || e.target;
+      box.dataset.manual = '1';
+      box.classList.remove('is-filled');
     }
     if (e.target.id === 'noise-volume') {
       app.setNoiseVolume(Number(e.target.value));

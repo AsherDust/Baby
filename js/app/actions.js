@@ -104,6 +104,8 @@
         date: String(f.get('date') || ''),
         values: Object.fromEntries(C.US_FIELDS.map((x) => [x.id, String(f.get(`v-${x.id}`) || '')])),
         placenta: String(f.get('placenta') || ''),
+        placentaMm: String(f.get('placentaMm') || ''),
+        placentaGrade: String(f.get('placentaGrade') || ''),
         note: String(f.get('note') || ''),
       };
       const error = M.usError(fields, ui.today);
