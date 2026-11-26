@@ -24,7 +24,10 @@ function bind() {
   w.confirm = () => true;
   w.URL.createObjectURL = (b) => { blobs.push(b); return 'blob:fake'; };
   w.URL.revokeObjectURL = () => {};
-  w.HTMLAnchorElement.prototype.click = function () {};
+  const clickLink = w.HTMLAnchorElement.prototype.click;
+  w.HTMLAnchorElement.prototype.click = function () {
+    if (!this.hasAttribute('download')) clickLink.call(this);
+  };
 }
 const $ = (s) => d.querySelector(s);
 const $$ = (s) => [...d.querySelectorAll(s)];
@@ -37,8 +40,9 @@ const nav = async (hash) => {
 const state = () => JSON.parse(w.localStorage.getItem('honey-pot:v1'));
 const toastText = () => d.getElementById('toast').textContent.replace(/\s+/g, ' ').trim();
 const reload = () => new Promise((r) => { iframe.onload = r; w.location.reload(); }).then(bind);
-const composer = () => $('form[data-form="journal"]');
+const composer = () => $('dialog[open] form[data-form="journal-day"]');
 const sheet = () => d.getElementById('sheet-dialog');
+const openDay = (date = '2026-10-12') => $(`.mcal-cell[data-date="${date}"]`).click();
 const pick = (root, mood) => root.querySelector(`.mood-opt.mood-${mood}`).click();
 const checked = (root) => (root.querySelector('input[name="mood"]:checked') || {}).value || '';
 const bursts = () => d.querySelectorAll('.burst').length;
@@ -59,43 +63,43 @@ iframe.onload = async () => {
     $('.mood-quick-btn[data-mood="tired"]').click();
     await wait(40);
     log(w.location.hash === '#/journal' && $('.tab[aria-current="page"]').getAttribute('href') === '#/journal', '点小脸进到心情页');
-    log(checked(composer()) === 'tired' && d.activeElement && d.activeElement.id === 'j-text', '选好了这个心情，光标在写字的框里', `${checked(composer())} ${d.activeElement && d.activeElement.id}`);
+    log(checked(composer()) === 'tired' && d.activeElement === composer().elements.text, '选好了这个心情，光标在写字的框里', `${checked(composer())} ${d.activeElement && d.activeElement.id}`);
     log($('.card-mood-tl .empty-bee'), '还没记过时显示空的时间线');
 
     pick(composer(), 'happy');
     composer().querySelectorAll('input[name="mood"]').forEach((r) => { r.checked = false; });
-    w.Baby.app.ui.journalMood = '';
     composer().requestSubmit();
     log(/先选一个心情吧/.test(composer().querySelector('.form-error').textContent) && state().journal.length === 0, '没选心情时不让记');
 
     pick(composer(), 'happy');
-    $('#j-text').value = '今天去散步了\n\n\n\n看到晚霞';
+    composer().elements.text.value = '今天去散步了\n\n\n\n看到晚霞';
     w.Baby.app.render();
-    log(checked(composer()) === 'happy' && $('#j-text').value.startsWith('今天去散步了'), '重绘后选好的心情和写了一半的字都还在');
+    log(checked(composer()) === 'happy' && composer().elements.text.value.startsWith('今天去散步了'), '重绘后选好的心情和写了一半的字都还在');
     composer().requestSubmit();
     await wait(10);
     let j = state().journal;
     log(j.length === 1 && j[0].mood === 'happy' && j[0].text === '今天去散步了\n\n看到晚霞' && /^\d\d:\d\d$/.test(j[0].time) && j[0].date === '2026-10-12', '记下一条，带上几点', JSON.stringify(j[0]));
     log(/记下了，豆豆也跟着开心/.test(toastText()) && $('#toast [data-action="undo"]'), '提示按心情说话，带撤销', toastText());
     log(bursts() >= 1, '记下时冒爱心');
-    log($('#j-text').value === '' && checked(composer()) === '', '记完后清空，可以接着写');
+    $('[data-action="mood-stats"]').click();
+    log($('#mood-stats .mood-stats-total').textContent === '一共记了 1 条', '展开统计显示全部记录总数');
+    $('[data-action="mood-stats"]').click();
     log($('.mood-entry.mood-happy') && $('.mood-day-rel').textContent === '今天' && /孕 24⁺³ 周/.test($('.mood-day-date').textContent), '时间线上出现今天这条，带孕周');
     log($('.mood-entry-text').textContent === '今天去散步了\n\n看到晚霞', '换行保留下来');
 
     $('[data-action="undo"]').click();
     log(state().journal.length === 0 && /已撤销/.test(toastText()), '撤销刚记的');
 
+    openDay();
     pick(composer(), 'happy');
     composer().requestSubmit();
     log(/开心的日子记下来了/.test(toastText()), '同样的事第二次换个说法', toastText());
     log(!$('.mood-entry-text'), '只选心情不写字也能记');
 
+    log(!$('.mcal-cell[data-date="2026-10-13"]'), '以后的日期没有记录入口');
+    openDay('2026-10-10');
     pick(composer(), 'low');
-    $('#j-date').value = '2026-10-13';
-    composer().requestSubmit();
-    log(/不能晚于今天/.test(composer().querySelector('.form-error').textContent) && state().journal.length === 1, '日期不能选明天');
-    $('#j-date').value = '2026-10-10';
-    $('#j-text').value = '<img src=x onerror="window.hacked=1">腰酸';
+    composer().elements.text.value = '<img src=x onerror="window.hacked=1">腰酸';
     composer().requestSubmit();
     j = state().journal;
     log(j.length === 2 && j[1].date === '2026-10-10' && j[1].time === '', '补记以前的日子，不带几点', JSON.stringify(j[1]));
@@ -103,16 +107,22 @@ iframe.onload = async () => {
     log(!$('.mood-entry-text img') && $$('.mood-entry-text')[0].textContent.startsWith('<img') && !w.hacked, '写的字原样显示，不当成网页代码');
     log($('.mood-month').textContent.includes('2026 年 10 月') && /2 条/.test($('.mood-month small').textContent), '月份标题带条数');
 
+    const todayEntry = w.Baby.app.state.journal[0];
+    todayEntry.text = '今天听到胎心了，想把这个瞬间记下来。\n' + '真开心'.repeat(8);
     await nav('#/');
+    const latestMood = $('.todo-icon-mood').parentElement;
+    log(latestMood.querySelector('time').textContent === todayEntry.time && latestMood.querySelector('.todo-mood-note').textContent === todayEntry.text, '首页显示今天最新心情的时间与完整正文');
     log(/今天的心情：开心/.test($('.panel-today').textContent) && $('.todo-icon-mood svg') && $('.panel-today a[href="#/journal"]'), '首页显示今天的心情，可以再写一条');
 
-    await nav('#/journal');
-    pick(composer(), 'excited');
+    $('.panel-today [data-action="journal-start"]').click();
+    await wait(40);
+    log(sheet().open && composer() && checked(composer()) === '' && composer().elements.text.value === '', '再写一条打开今天的空白表单');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(40);
     const low = state().journal.find((e) => e.mood === 'low');
     $(`[data-action="edit-journal"][data-id="${low.id}"]`).click();
     log(sheet().open && checked(sheet()) === 'low' && sheet().querySelector('textarea').value.endsWith('腰酸'), '点铅笔打开这条，内容都填好了');
     pick(sheet(), 'calm');
-    log(w.Baby.app.ui.journalMood === 'excited', '面板里换心情不影响上面正在写的');
     sheet().querySelector('textarea').value = '腰酸，睡前泡了脚';
     sheet().querySelector('input[name="date"]').value = '2026-10-20';
     sheet().querySelector('form').requestSubmit();
@@ -123,7 +133,6 @@ iframe.onload = async () => {
     const edited = j.find((e) => e.id === low.id);
     log(!sheet().open && edited.mood === 'calm' && edited.date === '2026-10-12' && edited.text === '腰酸，睡前泡了脚' && /保存好了/.test(toastText()), '改好后保存', toastText());
     log($$('.mood-day').length === 1 && j[j.length - 1].id === low.id, '改到今天后排进今天，没时间的排后面');
-    log(checked(composer()) === 'excited', '上面选好的心情还在');
 
     $(`[data-action="edit-journal"][data-id="${low.id}"]`).click();
     sheet().querySelector('[data-action="delete-journal"]').click();
@@ -146,6 +155,9 @@ iframe.onload = async () => {
     w.localStorage.setItem('honey-pot:v1', JSON.stringify(s));
     await reload();
     await nav('#/journal');
+    $('[data-action="mood-stats"]').click();
+    log($('#mood-stats .mood-stats-total').textContent === '一共记了 47 条', '展开统计显示全部记录总数');
+    $('[data-action="mood-stats"]').click();
     log($$('.mood-entry').length === 20 && /还有 27 条/.test($('[data-action="journal-more"]').textContent), '一次先显示 20 条', `${$$('.mood-entry').length}`);
     const sept = $$('.mood-month').find((h) => h.textContent.includes('9 月'));
     log(sept && /30 条/.test(sept.textContent), '月份条数算上没显示出来的', sept && sept.textContent);
@@ -167,6 +179,7 @@ iframe.onload = async () => {
     reduceMotion = true;
     d.querySelectorAll('.burst').forEach((b) => b.remove());
     await nav('#/journal');
+    openDay();
     pick(composer(), 'calm');
     composer().requestSubmit();
     await wait(10);
@@ -190,9 +203,31 @@ iframe.onload = async () => {
     const cal = () => $('.mcal');
     const cell = (date) => $(`.mcal-cell[data-date="${date}"]`);
     const title = () => cal().querySelector('.day-title').textContent.replace(/\s+/g, ' ');
-    log(cal() && (cal().compareDocumentPosition(composer()) & w.Node.DOCUMENT_POSITION_FOLLOWING), '月历在最上面，写心情的在它下面');
-    log(/2026 年 10 月/.test(title()) && $$('.mcal-week').length === 7 && $$('.mcal-cell.is-blank').length === 3 && $$('.mcal-cell[data-date]').length === 12 && $$('.mcal-cell.is-future').length === 19,
-      '10 月：一周从周一开始，1 号是周四；以后的日子点不了', `${$$('.mcal-cell[data-date]').length}/${$$('.mcal-cell.is-future').length}`);
+    const statsToggle = () => $('.mcal [aria-controls="mood-stats"]');
+    log(statsToggle().textContent === '统计' && statsToggle().getAttribute('aria-expanded') === 'false' && $('#mood-stats').hidden && !$('.mood-stats-total') && !$('.card-mood-tl .card-meta'), '月历统计默认收起，收起时隐藏总数');
+    statsToggle().click();
+    const stats = $('.mcal .mood-stage-counts');
+    log(statsToggle().getAttribute('aria-expanded') === 'true' && !$('#mood-stats').hidden && stats.tBodies[0].querySelector('td.st-mid')
+      && w.getComputedStyle(stats.tBodies[0].querySelector('td.st-mid')).backgroundColor === w.getComputedStyle($('.mcal-cell.st-mid')).backgroundColor, '展开统计，孕中期一行沿用月历格子的底色');
+    log($('.mood-total-icon svg').isEqualNode($('.tab[href="#/journal"] svg')), '合计使用心情页标签图标');
+    const originalWidth = iframe.style.width;
+    for (const width of [320, 517, 760]) {
+      iframe.style.width = width + 'px';
+      const totalCell = stats.tBodies[0].rows[0].cells[0];
+      const compact = width === 320;
+      log((w.getComputedStyle(totalCell.querySelector('.mood-stage-name')).display === 'none') === compact
+        && (w.getComputedStyle(totalCell.querySelector('.mood-count-unit')).display === 'none') === compact
+        && (!compact || (w.getComputedStyle(totalCell.querySelector('small')).fontWeight === '700' && totalCell.getAttribute('aria-label').includes('早期'))),
+        width + 'px 宽时合计格按空间显示阶段名或加粗总数');
+      const boxes = [...stats.tBodies[0].querySelectorAll('th, td')].map((el) => el.getBoundingClientRect());
+      log(boxes.every((box) => box.width > 0 && Math.abs(box.width - box.height) < 1), width + 'px 宽时，阶段和数量格均为正方形');
+    }
+    iframe.style.width = originalWidth;
+    const midRow = [...stats.tBodies[0].rows].find((row) => row.cells[0].firstChild.textContent === '中期');
+    log(!$('.mcal-legend') && !stats.caption && stats.tHead.rows[0].cells[0].textContent === '合计' && [...stats.tBodies[0].rows].map((row) => row.cells[0].firstChild.textContent).join() === '早期,中期,晚期,产后' && midRow.cells[0].querySelector('small').textContent === `${state().journal.length} 条`, '月历移除颜色图例，阶段卡统计全部月份的记录');
+    log([...midRow.cells].slice(1).every((cell, i) => Number(cell.textContent) === state().journal.filter((e) => e.mood === moods[i]).length), '阶段表按六种心情分别计数');
+    log(/2026 年 10 月/.test(title()) && $$('.mcal-week').length === 7 && $$('.mcal-cell.is-blank').length === 3 && $$('.mcal-cell[data-date]').filter((el) => el.dataset.date <= '2026-10-12').length === 12 && $$('.mcal-cell.is-future').length + $$('.mcal-cell[data-date]').filter((el) => el.dataset.date > '2026-10-12' && el.querySelector('.mcal-heart')).length === 19,
+      '10 月：一周从周一开始，1 号是周四；未来只有产检日可点', `${$$('.mcal-cell[data-date]').length}/${$$('.mcal-cell.is-future').length}`);
     const todays = J.onDay(state().journal, '2026-10-12');
     log(cell('2026-10-12').classList.contains(`mood-${todays[0].mood}`) && cell('2026-10-12').querySelector('.mood-face svg') && cell('2026-10-12').querySelector('.mcal-count').textContent === String(todays.length) && cell('2026-10-12').classList.contains('is-today'),
       '今天那格放最新那条的小脸，标出记了几条', `${todays[0].mood} ${todays.length} ${cell('2026-10-12').className}`);
@@ -202,6 +237,7 @@ iframe.onload = async () => {
     cell('2026-10-03').click();
     log(sheet().open && /10月3日/.test(sheet().querySelector('h2').textContent) && /孕中期 · 孕 23⁺¹ 周/.test(sheet().textContent) && sheet().querySelector('.mood-day-none') && /补记一条/.test(sheet().textContent),
       '点没记的一天：说还没记，可以补记', sheet().textContent.replace(/\s+/g, ' ').slice(0, 80));
+    log(composer().elements.text.placeholder === '想说点什么？写给自己，也可以写给宝宝（不写也行）', '补记输入框显示完整提示');
     sheet().querySelector('form').requestSubmit();
     log(sheet().open && /先选一个心情吧/.test(sheet().querySelector('.form-error').textContent), '没选心情时不让记');
     pick(sheet(), 'calm');
@@ -212,7 +248,16 @@ iframe.onload = async () => {
     log(!sheet().open && added && added.mood === 'calm' && added.time === '' && added.text === '补上那天去公园', '补记一条，不带几点', JSON.stringify(added));
     log(cell('2026-10-03').classList.contains('mood-calm') && cell('2026-10-03').classList.contains('is-pop') && $('#toast [data-action="undo"]'), '那一格换成小脸跳一下，可以撤销');
 
+    const model = w.Baby.model;
+    const app = w.Baby.app;
+    const booking = model.addCheckup(app.state, { date: '2026-10-12', title: '复查 <A>' });
+    model.addCheckup(app.state, { date: '2026-10-12', title: '复查 B' });
+    app.render();
+    log(cell('2026-10-12').querySelector('.mcal-count') && cell('2026-10-12').querySelector('.mcal-heart'), '同日多条心情和产检分别显示角标');
     cell('2026-10-12').click();
+    const notice = sheet().querySelector('.mood-checkups');
+    log(cell('2026-10-12').querySelector('.mcal-heart').isEqualNode(notice.firstElementChild) && w.getComputedStyle(notice).borderTopStyle === 'dashed', '产检提示框用虚线边框和月历同款红心');
+    log(sheet().querySelector('.dialog-head + .mood-checkups').textContent.includes('复查 <A>、复查 B') && !sheet().querySelector('.mood-checkups a'), '弹窗开头展示同日全部产检标题');
     log(sheet().open && /今天/.test(sheet().querySelector('h2').textContent) && sheet().querySelectorAll('.mood-entry').length === todays.length && /再记一条/.test(sheet().textContent), '点今天：列出今天记的几条，下面可以再记一条');
     pick(sheet(), 'happy');
     sheet().querySelector('form').requestSubmit();
@@ -227,19 +272,36 @@ iframe.onload = async () => {
 
     const next = () => cal().querySelector('[data-step="1"]');
     const prev = () => cal().querySelector('[data-step="-1"]');
-    log(next().disabled && !prev().disabled, '这个月不能往后翻');
+    model.updateCheckup(app.state, booking.id, { date: '2026-11-02' });
+    next().click();
+    cell('2026-11-02').click();
+    log(sheet().querySelector('.mood-checkups').textContent.includes('复查 <A>') && !composer(), '改约后能跨月查看未来产检，不能提前记录心情');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(20);
+    prev().click();
     prev().click();
     log(/2026 年 9 月/.test(title()) && /这个月记了 30 天/.test(title()) && cell('2026-09-15').querySelector('.mood-face') && !next().disabled, '翻到 9 月，说这个月记了几天', title());
     for (let i = 0; i < 6; i += 1) prev().click();
-    log(/2026 年 4 月/.test(title()) && prev().disabled && cell('2026-04-23').classList.contains('st-pre') && cell('2026-04-24').classList.contains('st-early') && /孕前/.test($('.mcal-legend').textContent),
+    log(/2026 年 4 月/.test(title()) && prev().disabled && cell('2026-04-23').classList.contains('st-pre') && cell('2026-04-24').classList.contains('st-early'),
       '最早翻到怀孕那个月，末次月经以前算孕前', title());
+    while (cal().dataset.month < '2026-09') next().click();
+    openDay('2026-09-05');
     pick(composer(), 'excited');
-    $('#j-date').value = '2026-09-05';
     composer().requestSubmit();
     await wait(10);
-    log(/2026 年 9 月/.test(title()) && cell('2026-09-05').classList.contains('is-pop'), '在上面补记到别的月份，月历翻过去', title());
+    log(/2026 年 9 月/.test(title()) && cell('2026-09-05').classList.contains('is-pop'), '在九月补记后，仍显示九月并标出所选日期', title());
     next().click();
-    log(/2026 年 10 月/.test(title()) && next().disabled, '翻回这个月');
+    log(/2026 年 10 月/.test(title()) && !next().disabled, '翻回这个月');
+
+    for (const date of ['2026-04-23', '2026-04-24']) {
+      J.add(w.Baby.app.state, { date, mood: 'calm', text: '' }, '2026-10-12', Date.now());
+    }
+    w.Baby.app.render();
+    const rows = [...$('.mood-stage-counts').tBodies[0].rows];
+    log(rows[0].cells[0].textContent.includes('孕前') && rows[1].cells[0].firstChild.textContent === '早期'
+      && rows[0].cells[2].textContent === '1' && rows[1].cells[2].textContent === '1', '跨阶段的两条平静记录各归到对应阶段');
+    statsToggle().click();
+    log($('#mood-stats').hidden && statsToggle().getAttribute('aria-expanded') === 'false', '再点统计收回表格');
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }

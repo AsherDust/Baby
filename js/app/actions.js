@@ -27,22 +27,6 @@
       checkNotifications();
     },
 
-    journal(form) {
-      const f = journalFields(form);
-      const error = J.entryError(f, ui.today);
-      if (error) return formError(form, error);
-      cheer(submitButton(form));
-      const entry = J.add(app.state, f, ui.today, Date.now());
-      persist();
-      ui.journalMood = '';
-      // 补记到别的月份时，月历翻过去，让那一格跳一下
-      ui.moodMonth = entry.date.slice(0, 7) === ui.today.slice(0, 7) ? '' : entry.date.slice(0, 7);
-      ui.moodPop = entry.date;
-      ui.clearInputs.push('j-text', 'j-date');
-      render();
-      toast(say(`mood-${entry.mood}`), () => J.remove(app.state, entry.id));
-    },
-
     // 月历上点了一天，在弹出来的面板里记（补记）
     'journal-day'(form) {
       const f = journalFields(form);
@@ -218,8 +202,11 @@
     },
 
     'journal-start'(el) {
-      ui.journalMood = el.dataset.mood;
-      go('#/journal', 'j-text');
+      ui.moodMonth = '';
+      window.addEventListener('hashchange', () => {
+        if (location.hash === '#/journal') openMoodDaySheet(ui.today, el.dataset.mood);
+      }, { once: true });
+      go('#/journal');
     },
 
     'edit-journal'(el) {
@@ -235,9 +222,14 @@
       toast('删掉了这条心情', () => app.state.journal.splice(removed.index, 0, removed.entry));
     },
 
+    'mood-stats'() {
+      ui.moodStatsOpen = !ui.moodStatsOpen;
+      render();
+    },
+
     'mood-month'(el) {
       const month = J.shiftMonth(el.closest('.mcal').dataset.month, Number(el.dataset.step));
-      ui.moodMonth = month >= ui.today.slice(0, 7) ? '' : month;
+      ui.moodMonth = month === ui.today.slice(0, 7) ? '' : month;
       render();
     },
 

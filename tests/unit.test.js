@@ -1235,7 +1235,17 @@ test('心情：新增带上几点，补记的不带；新的排前面，修改�
   eq(s.journal.map((e) => e.id), [a.id, b.id, c.id]);
   eq(J.remove(s, 'nope'), null);
   eq(J.onDay(s.journal, '2026-10-12').length, 2);
-  eq(J.moodOf('tired').name, '累');
+  eq(J.moodOf('tired').name, '累累');
+});
+
+test('心情：同一分钟内按创建先后排，旧备份也能读出最新一条', () => {
+  const entry = { date: '2026-10-12', time: '20:28', text: '' };
+  const id = (ms) => `j-${ms.toString(36)}abcd`;
+  const list = J.normalize([
+    { ...entry, id: id(NOON), mood: 'excited' },
+    { ...entry, id: id(NOON + 5000), mood: 'calm' },
+  ]);
+  eq(list.map((e) => e.mood), ['calm', 'excited']);
 });
 
 test('心情时间线：按天分组带孕龄，每月条数算全部，只显示前几条', () => {

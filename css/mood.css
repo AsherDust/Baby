@@ -34,7 +34,7 @@
 .st-post { background: #ECE6F6; background: color-mix(in srgb, #B9A8E0 34%, var(--card)); }
 .mcal-nav { margin-bottom: 12px; }
 .mcal .day-title small b { margin: 0 2px; font-family: var(--num); font-size: 15px; color: var(--honey-deep); }
-.mcal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.mcal-grid, .mood-stage-counts tr { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .mcal-week { padding-bottom: 2px; font-size: 12px; text-align: center; color: var(--ink-3); }
 .mcal-cell {
   position: relative;
@@ -59,6 +59,9 @@ button.mcal-cell:focus-visible { outline: 2.5px solid rgba(233, 169, 60, 0.7); o
 .mcal-num { font-family: var(--num); font-size: 15px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .mcal-cell .mood-face { width: 86%; height: 86%; transition: transform 0.35s cubic-bezier(0.3, 1.6, 0.5, 1); }
 button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
+.mcal-cell > .mcal-heart { position: absolute; top: -4px; left: -3px; }
+.mcal-heart { flex: none; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--card); color: var(--red); font-size: 15px; line-height: 1; pointer-events: none; }
+.mood-checkups { display: flex; align-items: baseline; gap: 8px; margin: 0 0 12px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: 16px; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
 .mcal-count {
   position: absolute;
   top: -4px;
@@ -89,14 +92,31 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
   60% { transform: scale(1.18) rotate(6deg); opacity: 1; }
   100% { transform: none; }
 }
-.mcal-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 14px; }
-.mcal-legend, .mcal-tally { display: flex; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; }
-.mcal-legend { gap: 4px 12px; font-size: 12px; color: var(--ink-3); }
-.mcal-legend li { display: flex; align-items: center; gap: 5px; }
-.mcal-legend i { width: 12px; height: 12px; border-radius: 4px; filter: saturate(1.8); }
-.mcal-tally { gap: 4px 10px; }
+.mcal-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.mcal-stats-toggle { display: inline-flex; align-items: center; gap: 6px; flex: none; margin-left: auto; padding: 7px 8px; border: 0; border-radius: 8px; background: var(--honey-glow); color: var(--honey-deep); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.mcal-stats-toggle::after { content: ""; border: 4px solid transparent; border-right: 0; border-left: 5px solid currentColor; }
+.mcal-stats-toggle[aria-expanded="true"]::after { transform: rotate(90deg); }
+.mcal-tally { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0; padding: 0; list-style: none; }
 .mcal-tally li { display: flex; align-items: center; gap: 3px; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .mcal-tally .mood-face { width: 22px; height: 22px; }
+
+.mood-stats-total { display: flex; align-items: center; gap: 12px; margin: 16px 0 6px; }
+.mood-stats-total::before { content: ""; flex: 1; border-top: 1px dashed var(--line-strong); }
+.mood-stage-counts, .mood-stage-counts thead { display: block; }
+.mood-stage-counts { font-variant-numeric: tabular-nums; text-align: center; }
+.mood-stage-counts tbody { display: grid; gap: 6px; }
+.mood-stage-counts tbody :is(th, td) { display: grid; place-content: center; aspect-ratio: 1; min-width: 0; min-height: 0; padding: 0; border-radius: 12px; font-size: 14px; line-height: 1.25; }
+.mood-stage-counts thead th { padding: 8px 0; font-size: 12px; font-weight: 500; color: var(--ink-2); }
+.mood-stage-counts .mood-face, .mood-total-icon { display: block; width: 24px; height: 24px; margin: 0 auto 2px; }
+.mood-total-icon svg { width: 100%; height: 100%; }
+.mood-stage-counts small, .todo-icon-mood + .todo-body time { color: var(--ink-2); font-size: 12px; font-weight: 400; }
+.mood-stage-counts small { display: block; }
+#mood-stats { container-type: inline-size; }
+@container (max-width: 280px) {
+  .mood-stage-name, .mood-count-unit { display: none; }
+  .mood-stage-counts small { color: inherit; font-size: inherit; font-weight: 700; }
+}
+.todo-mood-note { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* 点了一天弹出来的：那天的记录，下面接着记 */
 .mood-day-sheet .mood-entries { margin-bottom: 16px; }
@@ -105,7 +125,6 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
 .mood-day-bee svg { display: block; width: 46px; height: 35px; animation: float 4s ease-in-out infinite; }
 .mood-day-add { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
 
-.mood-form textarea,
 .mood-day-sheet textarea {
   display: block;
   width: 100%;
@@ -119,14 +138,7 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
   resize: vertical;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.mood-form-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
-.mood-date { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; color: var(--ink-2); }
-.mood-date input { height: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--field); font-size: 14px; }
-.mood-form textarea:focus,
-.mood-day-sheet textarea:focus,
-.mood-date input:focus { outline: none; border-color: var(--honey); box-shadow: 0 0 0 4px rgba(233, 169, 60, 0.18); }
-.mood-form-foot .btn { min-width: 112px; }
-.mood-form .form-error { margin-top: 10px; }
+.mood-day-sheet textarea:focus { outline: none; border-color: var(--honey); box-shadow: 0 0 0 4px rgba(233, 169, 60, 0.18); }
 
 /* 时间线：左边是哪天，右边一条条心情，像朋友圈的相册页 */
 .mood-month { display: flex; align-items: baseline; gap: 8px; margin: 26px 0 6px; font-family: var(--serif); font-size: 17px; letter-spacing: 0.04em; }
@@ -181,7 +193,7 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
 .todo-icon-mood svg { width: 34px; height: 34px; }
 
 @media (max-width: 720px) {
-  .mcal-grid { gap: 5px; }
+  .mcal-grid, .mood-stage-counts tr, .mood-stage-counts tbody { gap: 5px; }
   .mcal-cell { border-radius: 12px; }
   .mcal-num { font-size: 14px; }
   .mood-pick { gap: 2px; }
@@ -191,5 +203,5 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
 }
 
 @media (max-width: 720px), (pointer: coarse) {
-  .mood-form textarea, .mood-day-sheet textarea, .mood-date input { font-size: 16px; }
+  .mood-day-sheet textarea { font-size: 16px; }
 }

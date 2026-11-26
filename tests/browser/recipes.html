@@ -213,7 +213,7 @@ const menuIds = () => $$('.dish-open').map((b) => b.dataset.id);
     log(todo() && /午餐吃什么/.test(text(todo())) && $('.panel-today a[href="#/tools/recipes"]'), '11 点首页写着午餐吃什么', text(todo()));
     const titles = $$('.panel-today .todo-title').map((p) => p.textContent);
     const at$ = (re) => titles.findIndex((t) => re.test(t));
-    log(at$(/心情/) === 0 && at$(/吃什么/) === 1 && at$(/吃什么/) < at$(/称个体重/) && at$(/称个体重/) < at$(/产检/), '首页顺序：心情、吃什么、称体重、产检', titles.join(' / '));
+    log(at$(/心情/) === 0 && at$(/称个体重/) === 1 && at$(/称个体重/) < at$(/吃什么/) && at$(/吃什么/) < at$(/产检/), '首页顺序：心情、称体重、吃什么、产检', titles.join(' / '));
     log($$('.panel-today .meal-chip .dish-dot').length === 2 && $('.panel-today .todo-head #quick-kg'), '下一顿的菜带小圆点；称体重的输入框和标题在一行');
     at(22);
     const b2 = byId(R.menu(BOOK, w.Baby.app.state.meals, TOMORROW, w.Baby.app.recipeContext(TOMORROW))[0].dishes[0].recipe.id).name;

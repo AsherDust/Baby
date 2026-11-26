@@ -4,7 +4,7 @@
   const { dates: D, content: C, model: M, journal: J, art: A, i18n: { t }, app } = globalThis.Baby;
   const {
     settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, esc, atRisk, ui, glText, usText, profileFields,
-    moodPicker, moodEntry, moodDayAge, MOOD_STAGES
+    checkupHeart, moodPicker, moodEntry, moodDayAge, MOOD_STAGES
   } = app;
 
   // 弹窗打开时往历史里压一条，手机上按返回键（或侧滑返回）就是关弹窗，而不是退出页面
@@ -157,23 +157,33 @@
   }
 
   /** 点月历上的一天：那天记的都列出来，下面接着记一条（以前的日子就是补记） */
-  function openMoodDaySheet(date) {
-    if (!D.isISODate(date) || date > ui.today) return;
+  function openMoodDaySheet(date, selected = '') {
+    if (!D.isISODate(date)) return;
+    const titles = M.scheduleRows(app.state, ui.today).filter(({ status }) => status.date === date).map(({ ck }) => esc(ck.title));
+    const appointments = titles.length ? `<p class="mood-checkups">${checkupHeart}<span>今日产检：${titles.join('、')}</span></p>` : '';
     const entries = J.onDay(app.state.journal, date);
     const b = app.state.baby;
     const stage = MOOD_STAGES[J.stageOn(date, app.state.profile.dueDate, b ? b.birthDate : null)];
     const isToday = date === ui.today;
     const sub = `${stage} · ${moodDayAge(date)}${entries.length ? ` · 记了 ${entries.length} 条` : ''}`;
+    const head = dialogHead(isToday ? `今天 · ${D.formatDate(date, { weekday: true })}` : D.formatDate(date, { weekday: true, relativeTo: ui.today }), sub);
+    if (date > ui.today) {
+      if (!titles.length) return;
+      sheetDialog.innerHTML = `<div class="dialog-body mood-day-sheet">${head}${appointments}</div>`;
+      showDialog(sheetDialog);
+      return;
+    }
     sheetDialog.innerHTML = `
       <form class="dialog-body mood-day-sheet" data-form="journal-day" novalidate>
-        ${dialogHead(isToday ? `今天 · ${D.formatDate(date, { weekday: true })}` : D.formatDate(date, { weekday: true, relativeTo: ui.today }), sub)}
+        ${head}
+        ${appointments}
         ${entries.length
           ? `<ul class="mood-entries">${entries.map(moodEntry).join('')}</ul>`
           : `<p class="mood-day-none"><span class="mood-day-bee">${A.bee}</span>${isToday ? '今天还没记，说说今天怎么样？' : '这天还没记，想起来了就补一条吧'}</p>`}
         <p class="mood-day-add">${entries.length ? '再记一条' : isToday ? '记一条' : '补记一条'}</p>
-        ${moodPicker('')}
+        ${moodPicker(selected)}
         <input type="hidden" name="date" value="${date}">
-        <textarea name="text" rows="3" maxlength="${J.TEXT_MAX}" placeholder="想说点什么？不写也行" aria-label="想说的话"></textarea>
+        <textarea name="text" rows="3" maxlength="${J.TEXT_MAX}" placeholder="想说点什么？写给自己，也可以写给宝宝（不写也行）" aria-label="想说的话"></textarea>
         <p class="form-error" hidden></p>
         <div class="dialog-actions">
           <span class="spacer"></span>
@@ -182,6 +192,7 @@
         </div>
       </form>`;
     showDialog(sheetDialog);
+    if (selected) sheetDialog.querySelector('textarea').focus();
   }
 
   function openJournalSheet(id) {

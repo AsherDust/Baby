@@ -1,16 +1,11 @@
 (function () {
   'use strict';
   // 「心情」页：选个心情、写几句，下面是按天排的时间线；首页「今天心情怎么样」那一条也在这里
-  const { dates: D, journal: J, baby: Bb, art: A, app } = globalThis.Baby;
+  const { dates: D, model: M, journal: J, baby: Bb, art: A, app } = globalThis.Baby;
   const { esc, ui } = app;
 
+  const checkupHeart = '<span class="mcal-heart" aria-hidden="true">♥</span>';
   const face = (mood) => `<span class="mood-face">${A.mood[mood]}</span>`;
-
-  /** 第一行太长或者有好几行时，截一段加省略号 */
-  function clip(text, max) {
-    const line = text.split('\n')[0];
-    return line.length > max || line !== text ? `${line.slice(0, max)}…` : line;
-  }
 
   /** 选心情的一排小脸，表单里叫 mood */
   function moodPicker(selected) {
@@ -28,44 +23,47 @@
   const STAGE_NAMES = { pre: '孕前', early: '孕早期', mid: '孕中期', late: '孕晚期', post: '产后' };
   const WEEK_HEAD = ['一', '二', '三', '四', '五', '六', '日'];
 
-  /** 能翻到的月份：最早到怀孕那个月（或者更早的第一条记录），最晚到这个月 */
-  function monthRange(today) {
+  /** 月历覆盖心情记录和产检日程，初次打开仍显示本月。 */
+  function monthRange(today, rows) {
     const list = app.state.journal;
-    const lmp = D.lmpFromDue(app.state.profile.dueDate);
-    const first = list.length && list[list.length - 1].date < lmp ? list[list.length - 1].date : lmp;
-    return { first: first.slice(0, 7), last: today.slice(0, 7) };
+    const dates = [today, D.lmpFromDue(app.state.profile.dueDate)];
+    if (list.length) dates.push(list[list.length - 1].date);
+    if (rows.length) dates.push(rows[0].status.date);
+    const last = rows.length && rows[rows.length - 1].status.date > today ? rows[rows.length - 1].status.date : today;
+    return { first: dates.sort()[0].slice(0, 7), last: last.slice(0, 7) };
   }
 
-  function shownMonth(today) {
-    const { first, last } = monthRange(today);
-    const m = ui.moodMonth || last;
-    return m < first ? first : m > last ? last : m;
-  }
-
-  /** 这个月这一格怎么画：有记录画最新的那张小脸，几条就标个数；没记录写几号；以后的日子点不了 */
-  function calendarCell(c, pop) {
+  function calendarCell(c, pop, checkupDates) {
     if (!c) return '<span class="mcal-cell is-blank" aria-hidden="true"></span>';
     const cls = `mcal-cell st-${c.stage}${c.isToday ? ' is-today' : ''}${c.latest ? ` has-mood mood-${c.latest.mood}` : ''}${c.date === pop ? ' is-pop' : ''}`;
-    if (c.future) return `<span class="${cls} is-future" aria-hidden="true"><span class="mcal-num">${c.day}</span></span>`;
+    const checkup = checkupDates.has(c.date);
+    if (c.future && !checkup) return `<span class="${cls} is-future" aria-hidden="true"><span class="mcal-num">${c.day}</span></span>`;
     const what = c.latest ? `${J.moodOf(c.latest.mood).name}${c.count > 1 ? `，记了 ${c.count} 条` : ''}` : '还没记';
     const inner = c.latest
       ? `${face(c.latest.mood)}${c.count > 1 ? `<span class="mcal-count">${c.count}</span>` : ''}`
       : `<span class="mcal-num">${c.day}</span>${c.isToday ? '<span class="mcal-tap" aria-hidden="true">打卡</span>' : ''}`;
-    return `<button type="button" class="${cls}" data-action="mood-day" data-date="${c.date}" aria-label="${D.formatDate(c.date)}${c.isToday ? '（今天）' : ''}，${STAGE_NAMES[c.stage]}，${what}">${inner}</button>`;
+    return `<button type="button" class="${cls}" data-action="mood-day" data-date="${c.date}" aria-label="${D.formatDate(c.date)}${c.isToday ? '（今天）' : ''}，${STAGE_NAMES[c.stage]}${checkup ? '，有产检' : ''}${c.future ? '' : '，' + what}">${checkup ? checkupHeart : ''}${inner}</button>`;
   }
 
   /** 给人一点打卡的劲头：这个月是当前月时说连着记了几天，翻到别的月就说那个月记了几天 */
-  function calendarCheer(cal, today) {
+  function calendarCheer(cal, today, checkupDates) {
+    if (cal.month > today.slice(0, 7)) {
+      const days = cal.cells.filter((c) => c && checkupDates.has(c.date)).length;
+      return days ? `这个月有 <b>${days}</b> 天产检` : '这个月没有产检安排';
+    }
     if (cal.month !== today.slice(0, 7)) return cal.days ? `这个月记了 <b>${cal.days}</b> 天` : '这个月没有记录';
     const s = J.streak(app.state.journal, today);
-    if (s.today) return s.days > 1 ? `已经连着记了 <b>${s.days}</b> 天，真棒` : '今天打过卡啦，明天也来';
+    if (s.today) return s.days > 1 ? `已经连着记了 <b>${s.days}</b> 天，真棒` : '今天打过卡啦，明天也来哦~';
     if (s.days) return `已经连着记了 <b>${s.days}</b> 天，今天也来记一下吧`;
     return '今天还没记，点一下今天那格打个卡';
   }
 
   function viewMoodCalendar(today) {
-    const { first, last } = monthRange(today);
-    const month = shownMonth(today);
+    const rows = M.scheduleRows(app.state, today);
+    const checkupDates = new Set(rows.map(({ status }) => status.date));
+    const { first, last } = monthRange(today, rows);
+    const selected = ui.moodMonth || today.slice(0, 7);
+    const month = selected < first ? first : selected > last ? last : selected;
     const b = app.state.baby;
     const cal = J.calendar(app.state.journal, month, { dueDate: app.state.profile.dueDate, birthDate: b ? b.birthDate : null, today });
     const pop = ui.moodPop;
@@ -74,24 +72,43 @@
     const tally = J.MOODS
       .map((x) => [x, app.state.journal.filter((e) => e.mood === x.id && e.date.startsWith(month)).length])
       .filter(([, n]) => n);
-    const stages = ['early', 'mid', 'late', 'post'];
-    if (cal.cells.some((c) => c && c.stage === 'pre')) stages.unshift('pre');
     return `
       <article class="card mcal" aria-label="心情月历" data-month="${month}">
         <header class="day-nav mcal-nav">
           <button type="button" class="icon-btn" data-action="mood-month" data-step="-1" aria-label="上个月"${month <= first ? ' disabled' : ''}>${A.icon.chevronLeft}</button>
-          <h2 class="day-title">${y} 年 ${m} 月<small>${calendarCheer(cal, today)}</small></h2>
+          <h2 class="day-title">${y} 年 ${m} 月<small>${calendarCheer(cal, today, checkupDates)}</small></h2>
           <button type="button" class="icon-btn" data-action="mood-month" data-step="1" aria-label="下个月"${month >= last ? ' disabled' : ''}>${A.icon.chevronRight}</button>
         </header>
         <div class="mcal-grid">
           ${WEEK_HEAD.map((w) => `<span class="mcal-week" aria-hidden="true">${w}</span>`).join('')}
-          ${cal.cells.map((c) => calendarCell(c, pop)).join('')}
+          ${cal.cells.map((c) => calendarCell(c, pop, checkupDates)).join('')}
         </div>
-        <footer class="mcal-foot">
-          <ul class="mcal-legend" aria-label="格子的颜色">${stages.map((st) => `<li><i class="st-${st}"></i>${STAGE_NAMES[st]}</li>`).join('')}</ul>
+        <div class="mcal-foot">
           ${tally.length ? `<ul class="mcal-tally" aria-label="这个月的心情">${tally.map(([x, n]) => `<li class="mood-${x.id}" title="${x.name}">${face(x.id)}<b>${n}</b></li>`).join('')}</ul>` : ''}
-        </footer>
+          <button type="button" class="mcal-stats-toggle" data-action="mood-stats" aria-expanded="${ui.moodStatsOpen}" aria-controls="mood-stats">统计</button>
+        </div>
+        <div id="mood-stats"${ui.moodStatsOpen ? '' : ' hidden'}>${ui.moodStatsOpen ? viewStageCounts(app.state.journal) : ''}</div>
       </article>`;
+  }
+
+  function viewStageCounts(list) {
+    const { profile, baby } = app.state;
+    const counts = Object.fromEntries(Object.keys(STAGE_NAMES).map((stage) => [stage, { total: 0 }]));
+    for (const entry of list) {
+      const row = counts[J.stageOn(entry.date, profile.dueDate, baby?.birthDate)];
+      row.total += 1;
+      row[entry.mood] = (row[entry.mood] || 0) + 1;
+    }
+    const stages = Object.keys(STAGE_NAMES).filter((stage) => stage !== 'pre' || counts.pre.total);
+    return `
+      <p class="card-meta mood-stats-total">一共记了 ${list.length} 条</p>
+      <table class="mood-stage-counts" aria-label="各阶段的心情">
+        <thead><tr><th scope="col" aria-label="各阶段合计"><span class="mood-total-icon" aria-hidden="true">${A.icon.smile}</span>合计</th>${J.MOODS.map((m) => `<th scope="col">${face(m.id)}${m.name}</th>`).join('')}</tr></thead>
+        <tbody>${stages.map((stage) => `
+          <tr><th class="st-${stage}" scope="row" aria-label="${STAGE_NAMES[stage]}，共 ${counts[stage].total} 条"><span class="mood-stage-name">${STAGE_NAMES[stage].slice(-2)}</span><small>${counts[stage].total}<span class="mood-count-unit"> 条</span></small></th>
+            ${J.MOODS.map((m) => `<td class="st-${stage}">${counts[stage][m.id] || 0}</td>`).join('')}
+          </tr>`).join('')}</tbody>
+      </table>`;
   }
 
   function viewJournalPage(route, { today }) {
@@ -99,23 +116,6 @@
     return `
       ${viewMoodCare(today)}
       ${viewMoodCalendar(today)}
-      <article class="card card-mood">
-        <header class="card-head">
-          <div>
-            <h2 class="card-title">${A.icon.smile}今天感觉怎么样？</h2>
-            <p class="card-meta">${list.length ? `一共记了 ${list.length} 条` : '开心、累了、担心的时候，都可以来这里说说'}</p>
-          </div>
-        </header>
-        <form class="mood-form" data-form="journal" novalidate>
-          ${moodPicker(ui.journalMood)}
-          <textarea id="j-text" name="text" rows="3" maxlength="${J.TEXT_MAX}" placeholder="想说点什么？写给自己，也可以写给宝宝（不写也行）" aria-label="想说的话" data-keep></textarea>
-          <div class="mood-form-foot">
-            <label class="mood-date"><span>记在</span><input type="date" id="j-date" name="date" value="${today}" max="${today}" data-keep></label>
-            <button class="btn">记下来</button>
-          </div>
-          <p class="form-error" hidden></p>
-        </form>
-      </article>
       ${viewTimeline(list, today)}`;
   }
 
@@ -239,8 +239,11 @@
         <li class="todo-item is-done">
           <span class="todo-icon todo-icon-mood">${A.mood[latest.mood]}</span>
           <div class="todo-body">
-            <p class="todo-title">今天的心情：${J.moodOf(latest.mood).name}</p>
-            <p class="todo-text">${latest.text ? `${esc(clip(latest.text, 24))} · ` : ''}<a class="link" href="#/journal">再写一条</a></p>
+            <div class="todo-head">
+              <p class="todo-title">今天的心情：${J.moodOf(latest.mood).name}${latest.time ? ` <time>${latest.time}</time>` : ''}</p>
+              <a class="link" href="#/journal" data-action="journal-start">再写一条</a>
+            </div>
+            ${latest.text ? `<p class="todo-text todo-mood-note">${esc(latest.text)}</p>` : ''}
           </div>
         </li>`;
     }
@@ -260,5 +263,5 @@
       </li>`;
   }
 
-  Object.assign(app, { moodPicker, moodEntry, moodDayAge: dayAge, MOOD_STAGES: STAGE_NAMES, viewJournalPage, todoMood, todoMoodCare });
+  Object.assign(app, { checkupHeart, moodPicker, moodEntry, moodDayAge: dayAge, MOOD_STAGES: STAGE_NAMES, viewJournalPage, todoMood, todoMoodCare });
 })();

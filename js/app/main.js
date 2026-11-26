@@ -25,7 +25,6 @@
 
   document.addEventListener('change', (e) => {
     if (e.target.name === 'slot' && e.target.closest('.gl-form')) ui.glucoseSlot = e.target.value;
-    if (e.target.name === 'mood' && e.target.closest('form[data-form="journal"]')) ui.journalMood = e.target.value;
     if (e.target.classList.contains('story-voice')) setStoryVoice(e.target.dataset.lang, e.target.value);
   });
 

@@ -200,10 +200,13 @@ const SHEETS = [
     log(Boolean(d.querySelector('#toast .toast-oops')), '查到了出错的提示条');
     bad = bad.concat(audit(d.getElementById('toast'), '出错的提示条'));
     await open('main', 'journal');
+    d.querySelector('[data-action="mood-stats"]').click();
+    bad = bad.concat(audit(d.querySelector('.mood-stage-counts'), '各阶段的心情'));
+    d.querySelector('.mcal-cell.is-today').click();
     d.querySelector('.mood-opt.mood-calm').click();
     await wait(400);
-    bad = bad.concat(audit(d.getElementById('app'), '选好心情的心情页'));
-    d.querySelector('form[data-form="journal"]').requestSubmit();
+    bad = bad.concat(audit(d.getElementById('sheet-dialog'), '选好心情的记录弹窗'));
+    d.querySelector('form[data-form="journal-day"]').requestSubmit();
     await wait(600);
     log(Boolean(d.querySelector('#toast [data-action="undo"]')), '查到了带撤销的提示条');
     bad = bad.concat(audit(d.getElementById('toast'), '带撤销的提示条'));

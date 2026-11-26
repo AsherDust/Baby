@@ -110,11 +110,10 @@
     vaccinesDoneOpen: false,
     examsDoneOpen: false,
     glucoseSlot: '',
-    // 心情页上选好、还没记下的心情；首页点小脸进来时也先放这里
-    journalMood: '',
     journalShown: JOURNAL_SHOWN,
     // 心情月历翻到的月份（空着是这个月），和刚记下的那天（那一格跳一下）
     moodMonth: '',
+    moodStatsOpen: false,
     moodPop: '',
     clearInputs: [],
     undo: null,

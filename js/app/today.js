@@ -117,9 +117,9 @@
         <ul class="todo">
           ${todoMoodCare(today)}
           ${todoMood(today)}
-          ${todoMeal(now)}
-          ${todoKicks(ga, now)}
           ${todoWeight(M.weightSummary(app.state, today), M.gainStatus(app.state, today))}
+          ${todoKicks(ga, now)}
+          ${todoMeal(now)}
           ${todoCheckup(M.nextCheckup(rows))}
           ${todoBag(ga)}
           <li class="todo-item">

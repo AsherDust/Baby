@@ -11,7 +11,7 @@
     { id: 'happy', name: '开心' },
     { id: 'calm', name: '平静' },
     { id: 'excited', name: '期待' },
-    { id: 'tired', name: '累' },
+    { id: 'tired', name: '累累' },
     { id: 'low', name: '低落' },
     { id: 'anxious', name: '焦虑' },
   ];
@@ -21,7 +21,17 @@
   const isMood = (m) => MOODS.some((x) => x.id === m);
   const clockOf = (now) => `${pad2(new Date(now).getHours())}:${pad2(new Date(now).getMinutes())}`;
   const newId = () => U.newId('j');
-  const newest = (a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.time < b.time ? 1 : a.time > b.time ? -1 : 0);
+  // 蜜罐生成的编号带创建毫秒和四位随机后缀，旧记录也能区分同一分钟的先后。
+  function createdAt(id) {
+    const match = /^j-([a-z0-9]+)[a-z0-9]{4}$/.exec(id);
+    return match ? parseInt(match[1], 36) : 0;
+  }
+
+  function newest(a, b) {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+    if (a.time !== b.time) return a.time < b.time ? 1 : -1;
+    return createdAt(b.id) - createdAt(a.id);
+  }
 
   /** 统一换行，连着的空行只留一个 */
   function tidy(v) {
@@ -64,7 +74,7 @@
   /** 记在今天的带上几点；补记以前的日子不知道几点，就空着 */
   function add(state, f, today, now) {
     const entry = { id: newId(), ...fields(f), time: f.date === today ? clockOf(now) : '' };
-    state.journal.push(entry);
+    state.journal.unshift(entry);
     state.journal.sort(newest);
     return entry;
   }
