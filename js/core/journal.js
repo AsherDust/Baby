@@ -107,6 +107,59 @@
     return { days, months, more: list.length - shown.length };
   }
 
+  /** 那天在哪个阶段：pre 孕前、early 孕早期、mid 孕中期、late 孕晚期、post 宝宝出生以后 */
+  function stageOn(date, dueDate, birthDate) {
+    if (birthDate && date >= birthDate) return 'post';
+    const ga = D.gestation(dueDate, date).days;
+    return ga < 0 ? 'pre' : ['early', 'mid', 'late'][D.trimester(ga) - 1];
+  }
+
+  /** 2026-11 往前往后翻 n 个月 */
+  function shiftMonth(month, n) {
+    const [y, m] = month.split('-').map(Number);
+    const i = y * 12 + (m - 1) + n;
+    return `${Math.floor(i / 12)}-${pad2((i % 12) + 1)}`;
+  }
+
+  /**
+   * 月历：一周从周一开始，月初前面空出来的格子是 null；
+   * 每格是 { date, day, stage, latest（这天最新的一条）, count, isToday, future }，days 是这个月记了几天
+   */
+  function calendar(list, month, { dueDate, birthDate, today }) {
+    const [y, m] = month.split('-').map(Number);
+    const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+    const total = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const byDate = new Map();
+    for (const e of list) {
+      if (e.date.slice(0, 7) !== month) continue;
+      const day = byDate.get(e.date);
+      if (day) day.count += 1;
+      else byDate.set(e.date, { latest: e, count: 1 });
+    }
+    const cells = Array.from({ length: lead }, () => null);
+    for (let d = 1; d <= total; d += 1) {
+      const date = `${month}-${pad2(d)}`;
+      const got = byDate.get(date);
+      cells.push({
+        date, day: d, stage: stageOn(date, dueDate, birthDate),
+        latest: got ? got.latest : null, count: got ? got.count : 0, isToday: date === today, future: date > today,
+      });
+    }
+    return { month, cells, days: byDate.size };
+  }
+
+  /** 连着记了几天：今天记了从今天往前数，今天还没记从昨天往前数 */
+  function streak(list, today) {
+    const dates = new Set(list.map((e) => e.date));
+    let day = dates.has(today) ? today : D.addDays(today, -1);
+    let days = 0;
+    while (dates.has(day)) {
+      days += 1;
+      day = D.addDays(day, -1);
+    }
+    return { days, today: dates.has(today) };
+  }
+
   // 低落、焦虑算心情不太好；最近 14 天里有 5 天以上这样，温和地关心一下
   const HEAVY = ['low', 'anxious'];
   const CARE_DAYS = 14;
@@ -119,5 +172,8 @@
     return { days: days.size, show: days.size >= CARE_MIN };
   }
 
-  Baby.journal = { MOODS, TEXT_MAX, CARE_DAYS, CARE_MIN, moodOf, normalize, entryError, add, update, remove, onDay, timeline, careCheck };
+  Baby.journal = {
+    MOODS, TEXT_MAX, CARE_DAYS, CARE_MIN, moodOf, normalize, entryError, add, update, remove, onDay, timeline,
+    stageOn, shiftMonth, calendar, streak, careCheck,
+  };
 })();

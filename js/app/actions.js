@@ -4,7 +4,7 @@
   const { dates: D, content: C, model: M, journal: J, app } = globalThis.Baby;
   const {
     settingsDialog, checkupDialog, medDialog, sheetDialog, notifyPermission, JOURNAL_SHOWN, ui, render, go, closeDialog,
-    openGlucoseSheet, openUltrasoundSheet, openJournalSheet, openSettings, openCheckupDialog, openMedDialog, formError, submitButton,
+    openGlucoseSheet, openUltrasoundSheet, openJournalSheet, openMoodDaySheet, openSettings, openCheckupDialog, openMedDialog, formError, submitButton,
     toast, oops, say, cheer, persist, downloadCalendar, readProfile, saveWeight, saveGlucose,
     checkNotifications, storyActions, recipeActions, babyForms, babyActions, babyCareForms, babyCareActions, noiseActions, cloudForms, cloudActions, backupActions, startPelvic, stopPelvic
   } = app;
@@ -35,7 +35,24 @@
       const entry = J.add(app.state, f, ui.today, Date.now());
       persist();
       ui.journalMood = '';
+      // 补记到别的月份时，月历翻过去，让那一格跳一下
+      ui.moodMonth = entry.date.slice(0, 7) === ui.today.slice(0, 7) ? '' : entry.date.slice(0, 7);
+      ui.moodPop = entry.date;
       ui.clearInputs.push('j-text', 'j-date');
+      render();
+      toast(say(`mood-${entry.mood}`), () => J.remove(app.state, entry.id));
+    },
+
+    // 月历上点了一天，在弹出来的面板里记（补记）
+    'journal-day'(form) {
+      const f = journalFields(form);
+      const error = J.entryError(f, ui.today);
+      if (error) return formError(form, error);
+      cheer(submitButton(form));
+      const entry = J.add(app.state, f, ui.today, Date.now());
+      persist();
+      closeDialog(sheetDialog);
+      ui.moodPop = entry.date;
       render();
       toast(say(`mood-${entry.mood}`), () => J.remove(app.state, entry.id));
     },
@@ -216,6 +233,16 @@
       persist();
       render();
       toast('删掉了这条心情', () => app.state.journal.splice(removed.index, 0, removed.entry));
+    },
+
+    'mood-month'(el) {
+      const month = J.shiftMonth(el.closest('.mcal').dataset.month, Number(el.dataset.step));
+      ui.moodMonth = month >= ui.today.slice(0, 7) ? '' : month;
+      render();
+    },
+
+    'mood-day'(el) {
+      openMoodDaySheet(el.dataset.date);
     },
 
     'journal-more'() {

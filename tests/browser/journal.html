@@ -185,6 +185,61 @@ iframe.onload = async () => {
     $('[data-action="mood-care-hide"]').click();
     await wait(20);
     log(!$('.mood-care') && state().prefs.moodCareHidden === '2026-10-12' && /过几天/.test(toastText()), '点「过几天再说」就收起来，7 天内不再出现');
+
+    // ---- 心情月历 ----
+    const cal = () => $('.mcal');
+    const cell = (date) => $(`.mcal-cell[data-date="${date}"]`);
+    const title = () => cal().querySelector('.day-title').textContent.replace(/\s+/g, ' ');
+    log(cal() && (cal().compareDocumentPosition(composer()) & w.Node.DOCUMENT_POSITION_FOLLOWING), '月历在最上面，写心情的在它下面');
+    log(/2026 年 10 月/.test(title()) && $$('.mcal-week').length === 7 && $$('.mcal-cell.is-blank').length === 3 && $$('.mcal-cell[data-date]').length === 12 && $$('.mcal-cell.is-future').length === 19,
+      '10 月：一周从周一开始，1 号是周四；以后的日子点不了', `${$$('.mcal-cell[data-date]').length}/${$$('.mcal-cell.is-future').length}`);
+    const todays = J.onDay(state().journal, '2026-10-12');
+    log(cell('2026-10-12').classList.contains(`mood-${todays[0].mood}`) && cell('2026-10-12').querySelector('.mood-face svg') && cell('2026-10-12').querySelector('.mcal-count').textContent === String(todays.length) && cell('2026-10-12').classList.contains('is-today'),
+      '今天那格放最新那条的小脸，标出记了几条', `${todays[0].mood} ${todays.length} ${cell('2026-10-12').className}`);
+    log(cell('2026-10-03').querySelector('.mcal-num').textContent === '3' && !cell('2026-10-03').querySelector('.mood-face') && cell('2026-10-03').classList.contains('st-mid'), '没记的那天只写几号，底色是孕中期');
+    log(/已经连着记了 6 天/.test(title()), '说一声连着记了几天', title());
+
+    cell('2026-10-03').click();
+    log(sheet().open && /10月3日/.test(sheet().querySelector('h2').textContent) && /孕中期 · 孕 23⁺¹ 周/.test(sheet().textContent) && sheet().querySelector('.mood-day-none') && /补记一条/.test(sheet().textContent),
+      '点没记的一天：说还没记，可以补记', sheet().textContent.replace(/\s+/g, ' ').slice(0, 80));
+    sheet().querySelector('form').requestSubmit();
+    log(sheet().open && /先选一个心情吧/.test(sheet().querySelector('.form-error').textContent), '没选心情时不让记');
+    pick(sheet(), 'calm');
+    sheet().querySelector('textarea').value = '补上那天去公园';
+    sheet().querySelector('form').requestSubmit();
+    await wait(10);
+    const added = state().journal.find((e) => e.date === '2026-10-03');
+    log(!sheet().open && added && added.mood === 'calm' && added.time === '' && added.text === '补上那天去公园', '补记一条，不带几点', JSON.stringify(added));
+    log(cell('2026-10-03').classList.contains('mood-calm') && cell('2026-10-03').classList.contains('is-pop') && $('#toast [data-action="undo"]'), '那一格换成小脸跳一下，可以撤销');
+
+    cell('2026-10-12').click();
+    log(sheet().open && /今天/.test(sheet().querySelector('h2').textContent) && sheet().querySelectorAll('.mood-entry').length === todays.length && /再记一条/.test(sheet().textContent), '点今天：列出今天记的几条，下面可以再记一条');
+    pick(sheet(), 'happy');
+    sheet().querySelector('form').requestSubmit();
+    await wait(10);
+    const again = J.onDay(state().journal, '2026-10-12');
+    log(again.length === todays.length + 1 && /^\d\d:\d\d$/.test(again.find((e) => !todays.some((t) => t.id === e.id)).time) && cell('2026-10-12').querySelector('.mcal-count').textContent === String(again.length), '今天再记一条带上几点，格子上的条数也跟着变');
+    cell('2026-10-12').click();
+    sheet().querySelector('[data-action="edit-journal"]').click();
+    log(sheet().open && sheet().querySelector('form[data-form="journal-edit"]'), '在那天的列表里点铅笔改一条');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(20);
+
+    const next = () => cal().querySelector('[data-step="1"]');
+    const prev = () => cal().querySelector('[data-step="-1"]');
+    log(next().disabled && !prev().disabled, '这个月不能往后翻');
+    prev().click();
+    log(/2026 年 9 月/.test(title()) && /这个月记了 30 天/.test(title()) && cell('2026-09-15').querySelector('.mood-face') && !next().disabled, '翻到 9 月，说这个月记了几天', title());
+    for (let i = 0; i < 6; i += 1) prev().click();
+    log(/2026 年 4 月/.test(title()) && prev().disabled && cell('2026-04-23').classList.contains('st-pre') && cell('2026-04-24').classList.contains('st-early') && /孕前/.test($('.mcal-legend').textContent),
+      '最早翻到怀孕那个月，末次月经以前算孕前', title());
+    pick(composer(), 'excited');
+    $('#j-date').value = '2026-09-05';
+    composer().requestSubmit();
+    await wait(10);
+    log(/2026 年 9 月/.test(title()) && cell('2026-09-05').classList.contains('is-pop'), '在上面补记到别的月份，月历翻过去', title());
+    next().click();
+    log(/2026 年 10 月/.test(title()) && next().disabled, '翻回这个月');
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }

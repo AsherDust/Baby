@@ -26,7 +26,87 @@
 .mood-pick:has(input:checked) .mood-opt:not(:has(input:checked)) .mood-face { opacity: 0.55; filter: saturate(0.6); }
 .dialog-body .mood-pick { margin-bottom: 4px; }
 
-.mood-form textarea {
+/* 心情月历：每天一格，底色按孕期阶段，记过的放那天最新的小脸 */
+.st-pre { background: var(--paper-2); }
+.st-early { background: #E8F0DD; background: color-mix(in srgb, #A8CC8C 30%, var(--card)); }
+.st-mid { background: #FBEFCB; background: color-mix(in srgb, #F6C858 32%, var(--card)); }
+.st-late { background: #FBE2D6; background: color-mix(in srgb, #F4A68A 32%, var(--card)); }
+.st-post { background: #ECE6F6; background: color-mix(in srgb, #B9A8E0 34%, var(--card)); }
+.mcal-nav { margin-bottom: 12px; }
+.mcal .day-title small b { margin: 0 2px; font-family: var(--num); font-size: 15px; color: var(--honey-deep); }
+.mcal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.mcal-week { padding-bottom: 2px; font-size: 12px; text-align: center; color: var(--ink-3); }
+.mcal-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  aspect-ratio: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  font: inherit;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.mcal-cell.is-blank { background: none; cursor: default; }
+.mcal-cell.is-future { opacity: 0.4; cursor: default; }
+button.mcal-cell:hover { transform: translateY(-2px); }
+button.mcal-cell:active { transform: scale(0.92); }
+button.mcal-cell:focus-visible { outline: 2.5px solid rgba(233, 169, 60, 0.7); outline-offset: 2px; }
+.mcal-num { font-family: var(--num); font-size: 15px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.mcal-cell .mood-face { width: 86%; height: 86%; transition: transform 0.35s cubic-bezier(0.3, 1.6, 0.5, 1); }
+button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
+.mcal-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: var(--honey);
+  box-shadow: 0 0 0 2px var(--card);
+  color: #3D2A14;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 17px;
+}
+.mcal-cell.is-today { box-shadow: 0 0 0 2px var(--honey); }
+.mcal-cell.is-today .mcal-num { color: var(--honey-deep); }
+.mcal-tap { margin-top: 3px; font-size: 10px; font-weight: 600; line-height: 1; color: var(--honey-deep); }
+/* 今天还没记：轻轻地一呼一吸，招呼人来打卡 */
+.mcal-cell.is-today:not(.has-mood) { animation: mcal-breathe 2.6s ease-in-out infinite; }
+.mcal-cell.is-pop .mood-face { animation: mcal-pop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes mcal-breathe {
+  0%, 100% { box-shadow: 0 0 0 2px var(--honey), 0 0 0 0 var(--glow-honey); }
+  50% { box-shadow: 0 0 0 2px var(--honey), 0 0 0 6px var(--glow-honey); }
+}
+@keyframes mcal-pop {
+  0% { transform: scale(0.2) rotate(-30deg); opacity: 0; }
+  60% { transform: scale(1.18) rotate(6deg); opacity: 1; }
+  100% { transform: none; }
+}
+.mcal-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 14px; }
+.mcal-legend, .mcal-tally { display: flex; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; }
+.mcal-legend { gap: 4px 12px; font-size: 12px; color: var(--ink-3); }
+.mcal-legend li { display: flex; align-items: center; gap: 5px; }
+.mcal-legend i { width: 12px; height: 12px; border-radius: 4px; filter: saturate(1.8); }
+.mcal-tally { gap: 4px 10px; }
+.mcal-tally li { display: flex; align-items: center; gap: 3px; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.mcal-tally .mood-face { width: 22px; height: 22px; }
+
+/* 点了一天弹出来的：那天的记录，下面接着记 */
+.mood-day-sheet .mood-entries { margin-bottom: 16px; }
+.mood-day-none { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 12px 16px; border-radius: 16px; background: var(--honey-glow); font-size: 14px; color: var(--ink-2); }
+.mood-day-bee { flex: none; }
+.mood-day-bee svg { display: block; width: 46px; height: 35px; animation: float 4s ease-in-out infinite; }
+.mood-day-add { margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+
+.mood-form textarea,
+.mood-day-sheet textarea {
   display: block;
   width: 100%;
   min-height: 92px;
@@ -43,6 +123,7 @@
 .mood-date { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; color: var(--ink-2); }
 .mood-date input { height: 38px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--field); font-size: 14px; }
 .mood-form textarea:focus,
+.mood-day-sheet textarea:focus,
 .mood-date input:focus { outline: none; border-color: var(--honey); box-shadow: 0 0 0 4px rgba(233, 169, 60, 0.18); }
 .mood-form-foot .btn { min-width: 112px; }
 .mood-form .form-error { margin-top: 10px; }
@@ -100,6 +181,9 @@
 .todo-icon-mood svg { width: 34px; height: 34px; }
 
 @media (max-width: 720px) {
+  .mcal-grid { gap: 5px; }
+  .mcal-cell { border-radius: 12px; }
+  .mcal-num { font-size: 14px; }
   .mood-pick { gap: 2px; }
   .mood-day { grid-template-columns: 56px minmax(0, 1fr); gap: 10px; }
   .mood-day-num { font-size: 28px; }
@@ -107,5 +191,5 @@
 }
 
 @media (max-width: 720px), (pointer: coarse) {
-  .mood-form textarea, .mood-date input { font-size: 16px; }
+  .mood-form textarea, .mood-day-sheet textarea, .mood-date input { font-size: 16px; }
 }

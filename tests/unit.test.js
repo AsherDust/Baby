@@ -1252,6 +1252,32 @@ test('心情时间线：按天分组带孕龄，每月条数算全部，只显�
   eq(J.timeline([], DUE), { days: [], months: {}, more: 0 });
 });
 
+test('心情月历：阶段、翻月、一个月的格子、连着记了几天', () => {
+  // 预产期 2027-01-29：末次月经 2026-04-24，14 周是 07-31，28 周是 11-06
+  eq(['2026-04-23', '2026-04-24', '2026-07-30', '2026-07-31', '2026-11-05', '2026-11-06'].map((d) => J.stageOn(d, DUE, null)),
+    ['pre', 'early', 'early', 'mid', 'mid', 'late']);
+  eq([J.stageOn('2027-01-19', DUE, '2027-01-20'), J.stageOn('2027-01-20', DUE, '2027-01-20'), J.stageOn('2027-03-01', DUE, null)], ['late', 'post', 'late'], '出生那天起算产后');
+  eq([J.shiftMonth('2026-10', -1), J.shiftMonth('2026-01', -1), J.shiftMonth('2026-12', 1), J.shiftMonth('2026-10', -22)], ['2026-09', '2025-12', '2027-01', '2024-12']);
+
+  const s = M.createState({ dueDate: DUE });
+  [['2026-10-12', 'tired'], ['2026-10-12', 'excited'], ['2026-10-11', 'calm'], ['2026-10-01', 'happy'], ['2026-09-30', 'low']].forEach(([date, m], i) =>
+    J.add(s, mood({ date, mood: m }), '2026-10-12', NOON + i * 60e3));
+  const cal = J.calendar(s.journal, '2026-10', { dueDate: DUE, birthDate: null, today: '2026-10-12' });
+  eq([cal.cells.length, cal.cells.slice(0, 3), cal.days], [34, [null, null, null], 3], '10 月 1 日是周四，前面空 3 格；记了 3 天');
+  const c = (date) => cal.cells.find((x) => x && x.date === date);
+  eq([c('2026-10-12').latest.mood, c('2026-10-12').count, c('2026-10-12').isToday, c('2026-10-12').future], ['excited', 2, true, false], '同一天取最新的那条');
+  eq([c('2026-10-02').latest, c('2026-10-02').count, c('2026-10-02').day, c('2026-10-02').stage], [null, 0, 2, 'mid']);
+  eq([c('2026-10-13').future, c('2026-10-31').day], [true, 31]);
+  eq(J.calendar(s.journal, '2026-09', { dueDate: DUE, birthDate: null, today: '2026-10-12' }).cells.filter(Boolean).length, 30, '9 月 30 格，别的月的记录不混进来');
+  const feb = J.calendar([], '2027-02', { dueDate: DUE, birthDate: '2027-01-20', today: '2027-03-01' });
+  eq([feb.cells.length, feb.cells.filter(Boolean).every((x) => x.stage === 'post'), feb.days], [28, true, 0], '2027 年 2 月从周一开始、28 天');
+
+  eq(J.streak(s.journal, '2026-10-12'), { days: 2, today: true });
+  eq(J.streak(s.journal, '2026-10-13'), { days: 2, today: false }, '今天还没记时从昨天往前数');
+  eq(J.streak(s.journal, '2026-10-14'), { days: 0, today: false });
+  eq(J.streak(s.journal, '2026-10-01'), { days: 2, today: true }, '跨月也连着');
+});
+
 test('normalize：心情日记的清理，老数据没有这一项时为空', () => {
   const old = M.createState({ dueDate: DUE });
   delete old.journal;
