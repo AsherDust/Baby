@@ -113,7 +113,7 @@
     journalShown: JOURNAL_SHOWN,
     // 心情月历翻到的月份（空着是这个月），和刚记下的那天（那一格跳一下）
     moodMonth: '',
-    moodStatsOpen: false,
+    moodTallyOpen: true,
     moodPop: '',
     clearInputs: [],
     undo: null,

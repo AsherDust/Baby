@@ -58,19 +58,15 @@
     return '今天还没记，点一下今天那格打个卡';
   }
 
-  function viewMoodCalendar(today) {
-    const rows = M.scheduleRows(app.state, today);
+  function viewMoodCalendar(today, month, first, last, rows, entries) {
     const checkupDates = new Set(rows.map(({ status }) => status.date));
-    const { first, last } = monthRange(today, rows);
-    const selected = ui.moodMonth || today.slice(0, 7);
-    const month = selected < first ? first : selected > last ? last : selected;
     const b = app.state.baby;
-    const cal = J.calendar(app.state.journal, month, { dueDate: app.state.profile.dueDate, birthDate: b ? b.birthDate : null, today });
+    const cal = J.calendar(entries, month, { dueDate: app.state.profile.dueDate, birthDate: b ? b.birthDate : null, today });
     const pop = ui.moodPop;
     ui.moodPop = '';
     const [y, m] = month.split('-').map(Number);
     const tally = J.MOODS
-      .map((x) => [x, app.state.journal.filter((e) => e.mood === x.id && e.date.startsWith(month)).length])
+      .map((x) => [x, entries.filter((e) => e.mood === x.id).length])
       .filter(([, n]) => n);
     return `
       <article class="card mcal" aria-label="心情月历" data-month="${month}">
@@ -79,17 +75,32 @@
           <h2 class="day-title">${y} 年 ${m} 月<small>${calendarCheer(cal, today, checkupDates)}</small></h2>
           <button type="button" class="icon-btn" data-action="mood-month" data-step="1" aria-label="下个月"${month >= last ? ' disabled' : ''}>${A.icon.chevronRight}</button>
         </header>
-        <div class="mcal-grid">
+        <div class="mcal-viewport"><div class="mcal-grid">
           ${WEEK_HEAD.map((w) => `<span class="mcal-week" aria-hidden="true">${w}</span>`).join('')}
           ${cal.cells.map((c) => calendarCell(c, pop, checkupDates)).join('')}
-        </div>
+        </div></div>
         <div class="mcal-foot">
-          ${tally.length ? `<ul class="mcal-tally" aria-label="这个月的心情">${tally.map(([x, n]) => `<li class="mood-${x.id}" title="${x.name}">${face(x.id)}<b>${n}</b></li>`).join('')}</ul>` : ''}
-          <button type="button" class="mcal-stats-toggle" data-action="mood-stats" aria-expanded="${ui.moodStatsOpen}" aria-controls="mood-stats">统计</button>
+          <div class="mcal-summary">
+            <button type="button" class="mcal-total-toggle" data-action="mood-tally" aria-label="本月共 ${entries.length} 条心情，分类明细" aria-expanded="${ui.moodTallyOpen}" aria-controls="mcal-tally">${A.icon.smile}<b>${entries.length}</b></button>
+            <ul id="mcal-tally" class="mcal-tally" aria-label="这个月的心情"${ui.moodTallyOpen ? '' : ' hidden'}>${tally.map(([x, n]) => `<li class="mood-${x.id}" title="${x.name}">${face(x.id)}<b>${n}</b></li>`).join('')}</ul>
+          </div>
+          <button type="button" class="mcal-stats-toggle" data-action="mood-stats" aria-haspopup="dialog" aria-controls="sheet-dialog">统计</button>
         </div>
-        <div id="mood-stats"${ui.moodStatsOpen ? '' : ' hidden'}>${ui.moodStatsOpen ? viewStageCounts(app.state.journal) : ''}</div>
       </article>`;
   }
+
+  // 先试排横向数字；统计按钮换行说明整排放不下，再将数字移到图标下方。
+  function fitMoodSummary() {
+    const foot = app.root.querySelector('.mcal-foot');
+    if (!foot) return;
+    foot.classList.add('inline-counts');
+    const summary = foot.querySelector('.mcal-summary').getBoundingClientRect();
+    const stats = foot.querySelector('.mcal-stats-toggle').getBoundingClientRect();
+    foot.classList.toggle('inline-counts', stats.top < summary.bottom);
+  }
+
+  app.afterRender.push(fitMoodSummary);
+  window.addEventListener('resize', fitMoodSummary);
 
   function viewStageCounts(list) {
     const { profile, baby } = app.state;
@@ -112,11 +123,15 @@
   }
 
   function viewJournalPage(route, { today }) {
-    const list = app.state.journal;
+    const rows = M.scheduleRows(app.state, today);
+    const { first, last } = monthRange(today, rows);
+    const selected = ui.moodMonth || today.slice(0, 7);
+    const month = selected < first ? first : selected > last ? last : selected;
+    const entries = app.state.journal.filter((e) => e.date.startsWith(month));
     return `
       ${viewMoodCare(today)}
-      ${viewMoodCalendar(today)}
-      ${viewTimeline(list, today)}`;
+      ${viewMoodCalendar(today, month, first, last, rows, entries)}
+      ${viewTimeline(entries, today)}`;
   }
 
   function viewTimeline(list, today) {
@@ -125,24 +140,14 @@
         <article class="card card-mood-tl">
           <div class="empty">
             <span class="empty-art empty-bee">${A.bee}</span>
-            <p>这里会按日子排好你记下的心情。<br>等宝宝长大了，翻出来一起看看。</p>
+            <p>这个月还没有心情记录。</p>
           </div>
         </article>`;
     }
     const tl = J.timeline(list, app.state.profile.dueDate, ui.journalShown);
-    let month = '';
-    const parts = tl.days.map((day) => {
-      let head = '';
-      if (day.month !== month) {
-        month = day.month;
-        const [y, m] = month.split('-').map(Number);
-        head = `<h3 class="mood-month">${y} 年 ${m} 月<small>${tl.months[month]} 条</small></h3>`;
-      }
-      return head + viewDay(day, today);
-    });
     return `
       <article class="card card-mood-tl" aria-label="心情时间线">
-        ${parts.join('')}
+        ${tl.days.map((day) => viewDay(day, today)).join('')}
         ${tl.more ? `<button type="button" class="link link-more" data-action="journal-more">看更早的（还有 ${tl.more} 条）</button>` : ''}
       </article>`;
   }
@@ -263,5 +268,5 @@
       </li>`;
   }
 
-  Object.assign(app, { checkupHeart, moodPicker, moodEntry, moodDayAge: dayAge, MOOD_STAGES: STAGE_NAMES, viewJournalPage, todoMood, todoMoodCare });
+  Object.assign(app, { viewStageCounts, checkupHeart, moodPicker, moodEntry, moodDayAge: dayAge, MOOD_STAGES: STAGE_NAMES, viewJournalPage, todoMood, todoMoodCare });
 })();

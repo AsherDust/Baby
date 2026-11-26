@@ -12,7 +12,7 @@
 .mood-face svg { width: 100%; height: 100%; }
 .mood-name { font-size: 12.5px; line-height: 1.3; color: var(--ink-2); }
 
-.page-journal { max-width: 760px; }
+.page-journal { touch-action: pan-y pinch-zoom; max-width: 760px; }
 .mood-pick { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; max-width: 520px; margin: 0 0 12px; }
 .mood-opt { position: relative; display: grid; justify-items: center; gap: 4px; padding: 9px 0 7px; border: 1.5px solid transparent; border-radius: 16px; cursor: pointer; transition: background-color 0.15s, border-color 0.15s; }
 .mood-opt input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
@@ -34,6 +34,9 @@
 .st-post { background: #ECE6F6; background: color-mix(in srgb, #B9A8E0 34%, var(--card)); }
 .mcal-nav { margin-bottom: 12px; }
 .mcal .day-title small b { margin: 0 2px; font-family: var(--num); font-size: 15px; color: var(--honey-deep); }
+.mcal-viewport { overflow: clip; overflow-clip-margin: 5px; }
+.mcal { user-select: none; }
+.mcal.is-dragging, .mcal.is-dragging * { cursor: grabbing; }
 .mcal-grid, .mood-stage-counts tr { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .mcal-week { padding-bottom: 2px; font-size: 12px; text-align: center; color: var(--ink-3); }
 .mcal-cell {
@@ -92,15 +95,27 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
   60% { transform: scale(1.18) rotate(6deg); opacity: 1; }
   100% { transform: none; }
 }
-.mcal-foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.card.mcal { padding-bottom: 8px; }
+.mcal-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.mcal-summary { display: flex; align-items: center; min-width: 0; gap: 8px; }
 .mcal-stats-toggle { display: inline-flex; align-items: center; gap: 6px; flex: none; margin-left: auto; padding: 7px 8px; border: 0; border-radius: 8px; background: var(--honey-glow); color: var(--honey-deep); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.mcal-stats-toggle::after { content: ""; border: 4px solid transparent; border-right: 0; border-left: 5px solid currentColor; }
-.mcal-stats-toggle[aria-expanded="true"]::after { transform: rotate(90deg); }
+.mcal-total-toggle::after { content: ""; grid-column: 2; grid-row: 1 / 3; align-self: center; border: 4px solid transparent; border-right: 0; border-left: 5px solid currentColor; }
+.mcal-total-toggle[aria-expanded="true"]::after { transform: rotate(180deg); }
+.mcal-total-toggle { display: inline-grid; grid-template-columns: auto auto; justify-items: center; flex: none; gap: 2px 8px; padding: 6px 2px; border: 0; background: transparent; color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer; }
+.mcal-total-toggle svg { grid-column: 1; width: 22px; height: 22px; }
+.mcal-total-toggle b { grid-column: 1; }
+.mcal-summary b { font-size: 11.5px; }
+.mcal-tally b { font-weight: 400; }
+.mcal-tally[hidden] { display: none; }
 .mcal-tally { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0; padding: 0; list-style: none; }
-.mcal-tally li { display: flex; align-items: center; gap: 3px; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.mcal-tally li { display: grid; justify-items: center; gap: 2px; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.inline-counts .mcal-total-toggle, .inline-counts .mcal-tally li { display: flex; align-items: center; gap: 3px; }
+.inline-counts .mcal-total-toggle::after { margin-inline-start: 5px; }
 .mcal-tally .mood-face { width: 22px; height: 22px; }
 
-.mood-stats-total { display: flex; align-items: center; gap: 12px; margin: 16px 0 6px; }
+.dialog-body.mood-stats-sheet { gap: 4px; padding-top: 12px; }
+.mood-stats-sheet .dialog-head h2 { font-size: 18px; }
+.mood-stats-total { display: flex; align-items: center; gap: 12px; margin: 0 0 6px; }
 .mood-stats-total::before { content: ""; flex: 1; border-top: 1px dashed var(--line-strong); }
 .mood-stage-counts, .mood-stage-counts thead { display: block; }
 .mood-stage-counts { font-variant-numeric: tabular-nums; text-align: center; }
@@ -141,11 +156,8 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
 .mood-day-sheet textarea:focus { outline: none; border-color: var(--honey); box-shadow: 0 0 0 4px rgba(233, 169, 60, 0.18); }
 
 /* 时间线：左边是哪天，右边一条条心情，像朋友圈的相册页 */
-.mood-month { display: flex; align-items: baseline; gap: 8px; margin: 26px 0 6px; font-family: var(--serif); font-size: 17px; letter-spacing: 0.04em; }
-.mood-month:first-child { margin-top: 0; }
-.mood-month small { font-family: var(--sans); font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--ink-3); }
 .mood-day { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; padding: 14px 0; border-top: 1px dashed var(--line); }
-.mood-month + .mood-day { border-top: 0; padding-top: 8px; }
+.mood-day:first-child { border-top: 0; padding-top: 0; }
 .mood-day:last-of-type { padding-bottom: 0; }
 .mood-day-date { display: flex; flex-direction: column; margin: 0; line-height: 1.2; }
 .mood-day-rel { font-family: var(--serif); font-size: 21px; letter-spacing: 0.04em; }

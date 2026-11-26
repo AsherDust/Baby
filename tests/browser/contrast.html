@@ -202,6 +202,8 @@ const SHEETS = [
     await open('main', 'journal');
     d.querySelector('[data-action="mood-stats"]').click();
     bad = bad.concat(audit(d.querySelector('.mood-stage-counts'), '各阶段的心情'));
+    d.querySelector('#sheet-dialog [data-action="close-dialog"]').click();
+    await wait(40);
     d.querySelector('.mcal-cell.is-today').click();
     d.querySelector('.mood-opt.mood-calm').click();
     await wait(400);

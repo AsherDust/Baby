@@ -202,6 +202,7 @@
     },
 
     'journal-start'(el) {
+      ui.journalShown = JOURNAL_SHOWN;
       ui.moodMonth = '';
       window.addEventListener('hashchange', () => {
         if (location.hash === '#/journal') openMoodDaySheet(ui.today, el.dataset.mood);
@@ -222,15 +223,30 @@
       toast('删掉了这条心情', () => app.state.journal.splice(removed.index, 0, removed.entry));
     },
 
-    'mood-stats'() {
-      ui.moodStatsOpen = !ui.moodStatsOpen;
+    'mood-tally'() {
+      ui.moodTallyOpen = !ui.moodTallyOpen;
       render();
     },
 
+    'mood-stats'() {
+      sheetDialog.innerHTML = `<div class="dialog-body mood-stats-sheet">
+        ${app.dialogHead('阶段统计')}
+        <div id="mood-stats">${app.viewStageCounts(app.state.journal)}</div>
+      </div>`;
+      app.showDialog(sheetDialog);
+    },
+
     'mood-month'(el) {
-      const month = J.shiftMonth(el.closest('.mcal').dataset.month, Number(el.dataset.step));
+      const step = Number(el.dataset.step);
+      const month = J.shiftMonth(el.closest('.mcal').dataset.month, step);
+      ui.journalShown = JOURNAL_SHOWN;
       ui.moodMonth = month === ui.today.slice(0, 7) ? '' : month;
       render();
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        app.root.querySelector('.mcal-grid').animate([
+          { transform: `translateX(${step * 100}%)` }, { transform: 'none' },
+        ], { duration: 200, easing: 'ease-out' });
+      }
     },
 
     'mood-day'(el) {

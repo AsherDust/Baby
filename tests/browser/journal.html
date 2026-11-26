@@ -82,8 +82,9 @@ iframe.onload = async () => {
     log(/记下了，豆豆也跟着开心/.test(toastText()) && $('#toast [data-action="undo"]'), '提示按心情说话，带撤销', toastText());
     log(bursts() >= 1, '记下时冒爱心');
     $('[data-action="mood-stats"]').click();
-    log($('#mood-stats .mood-stats-total').textContent === '一共记了 1 条', '展开统计显示全部记录总数');
-    $('[data-action="mood-stats"]').click();
+    log($('#mood-stats .mood-stats-total').textContent === '一共记了 1 条', '弹窗显示全部记录总数');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(40);
     log($('.mood-entry.mood-happy') && $('.mood-day-rel').textContent === '今天' && /孕 24⁺³ 周/.test($('.mood-day-date').textContent), '时间线上出现今天这条，带孕周');
     log($('.mood-entry-text').textContent === '今天去散步了\n\n看到晚霞', '换行保留下来');
 
@@ -105,7 +106,7 @@ iframe.onload = async () => {
     log(j.length === 2 && j[1].date === '2026-10-10' && j[1].time === '', '补记以前的日子，不带几点', JSON.stringify(j[1]));
     log($$('.mood-day').length === 2 && $$('.mood-day-num')[0].textContent === '10' && /10月/.test($$('.mood-day')[1].textContent), '按天分组，以前的显示几号几月');
     log(!$('.mood-entry-text img') && $$('.mood-entry-text')[0].textContent.startsWith('<img') && !w.hacked, '写的字原样显示，不当成网页代码');
-    log($('.mood-month').textContent.includes('2026 年 10 月') && /2 条/.test($('.mood-month small').textContent), '月份标题带条数');
+    log(!$('.mood-month') && $('.mcal-total-toggle b').textContent === '2', '月份总数显示在月历，时间线不重复标题');
 
     const todayEntry = w.Baby.app.state.journal[0];
     todayEntry.text = '今天听到胎心了，想把这个瞬间记下来。\n' + '真开心'.repeat(8);
@@ -156,14 +157,35 @@ iframe.onload = async () => {
     await reload();
     await nav('#/journal');
     $('[data-action="mood-stats"]').click();
-    log($('#mood-stats .mood-stats-total').textContent === '一共记了 47 条', '展开统计显示全部记录总数');
-    $('[data-action="mood-stats"]').click();
-    log($$('.mood-entry').length === 20 && /还有 27 条/.test($('[data-action="journal-more"]').textContent), '一次先显示 20 条', `${$$('.mood-entry').length}`);
-    const sept = $$('.mood-month').find((h) => h.textContent.includes('9 月'));
-    log(sept && /30 条/.test(sept.textContent), '月份条数算上没显示出来的', sept && sept.textContent);
+    log($('#mood-stats .mood-stats-total').textContent === '一共记了 47 条', '弹窗显示全部记录总数');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(40);
+    log($$('.card-mood-tl .mood-entry').length === 3 && !$('#mcal-tally').hidden, '十月只显示三条，分类默认展开');
+    $('.mcal-total-toggle').click();
+    log($('#mcal-tally').hidden && $('.mcal-total-toggle b').textContent === '3', '收起分类后保留当月总数');
+    $('.mcal-total-toggle').click();
+    log(!$('#mcal-tally').hidden, '再次点击展开分类');
+    $('.mcal [data-step="-1"]').click();
+    const savedWidth = iframe.style.width;
+    const summaryBox = () => $('.mcal-summary').getBoundingClientRect();
+    const statsBox = () => $('.mcal-stats-toggle').getBoundingClientRect();
+    const countItems = () => [$('.mcal-total-toggle'), ...$$('#mcal-tally li')];
+    const besideIcons = () => countItems().every((item) => item.querySelector('b').getBoundingClientRect().left >= item.querySelector('svg').getBoundingClientRect().right);
+    iframe.style.width = '320px';
+    w.dispatchEvent(new w.Event('resize'));
+    log(statsBox().top >= summaryBox().bottom && Math.abs(statsBox().right - $('.mcal-foot').getBoundingClientRect().right) < 1, '窄屏分类放不下时统计按钮另起一行靠右');
+    log(countItems().every((item) => item.querySelector('b').getBoundingClientRect().top >= item.querySelector('svg').getBoundingClientRect().bottom), '横排放不下时合计与各类数字移到图标下面');
+    $('.mcal-total-toggle').click();
+    log($('.mcal-total-toggle b').getBoundingClientRect().left >= $('.mcal-total-toggle svg').getBoundingClientRect().right, '同样宽度下收起分类后总数回到横排');
+    $('.mcal-total-toggle').click();
+    iframe.style.width = '540px';
+    w.dispatchEvent(new w.Event('resize'));
+    log(besideIcons() && statsBox().top < summaryBox().bottom && statsBox().left >= summaryBox().right, '宽屏数字放在图标右侧，与统计按钮同排');
+    iframe.style.width = savedWidth;
+    log($$('.card-mood-tl .mood-entry').length === 20 && /还有 10 条/.test($('[data-action="journal-more"]').textContent) && $('.mcal-total-toggle b').textContent === '30', '翻到九月后分页和总数都只算九月');
     $('[data-action="journal-more"]').click();
-    $('[data-action="journal-more"]').click();
-    log($$('.mood-entry').length === 47 && !$('[data-action="journal-more"]') && $$('.mood-month').length === 3, '点「看更早的」显示更多，到底就没有按钮了');
+    log($$('.card-mood-tl .mood-entry').length === 30 && !$('[data-action="journal-more"]'), '展开更多只看本月');
+    $('.mcal [data-step="1"]').click();
 
     $('[data-action="open-settings"]').click();
     d.getElementById('settings-dialog').querySelector('[data-action="export-backup"]').click();
@@ -203,18 +225,18 @@ iframe.onload = async () => {
     const cal = () => $('.mcal');
     const cell = (date) => $(`.mcal-cell[data-date="${date}"]`);
     const title = () => cal().querySelector('.day-title').textContent.replace(/\s+/g, ' ');
-    const statsToggle = () => $('.mcal [aria-controls="mood-stats"]');
-    log(statsToggle().textContent === '统计' && statsToggle().getAttribute('aria-expanded') === 'false' && $('#mood-stats').hidden && !$('.mood-stats-total') && !$('.card-mood-tl .card-meta'), '月历统计默认收起，收起时隐藏总数');
+    const statsToggle = () => $('.mcal [data-action="mood-stats"]');
+    log(statsToggle().textContent === '统计' && statsToggle().getAttribute('aria-haspopup') === 'dialog' && !$('.mcal .mood-stats-total'), '月历仅显示统计入口');
     statsToggle().click();
-    const stats = $('.mcal .mood-stage-counts');
-    log(statsToggle().getAttribute('aria-expanded') === 'true' && !$('#mood-stats').hidden && stats.tBodies[0].querySelector('td.st-mid')
+    const stats = $('#sheet-dialog .mood-stage-counts');
+    log(sheet().open && stats.tBodies[0].querySelector('td.st-mid')
       && w.getComputedStyle(stats.tBodies[0].querySelector('td.st-mid')).backgroundColor === w.getComputedStyle($('.mcal-cell.st-mid')).backgroundColor, '展开统计，孕中期一行沿用月历格子的底色');
     log($('.mood-total-icon svg').isEqualNode($('.tab[href="#/journal"] svg')), '合计使用心情页标签图标');
     const originalWidth = iframe.style.width;
     for (const width of [320, 517, 760]) {
       iframe.style.width = width + 'px';
       const totalCell = stats.tBodies[0].rows[0].cells[0];
-      const compact = width === 320;
+      const compact = $('#mood-stats').getBoundingClientRect().width <= 280;
       log((w.getComputedStyle(totalCell.querySelector('.mood-stage-name')).display === 'none') === compact
         && (w.getComputedStyle(totalCell.querySelector('.mood-count-unit')).display === 'none') === compact
         && (!compact || (w.getComputedStyle(totalCell.querySelector('small')).fontWeight === '700' && totalCell.getAttribute('aria-label').includes('早期'))),
@@ -226,6 +248,29 @@ iframe.onload = async () => {
     const midRow = [...stats.tBodies[0].rows].find((row) => row.cells[0].firstChild.textContent === '中期');
     log(!$('.mcal-legend') && !stats.caption && stats.tHead.rows[0].cells[0].textContent === '合计' && [...stats.tBodies[0].rows].map((row) => row.cells[0].firstChild.textContent).join() === '早期,中期,晚期,产后' && midRow.cells[0].querySelector('small').textContent === `${state().journal.length} 条`, '月历移除颜色图例，阶段卡统计全部月份的记录');
     log([...midRow.cells].slice(1).every((cell, i) => Number(cell.textContent) === state().journal.filter((e) => e.mood === moods[i]).length), '阶段表按六种心情分别计数');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(40);
+    const swipe = async (dx, dy, pointerType = 'touch') => {
+      const target = cal().querySelector('.day-title');
+      const grid = cal().querySelector('.mcal-grid');
+      const send = (type, x, y) => target.dispatchEvent(new w.PointerEvent(type, {
+        bubbles: true, isPrimary: true, pointerId: 1, pointerType, clientX: x, clientY: y, button: 0,
+      }));
+      send('pointerdown', 180, 100);
+      send('pointermove', 180 + dx, 100 + dy);
+      const followed = Boolean(grid.style.transform);
+      send('pointerup', 180 + dx, 100 + dy);
+      const animations = grid.getAnimations();
+      animations.forEach((animation) => animation.finish());
+      await wait(50);
+      return followed && animations.length > 0;
+    };
+    await swipe(5, 100);
+    log(cal().dataset.month === '2026-10', '竖滑不切月');
+    await swipe(90, 8);
+    log(cal().dataset.month === '2026-09' && $('.mcal-total-toggle b').textContent === '30', '触屏右滑到上个月并更新时间线数据');
+    log(await swipe(-25, 1, 'mouse') && cal().dataset.month === '2026-09', '鼠标短拖跟手移动后回弹');
+    log(await swipe(-90, 5, 'mouse') && cal().dataset.month === '2026-10' && !sheet().open, '鼠标左拖滑入下个月');
     log(/2026 年 10 月/.test(title()) && $$('.mcal-week').length === 7 && $$('.mcal-cell.is-blank').length === 3 && $$('.mcal-cell[data-date]').filter((el) => el.dataset.date <= '2026-10-12').length === 12 && $$('.mcal-cell.is-future').length + $$('.mcal-cell[data-date]').filter((el) => el.dataset.date > '2026-10-12' && el.querySelector('.mcal-heart')).length === 19,
       '10 月：一周从周一开始，1 号是周四；未来只有产检日可点', `${$$('.mcal-cell[data-date]').length}/${$$('.mcal-cell.is-future').length}`);
     const todays = J.onDay(state().journal, '2026-10-12');
@@ -297,11 +342,12 @@ iframe.onload = async () => {
       J.add(w.Baby.app.state, { date, mood: 'calm', text: '' }, '2026-10-12', Date.now());
     }
     w.Baby.app.render();
+    statsToggle().click();
     const rows = [...$('.mood-stage-counts').tBodies[0].rows];
     log(rows[0].cells[0].textContent.includes('孕前') && rows[1].cells[0].firstChild.textContent === '早期'
       && rows[0].cells[2].textContent === '1' && rows[1].cells[2].textContent === '1', '跨阶段的两条平静记录各归到对应阶段');
-    statsToggle().click();
-    log($('#mood-stats').hidden && statsToggle().getAttribute('aria-expanded') === 'false', '再点统计收回表格');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    log(!sheet().open, '关闭统计回到月历');
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }

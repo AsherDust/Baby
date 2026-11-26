@@ -23,6 +23,79 @@
     }
   });
 
+  // 触屏可在心情页横滑，鼠标在月历内按住左键拖动。普通点击仍然打开日期。
+  let drag = null;
+  let suppressClick = false;
+  let settling = null;
+  function finishDrag(commit) {
+    const gesture = drag;
+    drag = null;
+    if (!gesture) return;
+    const { grid, calendar, offset } = gesture;
+    calendar.classList.remove('is-dragging');
+    if (!gesture.moved || !calendar.isConnected) return;
+    const step = offset < 0 ? 1 : -1;
+    const button = calendar.querySelector(`[data-action="mood-month"][data-step="${step}"]`);
+    const turn = commit && Math.abs(offset) >= 50 && !button.disabled;
+    const end = turn ? -step * grid.clientWidth : 0;
+    grid.style.transform = '';
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      if (turn) button.click();
+      return;
+    }
+    const motion = grid.animate([
+      { transform: `translateX(${offset}px)` }, { transform: `translateX(${end}px)` },
+    ], { duration: turn ? 130 : 160, easing: 'ease-out' });
+    settling = motion;
+    motion.finished.then(() => {
+      if (settling !== motion) return;
+      settling = null;
+      if (turn && calendar.isConnected) button.click();
+    }, () => {});
+  }
+
+  root.addEventListener('pointerdown', (e) => {
+    suppressClick = false;
+    if (!e.isPrimary) return finishDrag(false);
+    const page = e.target.closest(e.pointerType === 'mouse' ? '.mcal' : '.page-journal');
+    if (!page || e.button !== 0) return;
+    const calendar = page.closest('.mcal') || page.querySelector('.mcal');
+    if (settling) { settling.cancel(); settling = null; }
+    drag = { id: e.pointerId, calendar, grid: calendar.querySelector('.mcal-grid'), x: e.clientX, y: e.clientY, moved: false, offset: 0 };
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    if (!drag.moved) {
+      if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) return finishDrag(false);
+      if (Math.abs(dx) < 8 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+      drag.moved = true;
+      drag.calendar.classList.add('is-dragging');
+      if (drag.calendar.isConnected && e.isTrusted) {
+        drag.calendar.setPointerCapture(e.pointerId);
+      }
+      drag.grid.getAnimations().forEach((motion) => motion.cancel());
+    }
+    const limit = drag.grid.clientWidth;
+    drag.offset = Math.max(-limit, Math.min(limit, dx));
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) drag.grid.style.transform = `translateX(${drag.offset}px)`;
+  });
+  window.addEventListener('pointerup', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    suppressClick = drag.moved;
+    finishDrag(true);
+  });
+  window.addEventListener('pointercancel', (e) => { if (drag?.id === e.pointerId) finishDrag(false); });
+  window.addEventListener('blur', () => finishDrag(false));
+  root.addEventListener('click', (e) => {
+    if (suppressClick && e.detail) {
+      e.preventDefault();
+      e.stopPropagation();
+      suppressClick = false;
+    }
+  }, true);
+
   document.addEventListener('change', (e) => {
     if (e.target.name === 'slot' && e.target.closest('.gl-form')) ui.glucoseSlot = e.target.value;
     if (e.target.classList.contains('story-voice')) setStoryVoice(e.target.dataset.lang, e.target.value);
