@@ -54,35 +54,64 @@
     }, () => {});
   }
 
-  root.addEventListener('pointerdown', (e) => {
+  function beginDrag(calendar, id, x, y) {
     suppressClick = false;
-    if (!e.isPrimary) return finishDrag(false);
-    const page = e.target.closest(e.pointerType === 'mouse' ? '.mcal' : '.page-journal');
-    if (!page || e.button !== 0) return;
-    const calendar = page.closest('.mcal') || page.querySelector('.mcal');
     if (settling) { settling.cancel(); settling = null; }
-    drag = { id: e.pointerId, calendar, grid: calendar.querySelector('.mcal-grid'), x: e.clientX, y: e.clientY, moved: false, offset: 0 };
-  });
-  window.addEventListener('pointermove', (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const dx = e.clientX - drag.x;
-    const dy = e.clientY - drag.y;
+    drag = { id, calendar, grid: calendar.querySelector('.mcal-grid'), x, y, moved: false, offset: 0 };
+  }
+
+  function moveDrag(x, y) {
+    const dx = x - drag.x;
+    const dy = y - drag.y;
     if (!drag.moved) {
-      if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) return finishDrag(false);
-      if (Math.abs(dx) < 8 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 4) return;
+      if (Math.abs(dy) >= Math.abs(dx)) return finishDrag(false);
       drag.moved = true;
       drag.calendar.classList.add('is-dragging');
-      if (drag.calendar.isConnected && e.isTrusted) {
-        drag.calendar.setPointerCapture(e.pointerId);
-      }
       drag.grid.getAnimations().forEach((motion) => motion.cancel());
     }
     const limit = drag.grid.clientWidth;
     drag.offset = Math.max(-limit, Math.min(limit, dx));
     if (!matchMedia('(prefers-reduced-motion: reduce)').matches) drag.grid.style.transform = `translateX(${drag.offset}px)`;
+  }
+
+  // 只在心情页监听可取消的 touchmove。横向起手后持续阻止原生滚动，
+  // 纵向起手或双指操作则让浏览器正常滚动、缩放。
+  app.afterRender.push(() => {
+    const page = root.querySelector('.page-journal');
+    if (!page) return;
+    page.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return finishDrag(false);
+      const t = e.touches[0];
+      beginDrag(page.querySelector('.mcal'), 'touch', t.clientX, t.clientY);
+    }, { passive: true });
+    page.addEventListener('touchmove', (e) => {
+      if (drag?.id !== 'touch') return;
+      if (!e.cancelable || e.touches.length !== 1) return finishDrag(false);
+      moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+      if (drag?.moved) e.preventDefault();
+    }, { passive: false });
+    page.addEventListener('touchend', (e) => {
+      if (drag?.id !== 'touch') return;
+      if (drag.moved && e.cancelable) e.preventDefault();
+      finishDrag(!e.touches.length);
+    }, { passive: false });
+    page.addEventListener('touchcancel', () => finishDrag(false), { passive: true });
+  });
+
+  root.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return;
+    suppressClick = false;
+    const calendar = e.target.closest('.mcal');
+    if (calendar && e.isPrimary && e.button === 0) beginDrag(calendar, e.pointerId, e.clientX, e.clientY);
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (drag?.id !== e.pointerId) return;
+    moveDrag(e.clientX, e.clientY);
+    if (drag?.moved && e.isTrusted && !drag.calendar.hasPointerCapture(e.pointerId)) drag.calendar.setPointerCapture(e.pointerId);
   });
   window.addEventListener('pointerup', (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
+    if (drag?.id !== e.pointerId) return;
     suppressClick = drag.moved;
     finishDrag(true);
   });

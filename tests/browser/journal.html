@@ -250,24 +250,38 @@ iframe.onload = async () => {
     log([...midRow.cells].slice(1).every((cell, i) => Number(cell.textContent) === state().journal.filter((e) => e.mood === moods[i]).length), '阶段表按六种心情分别计数');
     sheet().querySelector('[data-action="close-dialog"]').click();
     await wait(40);
-    const swipe = async (dx, dy, pointerType = 'touch') => {
+    const swipe = async (dx, dy, pointerType = 'touch', verticalStart = false) => {
       const target = cal().querySelector('.day-title');
       const grid = cal().querySelector('.mcal-grid');
       const send = (type, x, y) => target.dispatchEvent(new w.PointerEvent(type, {
         bubbles: true, isPrimary: true, pointerId: 1, pointerType, clientX: x, clientY: y, button: 0,
       }));
-      send('pointerdown', 180, 100);
-      send('pointermove', 180 + dx, 100 + dy);
+      const touch = (type, x, y) => {
+        const point = new w.Touch({ identifier: 1, target, clientX: x, clientY: y });
+        return target.dispatchEvent(new w.TouchEvent(type, { bubbles: true, cancelable: true,
+          touches: type === 'touchend' ? [] : [point], changedTouches: [point] }));
+      };
+      if (pointerType === 'touch') {
+        touch('touchstart', 180, 100);
+        const nativeScroll = touch('touchmove', 180 + (verticalStart ? 2 : 12), 100 + (verticalStart ? 12 : 9));
+        log(nativeScroll === verticalStart, '起手主要向上或向下才放行原生滚动');
+        const stillNative = touch('touchmove', 180 + dx, 100 + dy);
+        log(stillNative === verticalStart, '方向确定后保持锁定');
+      } else {
+        send('pointerdown', 180, 100);
+        send('pointermove', 180 + dx, 100 + dy);
+      }
       const followed = Boolean(grid.style.transform);
-      send('pointerup', 180 + dx, 100 + dy);
+      if (pointerType === 'touch') touch('touchend', 180 + dx, 100 + dy);
+      else send('pointerup', 180 + dx, 100 + dy);
       const animations = grid.getAnimations();
       animations.forEach((animation) => animation.finish());
       await wait(50);
       return followed && animations.length > 0;
     };
-    await swipe(5, 100);
+    await swipe(5, 100, 'touch', true);
     log(cal().dataset.month === '2026-10', '竖滑不切月');
-    await swipe(90, 8);
+    await swipe(90, 115);
     log(cal().dataset.month === '2026-09' && $('.mcal-total-toggle b').textContent === '30', '触屏右滑到上个月并更新时间线数据');
     log(await swipe(-25, 1, 'mouse') && cal().dataset.month === '2026-09', '鼠标短拖跟手移动后回弹');
     log(await swipe(-90, 5, 'mouse') && cal().dataset.month === '2026-10' && !sheet().open, '鼠标左拖滑入下个月');
