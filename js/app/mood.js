@@ -269,7 +269,6 @@
                 ${face(m.id)}<span class="mood-name">${m.name}</span>
               </button>`).join('')}
           </div>
-          <p class="todo-text">点一个，想说的话写两句也行</p>
         </div>
       </li>`;
   }
