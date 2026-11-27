@@ -178,9 +178,19 @@ iframe.onload = async () => {
     $('.mcal-total-toggle').click();
     log($('.mcal-total-toggle b').getBoundingClientRect().left >= $('.mcal-total-toggle svg').getBoundingClientRect().right, '同样宽度下收起分类后总数回到横排');
     $('.mcal-total-toggle').click();
-    iframe.style.width = '360px';
-    w.dispatchEvent(new w.Event('resize'));
-    log(!besideIcons() && countItems().every((item) => Math.abs(item.querySelector('b').getBoundingClientRect().bottom - statsBox().bottom) < 1), '两行数字与同排统计按钮底部对齐');
+    // 数字字体和滚动条宽度会改变换行点，按实际布局找到两行数字与按钮同排的宽度。
+    let stackedWidth = null;
+    for (let width = 321; width < 540; width += 1) {
+      iframe.style.width = width + 'px';
+      w.dispatchEvent(new w.Event('resize'));
+      if (!besideIcons() && statsBox().top < summaryBox().bottom) {
+        stackedWidth = width;
+        break;
+      }
+    }
+    const bottomOffsets = countItems().map((item) => item.querySelector('b').getBoundingClientRect().bottom - statsBox().bottom);
+    log(stackedWidth !== null && bottomOffsets.every((offset) => Math.abs(offset) < 1),
+      '两行数字与同排统计按钮底部对齐', `宽度 ${stackedWidth ?? '未找到'}，底边差 ${bottomOffsets.join(', ')} px`);
     iframe.style.width = '540px';
     w.dispatchEvent(new w.Event('resize'));
     log(besideIcons() && statsBox().top < summaryBox().bottom && statsBox().left >= summaryBox().right, '宽屏数字放在图标右侧，与统计按钮同排');
