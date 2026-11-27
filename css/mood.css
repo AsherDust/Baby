@@ -34,7 +34,6 @@
 .st-post { background: #ECE6F6; background: color-mix(in srgb, #B9A8E0 34%, var(--card)); }
 @media (prefers-color-scheme: dark) {
   .st-pre { background: #4A5867; }
-  .mcal-cell.st-pre .mcal-num { color: var(--ink); }
 }
 .mcal-nav { margin-bottom: 12px; }
 .mcal .day-title small b { margin: 0 2px; font-family: var(--num); font-size: 15px; color: var(--honey-deep); }
