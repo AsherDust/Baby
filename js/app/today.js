@@ -142,7 +142,7 @@
   function todoWeight(ws, gain) {
     if (ws.todayEntry) {
       const parts = [ws.previous ? `比 ${D.formatDate(ws.previous.date)} ${kgDiff(ws.change)} kg` : '第一条记录，之后就能看到变化啦'];
-      if (ws.gain != null) parts.push(`孕期累计 ${kgDiff(ws.gain)} kg${gain ? GAIN_NOTE[gain.level] : ''}`);
+      if (ws.gain != null) parts.push(`孕期累计 <strong>${kgDiff(ws.gain)}</strong> kg${gain ? GAIN_NOTE[gain.level] : ''}`);
       return `
         <li class="todo-item is-done">
           <span class="todo-icon">${A.icon.check}</span>

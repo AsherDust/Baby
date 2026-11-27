@@ -48,11 +48,16 @@
 
 /* ---------- 用药与补剂 ---------- */
 
-.med-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.card-meds { --med-stage-min-width: 46px; }
+.card-meds > .card-head { flex-direction: row; }
+.card-meds > .card-head .card-actions { flex: none; }
 .med-summary { margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; background: var(--honey-glow); font-size: 13.5px; color: var(--warn-ink); }
-.med-axis { display: flex; gap: 3px; padding: 0 2px 6px; font-size: 11.5px; color: var(--ink-3); }
-.med-axis span { overflow: hidden; text-align: center; white-space: nowrap; }
-.med-axis .is-focus { color: var(--honey-deep); font-weight: 600; }
+.med-axis { display: flex; gap: 3px; padding: 0 2px 8px; }
+.med-axis-stage, .med-track > span { min-width: var(--med-stage-min-width); }
+.med-axis button { display: block; min-height: 24px; width: 100%; padding: 0 4px; border: 0; border-radius: 99px; background: var(--paper-2); color: var(--ink-2); font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.med-axis button:disabled { background: transparent; color: var(--ink-3); cursor: default; }
+.med-axis button.is-future { border: 1px dashed var(--line-strong); }
+.med-axis button[aria-pressed="true"] { background: var(--honey); color: #3D2A14; font-weight: 600; }
 .med-list { margin: 0; padding: 0; list-style: none; }
 .med { padding: 12px 2px 14px; border-top: 1px dashed var(--line); }
 .med-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
@@ -65,12 +70,12 @@
 .med-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .tag-med { background: var(--sky-soft); color: var(--sky-deep); }
 .med-track { position: relative; display: flex; gap: 3px; height: 8px; margin-top: 10px; }
-.med-track span { border-radius: 99px; background: var(--med-track); }
+.med-track span { position: relative; border-radius: 99px; background: var(--med-track); }
 .med-track span.is-focus { background: var(--med-track-focus); }
-.med-bar { position: absolute; top: 0; bottom: 0; min-width: 8px; border-radius: 99px; background: linear-gradient(90deg, #F4C664, var(--honey)); }
+.med-bar { position: absolute; top: 0; bottom: 0; left: var(--med-bar-start); min-width: min(8px, calc(100% - var(--med-bar-start))); border-radius: 99px; background: linear-gradient(90deg, #F4C664, var(--honey)); }
 .med-medicine .med-bar { background: linear-gradient(90deg, #B4CDDB, var(--sky)); }
 .med-bar-plan { opacity: 0.35; }
-.med-today { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--red); opacity: 0.45; }
+.med-today { position: absolute; z-index: 1; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--red); opacity: 0.45; }
 
 .suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -6px; font-size: 12.5px; color: var(--ink-3); }
 .suggest > span { margin-right: 2px; }

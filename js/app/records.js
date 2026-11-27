@@ -34,7 +34,7 @@
     const shown = ui.showAllWeights ? list : list.slice(0, WEIGHTS_SHOWN);
     const due = app.state.profile.dueDate;
     let meta = '还没有记录';
-    if (ws.latest) meta = `最近 ${kg(ws.latest.kg)} kg${ws.gain != null ? ` · 孕期累计 ${kgDiff(ws.gain)} kg` : ''} · 共 ${list.length} 条`;
+    if (ws.latest) meta = `最近 ${kg(ws.latest.kg)} kg${ws.gain != null ? ` · 孕期累计 <strong>${kgDiff(ws.gain)}</strong> kg` : ''} · 共 ${list.length} 条`;
 
     const rows = shown.map((w, i) => {
       const prev = list[i + 1];
@@ -102,18 +102,22 @@
     }
 
     const tl = M.medTimeline(rows, ga.days);
-    const pos = (d) => clamp01((d - tl.from) / (tl.to - tl.from)) * 100;
-    const bar = (from, to, cls) => `<i class="${cls}" style="left:${pos(from).toFixed(2)}%;width:${(pos(to) - pos(from)).toFixed(2)}%"></i>`;
     const stages = M.MED_STAGES
       .map((s) => ({ ...s, from: Math.max(s.from, tl.from), to: Math.min(s.to, tl.to), count: rows.filter((r) => r.stages.includes(s.id)).length }))
       .filter((s) => s.to > s.from);
+    const position = (stage, day) => clamp01((day - stage.from) / (stage.to - stage.from)) * 100;
+    const bar = (stage, from, to, cls) => {
+      const start = position(stage, from);
+      const end = position(stage, to);
+      return end > start ? `<i class="med-bar${cls}" style="--med-bar-start:${start.toFixed(2)}%;width:${(end - start).toFixed(2)}%"></i>` : '';
+    };
+    const todayPoint = ga.days + 0.5;
+    const todayStage = stages.find((stage) => todayPoint < stage.to) || stages.at(-1);
     const focus = stages.find((s) => s.id === ui.medStage && s.count) || null;
     // 汇总按先后说；下面的列表倒过来，最近开始吃的在最上面
     const shown = focus ? rows.filter((r) => r.stages.includes(focus.id)) : rows;
     const isFocus = (s) => (focus && focus.id === s.id ? ' class="is-focus"' : '');
 
-    const chip = (id, label, count) => `
-      <button type="button" class="chip" data-action="med-stage" data-stage="${id}" aria-pressed="${(focus ? focus.id : 'all') === id}"${count ? '' : ' disabled'}>${label}<small>${count}</small></button>`;
     let summary = '';
     if (focus) {
       const ranges = { t1: '1–13 周', t2: '14–27 周', t3: '28 周起' };
@@ -129,7 +133,6 @@
       const span = r.ongoing
         ? `${r.startGA < 0 ? '孕前' : `${D.formatGA(r.startGA)} 周`}起 · 已经 ${r.days} 天`
         : `${gaSpan(r.startGA, r.untilGA)} · 共 ${r.days} 天`;
-      const planned = r.endGA != null && r.endGA > r.untilGA ? bar(r.untilGA + 1, r.endGA + 1, 'med-bar med-bar-plan') : '';
       return `
         <li class="med med-${m.kind}">
           <div class="med-head">
@@ -149,10 +152,11 @@
             </div>
           </div>
           <div class="med-track" aria-hidden="true">
-            ${stages.map((s) => `<span${isFocus(s)} style="flex:${s.to - s.from}"></span>`).join('')}
-            ${bar(r.startGA, r.untilGA + 1, 'med-bar')}
-            ${planned}
-            <i class="med-today" style="left:${pos(ga.days + 0.5).toFixed(2)}%"></i>
+            ${stages.map((s) => `<span${isFocus(s)} style="flex:${s.to - s.from}">
+              ${bar(s, r.startGA, r.untilGA + 1, '')}
+              ${r.endGA != null && r.endGA > r.untilGA ? bar(s, r.untilGA + 1, r.endGA + 1, ' med-bar-plan') : ''}
+              ${s === todayStage ? `<i class="med-today" style="left:${position(s, todayPoint).toFixed(2)}%"></i>` : ''}
+            </span>`).join('')}
           </div>
         </li>`;
     };
@@ -160,11 +164,13 @@
     return `
       <article class="card card-meds">
         ${head}
-        <div class="med-filter" role="group" aria-label="按阶段看">
-          ${chip('all', '全部', rows.length)}${stages.map((s) => chip(s.id, s.name, s.count)).join('')}
+        <div class="med-axis" role="group" aria-label="按孕期阶段筛选用药">
+          ${stages.map((s) => `
+            <div class="med-axis-stage" style="flex:${s.to - s.from}">
+              <button type="button"${s.from > ga.days ? ' class="is-future"' : ''} data-action="med-stage" data-stage="${s.id}" aria-pressed="${focus?.id === s.id}"${s.count ? '' : ' disabled'}>${s.name}</button>
+            </div>`).join('')}
         </div>
         ${summary}
-        <div class="med-axis" aria-hidden="true">${stages.map((s) => `<span${isFocus(s)} style="flex:${s.to - s.from}">${s.name}</span>`).join('')}</div>
         <ul class="med-list">${shown.slice().reverse().map(row).join('')}</ul>
         <p class="fineprint">这里只做记录，吃什么、吃多少请遵医嘱。</p>
       </article>`;

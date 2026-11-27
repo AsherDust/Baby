@@ -75,7 +75,8 @@ iframe.onload = async () => {
     log(state().meds.length === 1 && state().meds[0].end === '2026-07-17', '存进本地');
     log(/0\.4 mg/.test(row('叶酸').querySelector('.med-extra').textContent), '显示用量');
     log(/孕前 – 12 周 · 共 167 天/.test(row('叶酸').querySelector('.med-ga').textContent), '孕前吃到 12 周，共 167 天', row('叶酸').querySelector('.med-ga').textContent);
-    log(chip('pre') && /1/.test(chip('pre').textContent) && /1/.test(chip('t1').textContent) && chip('t2').disabled, '阶段按钮：孕前和孕早期各 1，孕中期没记录不能点');
+    log(!chip('pre').disabled && !chip('t1').disabled && chip('t2').disabled, '有记录的阶段可筛选，孕中期没记录不能点');
+    log(w.getComputedStyle(chip('t3')).borderTopStyle === 'dashed' && w.getComputedStyle(chip('t2')).borderTopStyle === 'none', '未来阶段用虚线框，当前阶段没有边框');
 
     $('[data-action="add-med"]').click();
     fill(form(), { name: '黄体酮', start: '2026-05-28', end: '2026-07-03', note: '医生开的' });
@@ -100,19 +101,32 @@ iframe.onload = async () => {
     dialog().dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
     log(!dialog().open && state().meds.length === 3, '点遮罩关闭，不保存');
 
-    const bar = row('叶酸').querySelector('.med-bar');
-    log(parseFloat(bar.style.left) === 0 && parseFloat(bar.style.width) > 20, '时间轴从最早一样的开始画起', bar.getAttribute('style'));
-    const today = parseFloat(row('钙片').querySelector('.med-today').style.left);
+    const folicTrack = row('叶酸').querySelector('.med-track');
+    const folicBars = [...folicTrack.querySelectorAll('.med-bar')].map((bar) => bar.getBoundingClientRect());
+    const firstStage = folicTrack.children[0].getBoundingClientRect();
+    const secondStage = folicTrack.children[1].getBoundingClientRect();
+    log(folicBars.length === 2 && Math.abs(folicBars[0].left - firstStage.left) < 1
+      && Math.abs(folicBars[0].right - firstStage.right) < 1 && Math.abs(folicBars[1].left - secondStage.left) < 1
+      && folicBars[1].left - folicBars[0].right >= 2, '跨阶段高亮分别画在对应轨道内，中间留有空隙');
+    const today = row('钙片').querySelector('.med-today');
     const cal = row('钙片').querySelector('.med-bar');
-    log(Math.abs(parseFloat(cal.style.left) + parseFloat(cal.style.width) - today) < 0.5, '在吃的条画到今天', `${cal.getAttribute('style')} / ${today}`);
-    log($$('.med-axis span').map((s) => s.textContent).join() === '孕前,孕早期,孕中期,孕晚期', '时间轴标出四个阶段');
-
+    const barEnd = parseFloat(cal.style.getPropertyValue('--med-bar-start')) + parseFloat(cal.style.width);
+    log(cal.parentElement === today.parentElement && Math.abs(barEnd - parseFloat(today.style.left)) < 0.6, '在吃的条画到今天');
+    log($$('.med-axis button').map((s) => s.textContent).join() === '孕前,孕早期,孕中期,孕晚期', '时间轴标出四个阶段');
+    const savedWidth = iframe.style.width;
+    iframe.style.width = '320px';
+    const stageBoxes = $$('.med-axis button').map((el) => el.getBoundingClientRect());
+    log(stageBoxes.every((box, index) => !index || (box.left >= stageBoxes[index - 1].right && box.top === stageBoxes[0].top)), '窄屏下四个阶段标签同排且不重叠');
+    const trackBoxes = [...folicTrack.children].map((segment) => segment.getBoundingClientRect());
+    log(stageBoxes.every((box, index) => Math.abs(box.left - trackBoxes[index].left) < 1 && Math.abs(box.right - trackBoxes[index].right) < 1),
+      '每个阶段标签的左右边缘都与下方对应轨道对齐');
+    iframe.style.width = savedWidth;
     chip('t1').click();
     log(names().join() === '黄体酮,叶酸' && chip('t1').getAttribute('aria-pressed') === 'true', '只看孕早期');
     log(/孕早期（1–13 周）吃过 2 样：叶酸、黄体酮/.test($('.med-summary').textContent), '孕早期汇总', $('.med-summary') && $('.med-summary').textContent);
-    log($('.med-axis .is-focus').textContent === '孕早期', '时间轴高亮孕早期');
+    log($('.med-track .is-focus'), '时间轴高亮孕早期');
     chip('t1').click();
-    log(names().length === 3 && !$('.med-summary') && chip('all').getAttribute('aria-pressed') === 'true', '再点一次回到全部');
+    log(names().length === 3 && !$('.med-summary') && !$('.med-axis [aria-pressed="true"]'), '再点一次回到全部');
     chip('pre').click();
     log(names().join() === '叶酸' && /孕前吃过 1 样：叶酸/.test($('.med-summary').textContent), '孕前汇总');
     chip('t2').click();
@@ -123,7 +137,7 @@ iframe.onload = async () => {
     $('[data-action="undo"]').click();
     log(state().meds.find((m) => m.name === '钙片').end === null && /在吃/.test(row('钙片').textContent), '撤销后还是在吃');
 
-    chip('all').click();
+    chip('t2').click();
     row('黄体酮').querySelector('[data-action="edit-med"]').click();
     log(dialog().open && form().elements.name.value === '黄体酮' && form().elements.kind.value === 'medicine' && form().elements.end.value === '2026-07-03', '编辑时带出原来的内容');
     log(!dialog().querySelector('.suggest'), '编辑时不显示常用建议');
@@ -146,7 +160,7 @@ iframe.onload = async () => {
       row(name).querySelector('[data-action="edit-med"]').click();
       dialog().querySelector('[data-action="delete-med"]').click();
     }
-    log(!state().meds.some((m) => m.id === vit) && chip('all').getAttribute('aria-pressed') === 'true' && names().length === 2, '正在看的阶段删空了，自动回到全部');
+    log(!state().meds.some((m) => m.id === vit) && !$('.med-axis [aria-pressed="true"]') && names().length === 2, '正在看的阶段删空了，自动回到全部');
 
     $('[data-action="open-settings"]').click();
     d.getElementById('settings-dialog').querySelector('[data-action="export-backup"]').click();
