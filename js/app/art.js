@@ -145,6 +145,7 @@
     docCheck: icon('<path d="M14 3.5H7.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8z"/><path d="M14 3.5V8h4.5"/><path d="M9 14.2l2 2 4-4.2"/>'),
     alert: icon('<path d="M12 4.2l9 15.6H3z"/><path d="M12 10v4.4M12 17.2h0"/>'),
     home: icon('<path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.6v9.9h12V9.6"/><path d="M12 17.2l-2-1.9a1.25 1.25 0 0 1 2-1.5 1.25 1.25 0 0 1 2 1.5z"/>'),
+    house: icon('<path fill="currentColor" stroke="none" d="M2 11.5 12 3l10 8.5h-2.5V21h-5.7v-6.2h-3.6V21H4.5v-9.5z"/>'),
     notes: icon('<rect x="5" y="3.5" width="14" height="17" rx="3"/><path d="M8.8 8.5h6.4M8.8 12h6.4M8.8 15.5h3.6"/>'),
     grid: icon('<rect x="4" y="4" width="6.6" height="6.6" rx="2"/><rect x="13.4" y="4" width="6.6" height="6.6" rx="2"/><rect x="4" y="13.4" width="6.6" height="6.6" rx="2"/><circle cx="16.7" cy="16.7" r="3.3"/>'),
     chevronLeft: icon('<path d="M14.5 5.5L8 12l6.5 6.5"/>', 2.2),

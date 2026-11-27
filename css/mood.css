@@ -66,9 +66,12 @@ button.mcal-cell:focus-visible { outline: 2.5px solid rgba(233, 169, 60, 0.7); o
 .mcal-num { font-family: var(--num); font-size: 15px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .mcal-cell .mood-face { width: 86%; height: 86%; transition: transform 0.35s cubic-bezier(0.3, 1.6, 0.5, 1); }
 button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
-.mcal-cell > .mcal-heart { position: absolute; top: -4px; left: -3px; }
-.mcal-heart { flex: none; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--card); color: var(--red); font-size: 15px; line-height: 1; pointer-events: none; }
-.mood-checkups { display: flex; align-items: baseline; gap: 8px; margin: 0 0 12px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: 16px; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.mcal-cell > :is(.mcal-checkup, .mcal-birth) { position: absolute; top: -5px; left: -5px; }
+.mcal-checkup, .mcal-birth { flex: none; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--card); color: var(--red); pointer-events: none; }
+.mcal-birth { font-size: 15px; line-height: 1; }
+.mcal-checkup svg { width: 13px; height: 13px; }
+.mood-checkups, .mood-birth { display: flex; align-items: baseline; gap: 8px; margin: 0 0 12px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: 16px; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.mood-birth:has(+ .mood-checkups) { margin-bottom: 0; }
 .mcal-count {
   position: absolute;
   top: -4px;
@@ -99,7 +102,7 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
   60% { transform: scale(1.18) rotate(6deg); opacity: 1; }
   100% { transform: none; }
 }
-.card.mcal { padding-bottom: 8px; }
+.card.mcal { padding-bottom: 12px; }
 .mcal-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .mcal-summary { display: flex; align-items: center; min-width: 0; gap: 8px; }
 .mcal-stats-toggle { display: inline-flex; align-items: center; gap: 6px; flex: none; margin-left: auto; padding: 7px 8px; border: 0; border-radius: 8px; background: var(--honey-glow); color: var(--honey-deep); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
@@ -115,10 +118,15 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
 .mcal-tally li { display: grid; justify-items: center; gap: 2px; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .inline-counts .mcal-total-toggle, .inline-counts .mcal-tally li { display: flex; align-items: center; gap: 3px; }
 .inline-counts .mcal-total-toggle::after { margin-inline-start: 5px; }
+.mcal-foot:not(.inline-counts) .mcal-total-toggle { padding-bottom: 0; }
+.mcal-foot:not(.inline-counts) :is(.mcal-tally, .mcal-stats-toggle) { align-self: flex-end; }
 .mcal-tally .mood-face { width: 22px; height: 22px; }
 
 .dialog-body.mood-stats-sheet { gap: 4px; padding-top: 12px; }
 .mood-stats-sheet .dialog-head h2 { font-size: 18px; }
+.mood-stats-sheet .dialog-head .icon-btn { transform: translateY(-3px); }
+.mood-day-sheet .dialog-head .icon-btn { flex: none; align-self: flex-start; }
+.mood-today-label { display: inline-block; margin-inline-start: 8px; padding: 2px 7px; border-radius: 999px; background: var(--honey-glow); color: var(--honey-deep); font: 600 14px/1.3 var(--sans); letter-spacing: normal; vertical-align: middle; }
 .mood-stats-total { display: flex; align-items: center; gap: 12px; margin: 0 0 6px; }
 .mood-stats-total::before { content: ""; flex: 1; border-top: 1px dashed var(--line-strong); }
 .mood-stage-counts, .mood-stage-counts thead { display: block; }
@@ -219,5 +227,6 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
 }
 
 @media (max-width: 720px), (pointer: coarse) {
+  .mood-day-sheet .dialog-head .icon-btn { transform: translateY(-5px); }
   .mood-day-sheet textarea { font-size: 16px; }
 }

@@ -4,7 +4,9 @@
   const { dates: D, model: M, journal: J, baby: Bb, art: A, app } = globalThis.Baby;
   const { esc, ui } = app;
 
-  const checkupHeart = '<span class="mcal-heart" aria-hidden="true">♥</span>';
+  const checkupMarker = `<span class="mcal-checkup" aria-hidden="true">${A.icon.house}</span>`;
+  const birthMarker = '<span class="mcal-birth" aria-hidden="true">♥</span>';
+  const birthEventDate = ({ baby, profile }) => baby?.birthDate || profile.dueDate;
   const face = (mood) => `<span class="mood-face">${A.mood[mood]}</span>`;
 
   /** 选心情的一排小脸，表单里叫 mood */
@@ -26,23 +28,26 @@
   /** 月历覆盖心情记录和产检日程，初次打开仍显示本月。 */
   function monthRange(today, rows) {
     const list = app.state.journal;
-    const dates = [today, D.lmpFromDue(app.state.profile.dueDate)];
+    const birthDate = birthEventDate(app.state);
+    const dates = [today, birthDate, D.lmpFromDue(app.state.profile.dueDate)];
     if (list.length) dates.push(list[list.length - 1].date);
     if (rows.length) dates.push(rows[0].status.date);
-    const last = rows.length && rows[rows.length - 1].status.date > today ? rows[rows.length - 1].status.date : today;
+    const last = [today, birthDate, rows.at(-1)?.status.date || today].sort().at(-1);
     return { first: dates.sort()[0].slice(0, 7), last: last.slice(0, 7) };
   }
 
-  function calendarCell(c, pop, checkupDates) {
+  function calendarCell(c, pop, checkupDates, birthDate) {
     if (!c) return '<span class="mcal-cell is-blank" aria-hidden="true"></span>';
     const cls = `mcal-cell st-${c.stage}${c.isToday ? ' is-today' : ''}${c.latest ? ` has-mood mood-${c.latest.mood}` : ''}${c.date === pop ? ' is-pop' : ''}`;
     const checkup = checkupDates.has(c.date);
-    if (c.future && !checkup) return `<span class="${cls} is-future" aria-hidden="true"><span class="mcal-num">${c.day}</span></span>`;
+    const birth = c.date === birthDate;
+    if (c.future && !checkup && !birth) return `<span class="${cls} is-future" aria-hidden="true"><span class="mcal-num">${c.day}</span></span>`;
     const what = c.latest ? `${J.moodOf(c.latest.mood).name}${c.count > 1 ? `，记了 ${c.count} 条` : ''}` : '还没记';
     const inner = c.latest
       ? `${face(c.latest.mood)}${c.count > 1 ? `<span class="mcal-count">${c.count}</span>` : ''}`
       : `<span class="mcal-num">${c.day}</span>${c.isToday ? '<span class="mcal-tap" aria-hidden="true">打卡</span>' : ''}`;
-    return `<button type="button" class="${cls}" data-action="mood-day" data-date="${c.date}" aria-label="${D.formatDate(c.date)}${c.isToday ? '（今天）' : ''}，${STAGE_NAMES[c.stage]}${checkup ? '，有产检' : ''}${c.future ? '' : '，' + what}">${checkup ? checkupHeart : ''}${inner}</button>`;
+    const birthLabel = birth ? (app.state.baby?.birthDate ? '，宝宝出生日' : '，预产期') : '';
+    return `<button type="button" class="${cls}" data-action="mood-day" data-date="${c.date}" aria-label="${D.formatDate(c.date)}${c.isToday ? '（今天）' : ''}，${STAGE_NAMES[c.stage]}${birthLabel}${checkup ? '，有产检' : ''}${c.future ? '' : '，' + what}">${birth ? birthMarker : checkup ? checkupMarker : ''}${inner}</button>`;
   }
 
   /** 给人一点打卡的劲头：这个月是当前月时说连着记了几天，翻到别的月就说那个月记了几天 */
@@ -61,6 +66,7 @@
   function viewMoodCalendar(today, month, first, last, rows, entries) {
     const checkupDates = new Set(rows.map(({ status }) => status.date));
     const b = app.state.baby;
+    const birthDate = birthEventDate(app.state);
     const cal = J.calendar(entries, month, { dueDate: app.state.profile.dueDate, birthDate: b ? b.birthDate : null, today });
     const pop = ui.moodPop;
     ui.moodPop = '';
@@ -77,7 +83,7 @@
         </header>
         <div class="mcal-viewport"><div class="mcal-grid">
           ${WEEK_HEAD.map((w) => `<span class="mcal-week" aria-hidden="true">${w}</span>`).join('')}
-          ${cal.cells.map((c) => calendarCell(c, pop, checkupDates)).join('')}
+          ${cal.cells.map((c) => calendarCell(c, pop, checkupDates, birthDate)).join('')}
         </div></div>
         <div class="mcal-foot">
           <div class="mcal-summary">
@@ -268,5 +274,5 @@
       </li>`;
   }
 
-  Object.assign(app, { viewStageCounts, checkupHeart, moodPicker, moodEntry, moodDayAge: dayAge, MOOD_STAGES: STAGE_NAMES, viewJournalPage, todoMood, todoMoodCare });
+  Object.assign(app, { viewStageCounts, checkupMarker, birthMarker, birthEventDate, moodPicker, moodEntry, moodDayAge: dayAge, MOOD_STAGES: STAGE_NAMES, viewJournalPage, todoMood, todoMoodCare });
 })();

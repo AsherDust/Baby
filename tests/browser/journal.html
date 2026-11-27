@@ -178,6 +178,9 @@ iframe.onload = async () => {
     $('.mcal-total-toggle').click();
     log($('.mcal-total-toggle b').getBoundingClientRect().left >= $('.mcal-total-toggle svg').getBoundingClientRect().right, '同样宽度下收起分类后总数回到横排');
     $('.mcal-total-toggle').click();
+    iframe.style.width = '360px';
+    w.dispatchEvent(new w.Event('resize'));
+    log(!besideIcons() && countItems().every((item) => Math.abs(item.querySelector('b').getBoundingClientRect().bottom - statsBox().bottom) < 1), '两行数字与同排统计按钮底部对齐');
     iframe.style.width = '540px';
     w.dispatchEvent(new w.Event('resize'));
     log(besideIcons() && statsBox().top < summaryBox().bottom && statsBox().left >= summaryBox().right, '宽屏数字放在图标右侧，与统计按钮同排');
@@ -287,7 +290,7 @@ iframe.onload = async () => {
     log(cal().dataset.month === '2026-09' && $('.mcal-total-toggle b').textContent === '30', '触屏右滑到上个月并更新时间线数据');
     log(await swipe(-25, 1, 'mouse') && cal().dataset.month === '2026-09', '鼠标短拖跟手移动后回弹');
     log(await swipe(-90, 5, 'mouse') && cal().dataset.month === '2026-10' && !sheet().open, '鼠标左拖滑入下个月');
-    log(/2026 年 10 月/.test(title()) && $$('.mcal-week').length === 7 && $$('.mcal-cell.is-blank').length === 3 && $$('.mcal-cell[data-date]').filter((el) => el.dataset.date <= '2026-10-12').length === 12 && $$('.mcal-cell.is-future').length + $$('.mcal-cell[data-date]').filter((el) => el.dataset.date > '2026-10-12' && el.querySelector('.mcal-heart')).length === 19,
+    log(/2026 年 10 月/.test(title()) && $$('.mcal-week').length === 7 && $$('.mcal-cell.is-blank').length === 3 && $$('.mcal-cell[data-date]').filter((el) => el.dataset.date <= '2026-10-12').length === 12 && $$('.mcal-cell.is-future').length + $$('.mcal-cell[data-date]').filter((el) => el.dataset.date > '2026-10-12' && el.querySelector('.mcal-checkup')).length === 19,
       '10 月：一周从周一开始，1 号是周四；未来只有产检日可点', `${$$('.mcal-cell[data-date]').length}/${$$('.mcal-cell.is-future').length}`);
     const todays = J.onDay(state().journal, '2026-10-12');
     log(cell('2026-10-12').classList.contains(`mood-${todays[0].mood}`) && cell('2026-10-12').querySelector('.mood-face svg') && cell('2026-10-12').querySelector('.mcal-count').textContent === String(todays.length) && cell('2026-10-12').classList.contains('is-today'),
@@ -314,12 +317,14 @@ iframe.onload = async () => {
     const booking = model.addCheckup(app.state, { date: '2026-10-12', title: '复查 <A>' });
     model.addCheckup(app.state, { date: '2026-10-12', title: '复查 B' });
     app.render();
-    log(cell('2026-10-12').querySelector('.mcal-count') && cell('2026-10-12').querySelector('.mcal-heart'), '同日多条心情和产检分别显示角标');
+    log(cell('2026-10-12').querySelector('.mcal-count') && cell('2026-10-12').querySelector('.mcal-checkup'), '同日多条心情和产检分别显示角标');
     cell('2026-10-12').click();
     const notice = sheet().querySelector('.mood-checkups');
-    log(cell('2026-10-12').querySelector('.mcal-heart').isEqualNode(notice.firstElementChild) && w.getComputedStyle(notice).borderTopStyle === 'dashed', '产检提示框用虚线边框和月历同款红心');
+    log(cell('2026-10-12').querySelector('.mcal-checkup').isEqualNode(notice.firstElementChild) && w.getComputedStyle(notice).borderTopStyle === 'dashed', '产检提示框用虚线边框和月历同款红房子');
     log(sheet().querySelector('.dialog-head + .mood-checkups').textContent.includes('复查 <A>、复查 B') && !sheet().querySelector('.mood-checkups a'), '弹窗开头展示同日全部产检标题');
-    log(sheet().open && /今天/.test(sheet().querySelector('h2').textContent) && sheet().querySelectorAll('.mood-entry').length === todays.length && /再记一条/.test(sheet().textContent), '点今天：列出今天记的几条，下面可以再记一条');
+    const dayTitle = sheet().querySelector('h2');
+    log(sheet().open && dayTitle.firstChild.textContent === '10月12日 周一' && dayTitle.lastElementChild?.textContent === '今天'
+      && sheet().querySelectorAll('.mood-entry').length === todays.length && /再记一条/.test(sheet().textContent), '今天标签跟在日期后面，下方可以再记一条');
     pick(sheet(), 'happy');
     sheet().querySelector('form').requestSubmit();
     await wait(10);
@@ -364,6 +369,28 @@ iframe.onload = async () => {
       && rows[0].cells[2].textContent === '1' && rows[1].cells[2].textContent === '1', '跨阶段的两条平静记录各归到对应阶段');
     sheet().querySelector('[data-action="close-dialog"]').click();
     log(!sheet().open, '关闭统计回到月历');
+    await wait(40);
+
+    app.state.checkups = [];
+    app.render();
+    while (!next().disabled) next().click();
+    const due = app.state.profile.dueDate;
+    openDay(due);
+    log(cell(due).querySelector('.mcal-birth') && sheet().querySelector('.mood-birth span:last-child').textContent === '今天是预产期' && !composer(),
+      '未设置出生日期时可以翻到预产期查看爱心和详情');
+    sheet().querySelector('[data-action="close-dialog"]').click();
+    await wait(40);
+
+    const birthDate = '2026-10-12';
+    app.state.baby = w.Baby.baby.born({ name: '豆豆', birthDate, sex: 'girl' });
+    model.addCheckup(app.state, { date: birthDate, title: '同日产检' });
+    app.render();
+    const birthday = cell(birthDate);
+    openDay(birthDate);
+    log(cal().dataset.month === '2026-10' && birthday.querySelector('.mcal-birth') && !birthday.querySelector('.mcal-checkup')
+      && birthday.getAttribute('aria-label').includes('宝宝出生日，有产检'), '实际出生日期替换预产期，同日角标优先显示爱心');
+    log(sheet().querySelector('.mood-birth span:last-child').textContent === '今天豆豆出生啦！'
+      && sheet().querySelector('.mood-checkups').textContent.includes('今日产检：同日产检'), '同一天的出生和产检事件都显示在详情');
   } catch (e) {
     log(false, '脚本异常', `${e.message}\n${e.stack}`);
   }

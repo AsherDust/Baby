@@ -4,7 +4,7 @@
   const { dates: D, content: C, model: M, journal: J, art: A, i18n: { t }, app } = globalThis.Baby;
   const {
     settingsDialog, checkupDialog, medDialog, sheetDialog, DIALOGS, esc, atRisk, ui, glText, usText, profileFields,
-    checkupHeart, moodPicker, moodEntry, moodDayAge, MOOD_STAGES
+    checkupMarker, birthMarker, birthEventDate, moodPicker, moodEntry, moodDayAge, MOOD_STAGES
   } = app;
 
   // 弹窗打开时往历史里压一条，手机上按返回键（或侧滑返回）就是关弹窗，而不是退出页面
@@ -167,22 +167,26 @@
   function openMoodDaySheet(date, selected = '') {
     if (!D.isISODate(date)) return;
     const titles = M.scheduleRows(app.state, ui.today).filter(({ status }) => status.date === date).map(({ ck }) => esc(ck.title));
-    const appointments = titles.length ? `<p class="mood-checkups">${checkupHeart}<span>今日产检：${titles.join('、')}</span></p>` : '';
+    const appointments = titles.length ? `<p class="mood-checkups">${checkupMarker}<span>今日产检：${titles.join('、')}</span></p>` : '';
     const entries = J.onDay(app.state.journal, date);
     const b = app.state.baby;
+    const birthText = b?.birthDate ? `今天${esc(b.name || app.state.profile.nickname || '宝宝')}出生啦！` : '今天是预产期';
+    const birth = date === birthEventDate(app.state) ? `<p class="mood-birth">${birthMarker}<span>${birthText}</span></p>` : '';
     const stage = MOOD_STAGES[J.stageOn(date, app.state.profile.dueDate, b ? b.birthDate : null)];
     const isToday = date === ui.today;
     const sub = `${stage} · ${moodDayAge(date)}${entries.length ? ` · 记了 ${entries.length} 条` : ''}`;
-    const head = dialogHead(isToday ? `今天 · ${D.formatDate(date, { weekday: true })}` : D.formatDate(date, { weekday: true, relativeTo: ui.today }), sub);
+    const dateTitle = D.formatDate(date, { weekday: true, relativeTo: ui.today });
+    const head = dialogHead(dateTitle + (isToday ? '<span class="mood-today-label">今天</span>' : ''), sub);
     if (date > ui.today) {
-      if (!titles.length) return;
-      sheetDialog.innerHTML = `<div class="dialog-body mood-day-sheet">${head}${appointments}</div>`;
+      if (!birth && !titles.length) return;
+      sheetDialog.innerHTML = `<div class="dialog-body mood-day-sheet">${head}${birth}${appointments}</div>`;
       showDialog(sheetDialog);
       return;
     }
     sheetDialog.innerHTML = `
       <form class="dialog-body mood-day-sheet" data-form="journal-day" novalidate>
         ${head}
+        ${birth}
         ${appointments}
         ${entries.length
           ? `<ul class="mood-entries">${entries.map(moodEntry).join('')}</ul>`
