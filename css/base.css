@@ -214,7 +214,7 @@ svg { display: block; }
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s, border-color 0.15s;
 }
-.icon-btn:hover { color: var(--honey-deep); border-color: var(--line-strong); background: var(--honey-glow); }
+.icon-btn:not(.dialog-head [data-action="close-dialog"]):hover { color: var(--honey-deep); border-color: var(--line-strong); background: var(--honey-glow); }
 .icon-btn svg { width: 19px; height: 19px; }
 .icon-btn-sm { width: 28px; height: 28px; border-color: transparent; background: transparent; color: var(--ink-3); }
 .icon-btn-sm svg { width: 14px; height: 14px; }

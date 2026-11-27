@@ -18,6 +18,11 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; }
 .dialog-head h2 { margin: 0; font-family: var(--serif); font-size: 21px; letter-spacing: 0.04em; }
 .dialog-head .icon-btn { width: 34px; height: 34px; border-color: transparent; }
+.dialog-head h2[tabindex="-1"]:focus { outline: none; }
+.dialog-head [data-action="close-dialog"]:active { color: var(--honey-deep); border-color: var(--line-strong); }
+@media (hover: hover) and (pointer: fine) {
+  .dialog-head [data-action="close-dialog"]:hover { color: var(--honey-deep); border-color: var(--line-strong); background: var(--honey-glow); }
+}
 
 .dialog-sub { margin: 3px 0 0; font-size: 13px; color: var(--ink-3); }
 

@@ -18,10 +18,17 @@
     if (title) {
       title.id = title.id || `${dialog.id}-title`;
       dialog.setAttribute('aria-labelledby', title.id);
+      if (!dialog.querySelector('[autofocus]')) {
+        title.tabIndex = -1;
+        title.setAttribute('autofocus', '');
+      }
     } else {
       dialog.removeAttribute('aria-labelledby');
     }
     if (!dialog.open) dialog.showModal();
+    if (title?.hasAttribute('autofocus') && !dialog.contains(document.activeElement)) {
+      title.focus({ preventScroll: true });
+    }
     if (history.state && history.state.sheet) return;
     try {
       history.pushState({ sheet: true }, '');

@@ -229,6 +229,8 @@ iframe.onload = async () => {
     log(statsToggle().textContent === '统计' && statsToggle().getAttribute('aria-haspopup') === 'dialog' && !$('.mcal .mood-stats-total'), '月历仅显示统计入口');
     statsToggle().click();
     const stats = $('#sheet-dialog .mood-stage-counts');
+    log(d.activeElement === sheet().querySelector('h2') && d.activeElement.textContent === '阶段统计',
+      '统计弹窗打开时聚焦标题，关闭按钮不自动获得焦点');
     log(sheet().open && stats.tBodies[0].querySelector('td.st-mid')
       && w.getComputedStyle(stats.tBodies[0].querySelector('td.st-mid')).backgroundColor === w.getComputedStyle($('.mcal-cell.st-mid')).backgroundColor, '展开统计，孕中期一行沿用月历格子的底色');
     log($('.mood-total-icon svg').isEqualNode($('.tab[href="#/journal"] svg')), '合计使用心情页标签图标');
