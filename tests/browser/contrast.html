@@ -217,8 +217,9 @@ const SHEETS = [
       w.Baby.app.render();
       const cell = d.querySelector('.mcal-cell.st-pre');
       const background = rgba(w.getComputedStyle(d.querySelector('.mcal')).backgroundColor);
-      const edge = ratio(rgba(w.getComputedStyle(cell).borderTopColor), background);
-      log(edge >= 3, '深色月历的孕前格边框与卡片背景对比度不低于 3:1', edge.toFixed(2));
+      const cellStyle = w.getComputedStyle(cell);
+      const fill = ratio(rgba(cellStyle.backgroundColor), background);
+      log(cellStyle.borderTopWidth === '0px' && fill >= 2, '深色月历的孕前格用底色区分，底色与卡片背景对比度不低于 2:1', fill.toFixed(2));
       bad = bad.concat(audit(cell, '深色月历孕前格'));
     }
 

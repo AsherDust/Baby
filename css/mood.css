@@ -33,8 +33,8 @@
 .st-late { background: #FBE2D6; background: color-mix(in srgb, #F4A68A 32%, var(--card)); }
 .st-post { background: #ECE6F6; background: color-mix(in srgb, #B9A8E0 34%, var(--card)); }
 @media (prefers-color-scheme: dark) {
-  .st-pre { background: #3A4856; }
-  .mcal-cell.st-pre { border: 1px solid #768A9D; }
+  .st-pre { background: #4A5867; }
+  .mcal-cell.st-pre .mcal-num { color: var(--ink); }
 }
 .mcal-nav { margin-bottom: 12px; }
 .mcal .day-title small b { margin: 0 2px; font-family: var(--num); font-size: 15px; color: var(--honey-deep); }
@@ -70,7 +70,7 @@ button.mcal-cell:hover .mood-face { transform: rotate(-8deg) scale(1.06); }
 .mcal-checkup, .mcal-birth { flex: none; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--card); color: var(--red); pointer-events: none; }
 .mcal-birth { font-size: 15px; line-height: 1; }
 .mcal-checkup svg { width: 13px; height: 13px; }
-.mood-checkups, .mood-birth { display: flex; align-items: baseline; gap: 8px; margin: 0 0 12px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: 16px; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.mood-checkups, .mood-birth { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: 16px; color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
 .mood-birth:has(+ .mood-checkups) { margin-bottom: 0; }
 .mcal-count {
   position: absolute;
