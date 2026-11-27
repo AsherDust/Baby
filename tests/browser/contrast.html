@@ -212,6 +212,15 @@ const SHEETS = [
     await wait(600);
     log(Boolean(d.querySelector('#toast [data-action="undo"]')), '查到了带撤销的提示条');
     bad = bad.concat(audit(d.getElementById('toast'), '带撤销的提示条'));
+    if (DARK) {
+      w.Baby.app.ui.moodMonth = '2026-04';
+      w.Baby.app.render();
+      const cell = d.querySelector('.mcal-cell.st-pre');
+      const background = rgba(w.getComputedStyle(d.querySelector('.mcal')).backgroundColor);
+      const edge = ratio(rgba(w.getComputedStyle(cell).borderTopColor), background);
+      log(edge >= 3, '深色月历的孕前格边框与卡片背景对比度不低于 3:1', edge.toFixed(2));
+      bad = bad.concat(audit(cell, '深色月历孕前格'));
+    }
 
     // 睡前故事：晚上首页的卡片；故事页摆成读过、有收藏、有隐藏、朗读停在第二段的样子
     const evening = new Date(2026, 9, 12, 21, 0).getTime();
